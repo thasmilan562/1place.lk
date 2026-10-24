@@ -67,11 +67,16 @@ export default function Header() {
   };
 
   // Dynamic navbar height observer to guarantee zero layout shift
+  const baseNavbarHeightRef = useRef<number>(0);
   useEffect(() => {
     const updateNavbarHeight = () => {
       if (headerRef.current) {
         const height = headerRef.current.offsetHeight;
-        document.documentElement.style.setProperty("--navbar-height", `${height}px`);
+        // Only set base padding from un-scrolled state so page scroll position doesn't jump
+        if (!isScrolled || baseNavbarHeightRef.current === 0) {
+          baseNavbarHeightRef.current = height;
+          document.documentElement.style.setProperty("--navbar-height", `${height}px`);
+        }
       }
     };
     updateNavbarHeight();
@@ -82,7 +87,7 @@ export default function Header() {
       ro.disconnect();
       window.removeEventListener("resize", updateNavbarHeight);
     };
-  }, [pathname]);
+  }, [pathname, isScrolled]);
 
   // Load Firestore categories
   useEffect(() => {
@@ -178,101 +183,97 @@ export default function Header() {
         ref={headerRef}
         data-site-header
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 bg-white transition-all duration-300 font-sans border-b border-[#E8E8E8]",
-          isScrolled ? "shadow-sm" : "shadow-2xs"
+          "fixed top-0 left-0 right-0 z-50 transition-all duration-300 font-sans border-b",
+          isScrolled
+            ? "bg-white/95 backdrop-blur-md shadow-md border-neutral-200/90"
+            : "bg-white shadow-2xs border-[#E8E8E8]"
         )}
       >
-        {/* ── 1. Slim Utility Bar (Daraz-Style Clean Top Bar) ── */}
-        <div className="bg-[#F7F7F7] border-b border-[#E8E8E8] text-[11px] text-neutral-600 py-1.5 px-4 select-none">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            {/* Left Notice */}
-            <div className="flex items-center gap-4 text-neutral-500">
-              <span className="hidden sm:inline">Welcome to 1PLACE.LK • Sri Lanka&apos;s Curated Tech &amp; Lifestyle Store</span>
-              <span className="sm:hidden truncate">Welcome to 1PLACE.LK</span>
-            </div>
-
-            {/* Right Utilities: Help & Support, Order Tracking, Language / Currency */}
-            <div className="flex items-center gap-4 font-medium text-neutral-600">
-              <Link
-                href="/contact"
-                className="hover:text-[#64152F] transition-colors flex items-center gap-1"
-              >
-                <HelpCircle className="w-3.5 h-3.5 text-neutral-400" />
-                <span>Help &amp; Support</span>
-              </Link>
-              <span className="text-neutral-300">|</span>
-              <Link
-                href="/orders"
-                className="hover:text-[#64152F] transition-colors flex items-center gap-1"
-              >
-                <Package className="w-3.5 h-3.5 text-neutral-400" />
-                <span>Order Tracking</span>
-              </Link>
-              <span className="text-neutral-300 hidden sm:inline">|</span>
-              <div className="hidden sm:flex items-center gap-1 cursor-pointer hover:text-[#64152F] transition-colors">
-                <span>🇱🇰 Sri Lanka (LKR)</span>
-                <ChevronDown className="w-3 h-3 text-neutral-400" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── 2. Main Header Row (Clean White Marketplace Header) ── */}
-        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-3 lg:py-3.5">
+        {/* ── Main Header Row (Smooth Shrink on Scroll) ── */}
+        <div
+          className={cn(
+            "max-w-7xl mx-auto px-4 lg:px-8 transition-all duration-300 ease-in-out",
+            isScrolled ? "py-1.5 lg:py-2" : "py-3 lg:py-3.5"
+          )}
+        >
           <div className="flex items-center justify-between gap-4">
             {/* Mobile Hamburger Button */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Open navigation menu"
-              className="lg:hidden p-2 -ml-2 rounded-lg text-[#111111] hover:bg-neutral-100 transition-colors"
+              className={cn(
+                "lg:hidden p-1.5 -ml-1.5 rounded-lg text-[#111111] hover:bg-neutral-100 transition-colors",
+                isScrolled ? "p-1" : "p-2 -ml-2"
+              )}
             >
-              <Menu className="w-6 h-6" />
+              <Menu className={cn("transition-all duration-300", isScrolled ? "w-5 h-5" : "w-6 h-6")} />
             </button>
 
-            {/* Official ONEPLACE Logo */}
-            <BrandLogo
-              variant="header"
-              href="/"
-              priority
-              onClick={() => {
-                if (pathname === "/") {
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }
-              }}
-            />
+            {/* Official ONEPLACE Logo with smooth scale on scroll */}
+            <div
+              className={cn(
+                "transition-all duration-300 ease-in-out origin-left flex items-center shrink-0",
+                isScrolled ? "scale-90" : "scale-100"
+              )}
+            >
+              <BrandLogo
+                variant="header"
+                href="/"
+                priority
+                onClick={() => {
+                  if (pathname === "/") {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
+              />
+            </div>
 
-            {/* Desktop Large Centered Product Search Input & Burgundy Button (Marketplace Style) */}
+            {/* Desktop Large Centered Product Search Input & Burgundy Button */}
             <form
               onSubmit={handleSearchSubmit}
               className="hidden lg:flex flex-1 max-w-2xl mx-6 relative"
             >
-              <div className="flex items-center w-full h-11 bg-[#F5F5F5] hover:bg-[#EFEFEF] focus-within:bg-white border-2 border-transparent focus-within:border-[#64152F] rounded-lg overflow-hidden transition-all shadow-2xs">
+              <div
+                className={cn(
+                  "flex items-center w-full bg-[#F5F5F5] hover:bg-[#EFEFEF] focus-within:bg-white border-2 border-transparent focus-within:border-[#64152F] rounded-lg overflow-hidden transition-all duration-300 shadow-2xs",
+                  isScrolled ? "h-9 lg:h-9.5" : "h-11"
+                )}
+              >
                 <input
                   type="text"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search for products, brands and categories..."
-                  className="flex-1 h-full px-4 text-sm text-[#111111] bg-transparent outline-none placeholder:text-neutral-400 font-medium"
+                  className={cn(
+                    "flex-1 h-full px-4 text-[#111111] bg-transparent outline-none placeholder:text-neutral-400 font-medium transition-all duration-300",
+                    isScrolled ? "text-xs" : "text-sm"
+                  )}
                 />
                 <button
                   type="submit"
                   aria-label="Search"
-                  className="h-full px-6 bg-[#64152F] hover:bg-[#4E0F23] text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  className={cn(
+                    "h-full bg-[#64152F] hover:bg-[#4E0F23] text-white flex items-center justify-center transition-all duration-300 cursor-pointer shrink-0",
+                    isScrolled ? "px-4.5" : "px-6"
+                  )}
                 >
-                  <Search className="w-4 h-4 stroke-[2.5]" />
+                  <Search className={cn("transition-all duration-300", isScrolled ? "w-3.5 h-3.5 stroke-[2.5]" : "w-4 h-4 stroke-[2.5]")} />
                 </button>
               </div>
             </form>
 
             {/* Header Right Actions: Account/Sign In, Sign Up, Wishlist, Cart */}
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className={cn("flex items-center transition-all duration-300", isScrolled ? "gap-1.5 sm:gap-3" : "gap-2 sm:gap-4")}>
               {/* Account / Sign In / Sign Up */}
               <div className="hidden lg:flex items-center gap-1.5 relative">
                 {user ? (
                   <>
                     <button
                       onClick={() => setUserMenuOpen(!userMenuOpen)}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm font-semibold text-[#111111] hover:text-[#64152F] hover:bg-neutral-50 transition-all cursor-pointer"
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg font-semibold text-[#111111] hover:text-[#64152F] hover:bg-neutral-50 transition-all cursor-pointer",
+                        isScrolled ? "px-2 py-1 text-xs" : "px-2.5 py-1.5 text-sm"
+                      )}
                       aria-label="Account menu"
                     >
                       <UserAvatar
@@ -335,12 +336,12 @@ export default function Header() {
                     </AnimatePresence>
                   </>
                 ) : (
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-800">
+                  <div className={cn("flex items-center gap-1.5 font-semibold text-neutral-800 transition-all duration-300", isScrolled ? "text-[11px]" : "text-xs")}>
                     <button
                       onClick={() => setAuthOpen(true)}
                       className="flex items-center gap-1.5 hover:text-[#64152F] px-2 py-1.5 rounded-md hover:bg-neutral-50 transition-colors cursor-pointer"
                     >
-                      <User className="w-4 h-4 text-neutral-600" />
+                      <User className={cn("text-neutral-600 transition-all", isScrolled ? "w-3.5 h-3.5" : "w-4 h-4")} />
                       <span>Sign In</span>
                     </button>
                     <span className="text-neutral-300">|</span>
@@ -357,10 +358,13 @@ export default function Header() {
               {/* Wishlist Icon with Live Count */}
               <Link
                 href="/wishlist"
-                className="relative p-2 rounded-lg text-neutral-800 hover:text-[#64152F] hover:bg-neutral-50 transition-all flex items-center"
+                className={cn(
+                  "relative rounded-lg text-neutral-800 hover:text-[#64152F] hover:bg-neutral-50 transition-all flex items-center",
+                  isScrolled ? "p-1.5" : "p-2"
+                )}
                 aria-label={`Wishlist (${wishlist.length} items)`}
               >
-                <Heart className="w-5 h-5 stroke-[1.8]" />
+                <Heart className={cn("stroke-[1.8] transition-all", isScrolled ? "w-4.5 h-4.5" : "w-5 h-5")} />
                 {wishlist.length > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-[#64152F] text-white text-[10px] font-bold flex items-center justify-center leading-none shadow-xs">
                     {wishlist.length}
@@ -372,11 +376,14 @@ export default function Header() {
               <button
                 type="button"
                 onClick={() => setCartOpen(true)}
-                className="relative flex items-center gap-2 p-2 rounded-lg text-neutral-800 hover:text-[#64152F] hover:bg-neutral-50 transition-all cursor-pointer"
+                className={cn(
+                  "relative flex items-center rounded-lg text-neutral-800 hover:text-[#64152F] hover:bg-neutral-50 transition-all cursor-pointer",
+                  isScrolled ? "gap-1.5 p-1.5" : "gap-2 p-2"
+                )}
                 aria-label={`Shopping cart with ${itemCount} items`}
               >
                 <div className="relative">
-                  <ShoppingCart className="w-5 h-5 stroke-[1.8]" />
+                  <ShoppingCart className={cn("stroke-[1.8] transition-all", isScrolled ? "w-4.5 h-4.5" : "w-5 h-5")} />
                   {itemCount > 0 && (
                     <span className="absolute -top-1.5 -right-2 min-w-4 h-4 px-1 rounded-full bg-[#64152F] text-white text-[10px] font-bold flex items-center justify-center leading-none shadow-xs">
                       {itemCount > 99 ? "99+" : itemCount}
@@ -385,7 +392,7 @@ export default function Header() {
                 </div>
                 <div className="hidden xl:flex flex-col text-left leading-tight ml-1">
                   <span className="text-[10px] text-neutral-500 font-medium">Cart</span>
-                  <span className="text-xs font-bold text-[#111111]">
+                  <span className={cn("font-bold text-[#111111] transition-all", isScrolled ? "text-[11px]" : "text-xs")}>
                     {total > 0 ? `LKR ${total.toLocaleString("en-LK")}` : "LKR 0.00"}
                   </span>
                 </div>
@@ -396,7 +403,10 @@ export default function Header() {
           {/* Mobile Row 2: Full-Width Search Input with Burgundy Search Button */}
           <form
             onSubmit={handleSearchSubmit}
-            className="lg:hidden mt-2.5 flex items-center w-full h-10 bg-[#F5F5F5] border border-[#E8E8E8] focus-within:border-[#64152F] rounded-lg overflow-hidden transition-all shadow-2xs"
+            className={cn(
+              "lg:hidden flex items-center w-full bg-[#F5F5F5] border border-[#E8E8E8] focus-within:border-[#64152F] rounded-lg overflow-hidden transition-all duration-300 shadow-2xs",
+              isScrolled ? "mt-1.5 h-8.5" : "mt-2.5 h-10"
+            )}
           >
             <input
               type="text"
