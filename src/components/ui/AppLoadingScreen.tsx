@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
-import { Zap, ShieldCheck, Sparkles } from "lucide-react";
+import { Zap, ShieldCheck } from "lucide-react";
 
 const STATUS_MESSAGES = [
   "Initializing 1PLACE.LK...",

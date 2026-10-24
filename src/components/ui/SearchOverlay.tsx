@@ -13,7 +13,6 @@ import {
   ArrowRight,
   Package,
   Tag,
-  Sparkles,
   ShoppingBag,
   Trash2,
   CornerDownLeft,
@@ -533,7 +532,6 @@ export default function SearchOverlay() {
               {searchResults.didYouMean && (
                 <div className="flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs sm:text-sm">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
                     <span>Did you mean:</span>
                     <button
                       type="button"

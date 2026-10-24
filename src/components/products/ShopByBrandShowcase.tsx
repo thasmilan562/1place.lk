@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Brand } from "@/lib/types";
 import { DEFAULT_BRANDS } from "@/lib/data";
-import { Check, ChevronDown, ChevronUp, Sparkles, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, X } from "lucide-react";
 
 type Tab = "phones" | "laptops" | "accessories";
 
@@ -140,7 +140,6 @@ export default function ShopByBrandShowcase({
         <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-4 mb-6">
           <div className="text-center sm:text-left space-y-1">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-neutral-200/70 text-[10px] font-black uppercase tracking-wider text-neutral-700">
-              <Sparkles className="w-3 h-3 text-neutral-900" />
               Official Brands
             </div>
             <h2 className="text-2xl sm:text-3xl font-black text-[#090909] tracking-tight">

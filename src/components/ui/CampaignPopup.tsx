@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Sparkles, Tag, ArrowRight, Check } from "lucide-react";
+import { X, Tag, ArrowRight, Check } from "lucide-react";
 import { getCampaignPopupSettings } from "@/lib/firestore-client";
 import { useToast } from "@/components/ui/ToastProvider";
 import { normalizeImageUrl } from "@/lib/utils";
@@ -200,11 +200,10 @@ export default function CampaignPopup() {
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               {popup.badgeText && (
                 <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-wider ${
+                  className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-wider ${
                     isLight ? "bg-black text-white" : "bg-amber-400 text-black"
                   }`}
                 >
-                  <Sparkles className="w-3 h-3" />
                   {popup.badgeText}
                 </span>
               )}

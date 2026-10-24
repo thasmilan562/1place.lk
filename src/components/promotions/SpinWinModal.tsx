@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
-  Sparkles,
   ShoppingBag,
   Gift,
   Truck,
@@ -304,8 +303,7 @@ export default function SpinWinModal() {
                   {/* Brand & Badge Header */}
                   <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2.5">
                     <BrandLogo variant="auth" />
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-[#64152F] to-[#8A1C3E] border border-[#FFE875]/40 text-[#FFE875] text-[10px] sm:text-xs font-black tracking-widest uppercase shadow-md">
-                      <Sparkles className="w-3.5 h-3.5 text-[#FFE875]" />
+                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-[#64152F] to-[#8A1C3E] border border-[#FFE875]/40 text-[#FFE875] text-[10px] sm:text-xs font-black tracking-widest uppercase shadow-md">
                       <span>{settings.badgeText || "FIRST ORDER SPECIAL"}</span>
                     </div>
                   </div>
@@ -363,12 +361,12 @@ export default function SpinWinModal() {
                             </>
                           ) : isWheelSpinning ? (
                             <>
-                              <Sparkles className="w-5 h-5 animate-spin text-[#FFE875]" />
+                              <Gift className="w-5 h-5 animate-bounce text-[#FFE875]" />
                               <span>Spinning For Your Gift...</span>
                             </>
                           ) : (
                             <>
-                              <Sparkles className="w-5 h-5 text-[#FFE875]" />
+                              <Gift className="w-5 h-5 text-[#FFE875]" />
                               <span>SPIN NOW &amp; WIN FREE GIFT</span>
                             </>
                           )}

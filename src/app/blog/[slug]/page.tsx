@@ -13,7 +13,7 @@ import {
   HelpCircle,
   MapPin,
   Phone,
-  Sparkles,
+  Lightbulb,
   Share2,
 } from "lucide-react";
 import { BLOG_POSTS, getBlogPostBySlug } from "@/lib/blog-data";
@@ -344,7 +344,7 @@ export default async function BlogPostDetailPage({ params }: BlogPostPageProps) 
                     className="my-8 p-6 rounded-2xl bg-gradient-to-r from-blue-950/30 to-zinc-900 border border-blue-900/40"
                   >
                     <div className="flex items-center gap-2 text-blue-400 font-semibold text-sm mb-2">
-                      <Sparkles className="w-4 h-4" />
+                      <Lightbulb className="w-4 h-4" />
                       <span>{block.title}</span>
                     </div>
                     <p className="text-sm sm:text-base text-zinc-300 mb-4">{block.text}</p>

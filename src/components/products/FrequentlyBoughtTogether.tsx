@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
-import { Plus, Check, ShoppingBag, Sparkles, ArrowRight, ShieldCheck } from "lucide-react";
+import { Plus, Check, ShoppingBag, ArrowRight, ShieldCheck } from "lucide-react";
 import { Product } from "@/lib/types";
 import { getFrequentlyBoughtTogetherBundle } from "@/lib/recommendation-engine";
 import { formatPrice, announceToScreenReader } from "@/lib/utils";
@@ -98,8 +98,7 @@ export default function FrequentlyBoughtTogether({
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 relative z-10">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-black uppercase tracking-wider mb-2 border border-amber-400/30">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <div className="inline-flex items-center px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-black uppercase tracking-wider mb-2 border border-amber-400/30">
             <span>FREQUENTLY BOUGHT TOGETHER</span>
           </div>
           <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">

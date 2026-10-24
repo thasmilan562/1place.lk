@@ -8,7 +8,7 @@ import {
   Smartphone,
   Tv,
   Shirt,
-  Sparkles,
+  Heart,
   Home,
   Gamepad2,
   Headphones,
@@ -71,7 +71,7 @@ const CORE_CATEGORIES: DisplayCategory[] = [
     id: "cat-beauty",
     name: "Beauty & Skincare",
     slug: "beauty-skincare",
-    iconName: "Sparkles",
+    iconName: "Heart",
     href: "/category/beauty-skincare",
   },
   {
@@ -126,7 +126,7 @@ function resolveCategoryIcon(name: string, slug?: string): string {
   if (text.includes("game") || text.includes("gaming") || text.includes("console")) return "Gamepad2";
   if (text.includes("headphone") || text.includes("audio") || text.includes("earbud") || text.includes("speaker") || text.includes("sound")) return "Headphones";
   if (text.includes("fashion") || text.includes("cloth") || text.includes("wear") || text.includes("shirt") || text.includes("apparel")) return "Shirt";
-  if (text.includes("beauty") || text.includes("skin") || text.includes("cosmetic") || text.includes("perfume")) return "Sparkles";
+  if (text.includes("beauty") || text.includes("skin") || text.includes("cosmetic") || text.includes("perfume")) return "Heart";
   if (text.includes("home") || text.includes("living") || text.includes("kitchen") || text.includes("furniture")) return "Home";
   if (text.includes("sport") || text.includes("fitness") || text.includes("gym") || text.includes("workout")) return "Dumbbell";
   if (text.includes("toy") || text.includes("kid") || text.includes("baby") || text.includes("children")) return "Baby";
@@ -148,8 +148,8 @@ function CategoryIcon({ name, className }: { name: string; className?: string })
       return <Headphones className={className} />;
     case "Shirt":
       return <Shirt className={className} />;
-    case "Sparkles":
-      return <Sparkles className={className} />;
+    case "Heart":
+      return <Heart className={className} />;
     case "Home":
       return <Home className={className} />;
     case "Watch":

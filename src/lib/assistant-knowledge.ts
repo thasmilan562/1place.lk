@@ -32,7 +32,7 @@ export const ASSISTANT_QUICK_ACTIONS: Record<
   en: [
     { id: "find_phone", label: "📱 Find Products", icon: "Smartphone", action: "start_find_phone" },
     { id: "budget_phone", label: "💰 Under LKR 100k", icon: "Tag", action: "budget_100k" },
-    { id: "flagships", label: "✨ New Flagships", icon: "Sparkles", action: "find_flagships" },
+    { id: "flagships", label: "🔥 New Flagships", icon: "Flame", action: "find_flagships" },
     { id: "audio_tech", label: "🎧 Audio & TWS", icon: "Headphones", action: "find_audio" },
     { id: "track_order", label: "📦 Track Order", icon: "Package", action: "start_track_order" },
     { id: "human_support", label: "💬 WhatsApp Support", icon: "MessageCircle", action: "open_whatsapp" },
@@ -40,7 +40,7 @@ export const ASSISTANT_QUICK_ACTIONS: Record<
   ta: [
     { id: "find_phone", label: "📱 பொருட்கள் தேட", icon: "Smartphone", action: "start_find_phone" },
     { id: "budget_phone", label: "💰 100k-க்குள் Phone", icon: "Tag", action: "budget_100k" },
-    { id: "flagships", label: "✨ புதிய Flagships", icon: "Sparkles", action: "find_flagships" },
+    { id: "flagships", label: "🔥 புதிய Flagships", icon: "Flame", action: "find_flagships" },
     { id: "audio_tech", label: "🎧 Audio & Buds", icon: "Headphones", action: "find_audio" },
     { id: "track_order", label: "📦 Order Track", icon: "Package", action: "start_track_order" },
     { id: "human_support", label: "💬 WhatsApp உதவி", icon: "MessageCircle", action: "open_whatsapp" },
@@ -48,7 +48,7 @@ export const ASSISTANT_QUICK_ACTIONS: Record<
   si: [
     { id: "find_phone", label: "📱 භාණ්ඩ සොයන්න", icon: "Smartphone", action: "start_find_phone" },
     { id: "budget_phone", label: "💰 100k යටතේ", icon: "Tag", action: "budget_100k" },
-    { id: "flagships", label: "✨ නවතම Flagships", icon: "Sparkles", action: "find_flagships" },
+    { id: "flagships", label: "🔥 නවතම Flagships", icon: "Flame", action: "find_flagships" },
     { id: "audio_tech", label: "🎧 Audio උපාංග", icon: "Headphones", action: "find_audio" },
     { id: "track_order", label: "📦 Order Track", icon: "Package", action: "start_track_order" },
     { id: "human_support", label: "💬 WhatsApp", icon: "MessageCircle", action: "open_whatsapp" },

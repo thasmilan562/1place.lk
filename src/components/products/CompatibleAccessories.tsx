@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Sparkles, Zap, Headphones, Watch, BatteryCharging, Shield, Cable as CableIcon } from "lucide-react";
+import { ArrowRight, Package, Zap, Headphones, Watch, BatteryCharging, Shield, Cable as CableIcon } from "lucide-react";
 import { Product } from "@/lib/types";
 import {
   detectProductBrand,
@@ -61,7 +61,7 @@ export default function CompatibleAccessories({
   const isPhone = productType === "phone" || productType === "tablet" || productType === "laptop";
 
   const filterTabs = [
-    { id: "all", label: "All Accessories", icon: Sparkles },
+    { id: "all", label: "All Accessories", icon: Package },
     { id: "chargers", label: "Fast Chargers", icon: Zap },
     { id: "audio", label: "Earbuds & Audio", icon: Headphones },
     { id: "watches", label: "Smart Watches", icon: Watch },

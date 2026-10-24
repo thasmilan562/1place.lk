@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Product } from "@/lib/types";
 import ProductCard from "@/components/products/ProductCard";
 
@@ -98,7 +98,7 @@ export default function CompleteYourSetup({
       <div className="flex items-center justify-between mb-8">
         <div>
           <span className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-black" /> Recommendations
+            Recommendations
           </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-black tracking-tight">
             Complete Your Setup

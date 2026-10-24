@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Check, Flame, Sparkles, Tag, ShieldCheck } from "lucide-react";
+import { Check, Flame, Tag, ShieldCheck } from "lucide-react";
 import { Product } from "@/lib/types";
 
 interface ShopQuickFiltersProps {
@@ -126,7 +126,6 @@ export default function ShopQuickFilters({
               : "bg-neutral-100/90 hover:bg-neutral-200/80 text-neutral-700 hover:text-black border border-transparent"
           }`}
         >
-          <Sparkles className="w-3 h-3 text-amber-500" />
           <span>New Arrivals</span>
         </button>
       )}

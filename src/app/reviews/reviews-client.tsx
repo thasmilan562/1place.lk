@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
 import {
-  Star, X, Loader2, Quote, Sparkles, PenLine, CheckCircle2,
+  Star, X, Loader2, Quote, PenLine, CheckCircle2,
   ExternalLink, MessageCircle, Gift, Bell, Users, Zap,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -196,7 +196,6 @@ export default function ReviewsClient({
                 transition={{ delay: 0.1, duration: 0.5 }}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200/70 text-xs font-bold text-yellow-700 mb-6 uppercase tracking-widest shadow-sm"
               >
-                <Sparkles className="w-3.5 h-3.5 text-yellow-500" />
                 Customer Reviews
                 <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
               </motion.div>
@@ -731,7 +730,7 @@ export default function ReviewsClient({
                           <Loader2 className="w-5 h-5 animate-spin" />
                         ) : (
                           <>
-                            <Sparkles className="w-4 h-4" />
+                            <PenLine className="w-4 h-4" />
                             Submit Review
                           </>
                         )}

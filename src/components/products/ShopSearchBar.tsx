@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, ShoppingBag, ArrowRight, Sparkles, Tag, Package, CornerDownLeft } from "lucide-react";
+import { Search, X, ShoppingBag, ArrowRight, Tag, Package, CornerDownLeft } from "lucide-react";
 import { Product, Category, Brand } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { executeIntelligentSearch, SearchEngineResults } from "@/lib/search/search-engine";
@@ -171,7 +171,6 @@ export default function ShopSearchBar({
           {/* Header with Did You Mean */}
           <div className="px-4 py-2.5 bg-neutral-50/80 flex items-center justify-between text-xs text-neutral-500 font-semibold">
             <span className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-neutral-700" />
               {searchResults.totalMatches > 0 ? `Matches (${searchResults.totalMatches} products)` : "Search Results"}
             </span>
             <span className="text-[11px] text-neutral-400 font-normal">Press Enter to search</span>
@@ -181,7 +180,6 @@ export default function ShopSearchBar({
           {searchResults.didYouMean && (
             <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 flex items-center justify-between text-xs text-amber-900">
               <div className="flex items-center gap-1.5 truncate">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                 <span>Did you mean:</span>
                 <button
                   type="button"

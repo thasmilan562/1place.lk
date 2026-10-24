@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Star, CheckCircle2, Quote, ExternalLink, Edit3, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import { Star, CheckCircle2, Quote, ExternalLink, Edit3, ChevronLeft, ChevronRight } from "lucide-react";
 import { Review, GoogleReviewsSettings } from "@/lib/types";
 import { siteSettings } from "@/lib/data";
 import { DEFAULT_GOOGLE_REVIEWS_SETTINGS, getGoogleReviewsSettings } from "@/lib/firestore-client";
@@ -137,7 +137,6 @@ function ReviewCard({ review, mainViewAllUrl, onLinkClick }: ReviewCardProps) {
           <div className="flex items-center gap-1.5">
             {review.featured && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[9.5px] sm:text-[10px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
-                <Sparkles className="w-3 h-3 text-amber-600" />
                 <span>Featured</span>
               </span>
             )}

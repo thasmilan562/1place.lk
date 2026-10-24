@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Sparkles, Tag, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Tag, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { OfferBanner } from "@/lib/types";
 import { normalizeImageUrl } from "@/lib/utils";
@@ -124,7 +124,6 @@ export default function ShopBannerSlider({ banners = [] }: ShopBannerSliderProps
       {(current.showAnnouncementTicker || current.announcementText) && (
         <div className="bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-black px-4 py-1.5 text-xs font-black uppercase tracking-wider flex items-center justify-between overflow-hidden shadow-sm relative z-30">
           <div className="flex items-center gap-2 animate-pulse shrink-0">
-            <Sparkles className="w-3.5 h-3.5" />
             <span>SPECIAL ANNOUNCEMENT:</span>
           </div>
           <div className="truncate font-extrabold mx-4 flex-1 text-center">

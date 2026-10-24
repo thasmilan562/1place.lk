@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export default function LargeCampaignBanner() {
   return (
@@ -15,7 +15,6 @@ export default function LargeCampaignBanner() {
         {/* Left Text Content */}
         <div className="relative z-10 max-w-lg mb-6 md:mb-0">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 border border-[#D5CCC6] text-[10px] sm:text-xs font-black uppercase tracking-wider text-[#64152F] mb-3 shadow-2xs">
-            <Sparkles className="w-3 h-3 text-[#64152F]" />
             <span>NEW COLLECTION</span>
           </div>
 

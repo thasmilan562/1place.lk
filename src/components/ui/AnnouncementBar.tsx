@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X, Sparkles, ArrowRight } from "lucide-react";
+import { X, ArrowRight } from "lucide-react";
 import { OfferBanner } from "@/lib/types";
 import { getOfferBanners } from "@/lib/firestore-client";
 
@@ -44,7 +44,6 @@ export default function AnnouncementBar() {
     <div className="bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-black py-2 px-4 relative z-[60] text-xs font-semibold">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         <div className="flex-1 text-center flex items-center justify-center gap-2 truncate">
-          <Sparkles className="w-3.5 h-3.5 shrink-0" />
           <span>
             {banner.headline} {banner.highlightText && <strong className="underline">{banner.highlightText}</strong>}
           </span>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { MapPin, Phone, Clock, Mail, MessageSquare, Navigation, ExternalLink, Send, Sparkles } from "lucide-react";
+import { MapPin, Phone, Clock, Mail, MessageSquare, Navigation, ExternalLink, Send } from "lucide-react";
 import { siteSettings as defaultSettings } from "@/lib/data";
 import { SiteSettings } from "@/lib/types";
 import { getSiteSettings } from "@/lib/firestore-client";
@@ -51,7 +51,6 @@ export default function ContactClient({ initialSettings }: { initialSettings?: S
       <div className="border-b border-border bg-card/60 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 lg:px-6 py-14 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-foreground/5 border border-foreground/10 text-xs font-bold uppercase tracking-wider mb-3">
-            <Sparkles className="w-3.5 h-3.5 text-blue-500" />
             <span>Official Store Helpline &amp; Location</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-3">

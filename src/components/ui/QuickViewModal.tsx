@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
-import { X, Check, ShoppingBag, Heart, ShieldCheck, Truck, Sparkles, MessageCircle } from "lucide-react";
+import { X, Check, ShoppingBag, Heart, ShieldCheck, Truck, MessageCircle } from "lucide-react";
 import { Product } from "@/lib/types";
 import { formatPrice, announceToScreenReader, normalizeImageUrl } from "@/lib/utils";
 import { useCart } from "@/lib/cart-context";
@@ -321,7 +321,6 @@ export default function QuickViewModal({ product, isOpen, onClose }: QuickViewMo
             {/* Installment Plan Notice if applicable */}
             {product.installment_price && !isOutOfStock && (
               <div className="mb-4 p-2.5 rounded-xl bg-neutral-100 border border-neutral-200 text-xs font-semibold text-neutral-800 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>{product.installment_price}</span>
               </div>
             )}
