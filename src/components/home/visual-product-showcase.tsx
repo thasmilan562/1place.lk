@@ -10,33 +10,42 @@ import { normalizeImageUrl } from "@/lib/utils";
 
 interface VisualProductShowcaseProps {
   settings?: VisualShowcaseSettings | null;
-  placement?: ShowcasePlacement;
+  placement?: ShowcasePlacement | string;
+  singleSlide?: VisualShowcaseSlide;
+  slides?: VisualShowcaseSlide[];
+  className?: string;
 }
 
-export default function VisualProductShowcase({ settings, placement }: VisualProductShowcaseProps) {
+export default function VisualProductShowcase({ settings, placement, singleSlide, slides, className }: VisualProductShowcaseProps) {
   const showcase = settings || DEFAULT_SHOWCASE_SETTINGS;
   const prefersReducedMotion = useReducedMotion();
 
-  // Filter only active/enabled slides for THIS placement position
-  const activeSlides: VisualShowcaseSlide[] = (
-    showcase.slides && showcase.slides.length > 0
-      ? showcase.slides.filter((s) => {
-          if (s.enabled === false) return false;
-          if (placement) {
-            const slidePlacement = s.placement || showcase.placement || "below_category";
-            return slidePlacement === placement;
-          }
-          return true;
-        })
-      : (DEFAULT_SHOWCASE_SETTINGS.slides || []).filter((s) => {
-          if (s.enabled === false) return false;
-          if (placement) {
-            const slidePlacement = s.placement || DEFAULT_SHOWCASE_SETTINGS.placement || "below_category";
-            return slidePlacement === placement;
-          }
-          return true;
-        })
-  ).sort((a, b) => (a.order || 0) - (b.order || 0));
+  // Filter only active/enabled slides for THIS placement position (or direct slides / single slide)
+  const activeSlides: VisualShowcaseSlide[] = singleSlide
+    ? singleSlide.enabled !== false
+      ? [singleSlide]
+      : []
+    : slides && slides.length > 0
+    ? slides.filter((s) => s.enabled !== false).sort((a, b) => (a.order || 0) - (b.order || 0))
+    : (
+        showcase.slides && showcase.slides.length > 0
+          ? showcase.slides.filter((s) => {
+              if (s.enabled === false) return false;
+              if (placement) {
+                const slidePlacement = s.placement || showcase.placement || "below_category";
+                return slidePlacement === placement;
+              }
+              return true;
+            })
+          : (DEFAULT_SHOWCASE_SETTINGS.slides || []).filter((s) => {
+              if (s.enabled === false) return false;
+              if (placement) {
+                const slidePlacement = s.placement || DEFAULT_SHOWCASE_SETTINGS.placement || "below_category";
+                return slidePlacement === placement;
+              }
+              return true;
+            })
+      ).sort((a, b) => (a.order || 0) - (b.order || 0));
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -212,9 +221,11 @@ export default function VisualProductShowcase({ settings, placement }: VisualPro
                   ? "aspect-[1920/850] min-h-[220px] justify-center"
                   : mobileRatio === "1080x1440"
                   ? "aspect-[1080/1440] min-h-[440px] justify-center"
+                  : mobileRatio === "1024x387" || mobileRatio === "widescreen"
+                  ? "aspect-[1024/387] min-h-[200px] justify-center"
                   : hasForegroundImage
                   ? "min-h-[420px] justify-between"
-                  : "min-h-[340px] justify-center"
+                  : "min-h-[300px] justify-center"
               } border-0 rounded-none shadow-none flex flex-col items-center pt-6 px-4 pb-4 z-10`}
             >
           {/* Top Content Block: Badge -> Heading -> Subtitle -> Action CTAs */}
@@ -377,6 +388,8 @@ export default function VisualProductShowcase({ settings, placement }: VisualPro
               ? { aspectRatio: "1920 / 850", minHeight: "380px" }
               : (currentSlide.banner_size_ratio || (currentSlide as any).bannerSizeRatio) === "1080x1440"
               ? { aspectRatio: "1080 / 1440", minHeight: "560px" }
+              : (currentSlide.banner_size_ratio || (currentSlide as any).bannerSizeRatio) === "1024x387" || (currentSlide.banner_size_ratio || (currentSlide as any).bannerSizeRatio) === "widescreen"
+              ? { aspectRatio: "1024 / 387", minHeight: "360px" }
               : undefined
           }
           className={`relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col ${desktopJustifyClass} items-center ${
@@ -388,6 +401,8 @@ export default function VisualProductShowcase({ settings, placement }: VisualPro
               ? "aspect-[1920/850] py-10 justify-center"
               : (currentSlide.banner_size_ratio || (currentSlide as any).bannerSizeRatio) === "1080x1440"
               ? "aspect-[1080/1440] py-16 justify-center"
+              : (currentSlide.banner_size_ratio || (currentSlide as any).bannerSizeRatio) === "1024x387" || (currentSlide.banner_size_ratio || (currentSlide as any).bannerSizeRatio) === "widescreen"
+              ? "aspect-[1024/387] py-8 justify-center"
               : hasForegroundImage
               ? "min-h-[480px] sm:min-h-[560px] md:min-h-[620px] lg:min-h-[680px] xl:min-h-[720px] pt-6 sm:pt-8 md:pt-10 pb-0"
               : "min-h-[440px] sm:min-h-[500px] md:min-h-[560px] lg:min-h-[620px]"

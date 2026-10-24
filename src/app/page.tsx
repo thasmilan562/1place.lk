@@ -88,14 +88,21 @@ export default async function HomePage() {
       {/* 1. Full-Width Hero Banner (Matching Reference Layout) */}
       <HeroSection />
 
+      {/* Visual Showcase: Below Hero Banner */}
+      <VisualProductShowcase settings={showcaseSettings} placement="below_hero" />
+
       {/* 2. Circular Category Navigation Strip (Overlaid 50% on bottom of Hero Banner) */}
       <CircularCategories categories={categories} />
 
-      {/* 3. Complete Shop All Products Catalogue (Today's Deal banner placed after 4 rows) */}
+      {/* Visual Showcase: Below Shop by Category */}
+      <VisualProductShowcase settings={showcaseSettings} placement="below_category" />
+
+      {/* 3. Complete Shop All Products Catalogue (Visual Showcase Banners interleaved at specified Product Lines) */}
       <ShopAllProductsSection
         initialProducts={products}
         categories={categories}
         todayDealSettings={todayDealSettings}
+        showcaseSettings={showcaseSettings}
       />
 
       {/* 4. Category-Wise Sections (Auto-hides empty categories, 6-col responsive) */}
@@ -103,7 +110,10 @@ export default async function HomePage() {
 
       {/* 5. New Arrivals Collection (If Enabled) */}
       {newArrivalsSettings?.enabled === true && (
-        <NewArrivalsSection initialProducts={products} initialSettings={newArrivalsSettings} />
+        <>
+          <NewArrivalsSection initialProducts={products} initialSettings={newArrivalsSettings} />
+          <VisualProductShowcase settings={showcaseSettings} placement="below_new_arrivals" />
+        </>
       )}
 
       {/* Store Gallery (Life at 1PLACE.LK) */}
@@ -125,6 +135,9 @@ export default async function HomePage() {
 
       {/* 6. Customer Trust & Shopping Benefits Bar */}
       <StoreBenefitsBar />
+
+      {/* Visual Showcase: Above Location / Footer */}
+      <VisualProductShowcase settings={showcaseSettings} placement="above_location" />
 
       {/* 7. Scrolling Announcement Bar (Sits directly above Footer) */}
       <AnnouncementTicker />

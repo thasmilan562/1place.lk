@@ -41,6 +41,18 @@ interface ShowcaseTabProps {
 }
 
 const PLACEMENT_OPTIONS: { value: ShowcasePlacement; label: string; icon: string }[] = [
+  // ── Product Catalogue Line Placements (Row by Row) ──
+  { value: "below_product_line_1", label: 'Below Product Line 1 (After 1st Row)', icon: "🛍️" },
+  { value: "below_product_line_2", label: 'Below Product Line 2 (After 2nd Row)', icon: "🛍️" },
+  { value: "below_product_line_3", label: 'Below Product Line 3 (After 3rd Row)', icon: "🛍️" },
+  { value: "below_product_line_4", label: 'Below Product Line 4 (After 4th Row)', icon: "🛍️" },
+  { value: "below_product_line_5", label: 'Below Product Line 5 (After 5th Row)', icon: "🛍️" },
+  { value: "below_product_line_6", label: 'Below Product Line 6 (After 6th Row)', icon: "🛍️" },
+  { value: "below_product_line_8", label: 'Below Product Line 8 (After 8th Row)', icon: "🛍️" },
+  { value: "below_product_line_10", label: 'Below Product Line 10 (After 10th Row)', icon: "🛍️" },
+  { value: "custom_product_line", label: 'Custom Product Line (Specify Row Number)', icon: "🔢" },
+
+  // ── Homepage Section Placements ──
   { value: "below_category", label: 'Below "Shop by Category"', icon: "📱" },
   { value: "above_brand", label: 'Above "Shop by Brand"', icon: "🏷️" },
   { value: "below_brand", label: 'Below "Shop by Brand"', icon: "🏷️" },
@@ -55,7 +67,11 @@ const PLACEMENT_OPTIONS: { value: ShowcasePlacement; label: string; icon: string
   { value: "above_location", label: "Above Store Location & Footer", icon: "📍" },
 ];
 
-function getPlacementDisplay(placement?: ShowcasePlacement) {
+function getPlacementDisplay(placement?: ShowcasePlacement, product_line?: number) {
+  if (placement === "custom_product_line" || (placement && placement.startsWith("below_product_line_"))) {
+    const lineNum = product_line ?? (placement.startsWith("below_product_line_") ? parseInt(placement.replace("below_product_line_", ""), 10) : 2);
+    return `🛍️ Below Product Line ${lineNum} (Row ${lineNum})`;
+  }
   const opt = PLACEMENT_OPTIONS.find((p) => p.value === (placement || "below_category"));
   return opt ? `${opt.icon} ${opt.label}` : '📱 Below "Shop by Category"';
 }
@@ -147,15 +163,16 @@ export default function ShowcaseTab({
     const newSlide: VisualShowcaseSlide = {
       id: `slide-${Date.now()}`,
       enabled: true,
-      eyebrow: "New",
-      eyebrow_bg: "#000000",
-      eyebrow_color: "#FFFFFF",
-      title: "",
+      eyebrow: "NEW",
+      eyebrow_bg: "#FFFFFF",
+      eyebrow_color: "#000000",
+      title: "Galaxy S26 Ultra",
       subtitle: "",
       desktop_image: "",
       bg_type: "image",
-      bg_image: "https://images.unsplash.com/photo-1616469829941-c7200edec809?q=80&w=1600&auto=format&fit=crop",
-      bg_overlay_opacity: 25,
+      bg_image: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?q=80&w=1600&auto=format&fit=crop",
+      bg_image_mobile: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?q=80&w=800&auto=format&fit=crop",
+      bg_overlay_opacity: 20,
       bg_overlay_color: "#000000",
       text_align: "center",
       content_position: "center",
@@ -166,7 +183,10 @@ export default function ShowcaseTab({
       secondary_cta_text: "Buy Now",
       secondary_cta_url: "/products",
       show_secondary_cta: true,
-      placement: "below_category",
+      placement: "below_product_line_2",
+      product_line: 2,
+      banner_size_ratio: "1024x387",
+      banner_size_ratio_mobile: "1024x387",
       order: slides.length + 1,
     };
 
@@ -508,7 +528,7 @@ export default function ShowcaseTab({
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border truncate max-w-[200px] ${
                           isLight ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-amber-500/10 text-amber-300 border border-amber-500/20"
                         }`}>
-                          {getPlacementDisplay(slidePlacement)}
+                          {getPlacementDisplay(slidePlacement, slide.product_line)}
                         </span>
                         {slide.bg_type === "image" && (
                           <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
@@ -579,15 +599,20 @@ export default function ShowcaseTab({
                             Homepage Placement Position
                           </label>
                           <p className="text-[11px] text-white/50">
-                            Choose where on the homepage this showcase banner is displayed.
+                            Choose where on the homepage or after which product line this showcase banner is displayed.
                           </p>
                         </div>
 
                         <select
                           value={slide.placement || "below_category"}
-                          onChange={(e) =>
-                            updateSlide(idx, { placement: e.target.value as ShowcasePlacement })
-                          }
+                          onChange={(e) => {
+                            const val = e.target.value as ShowcasePlacement;
+                            let lineNum: number | undefined = slide.product_line;
+                            if (val.startsWith("below_product_line_")) {
+                              lineNum = parseInt(val.replace("below_product_line_", ""), 10);
+                            }
+                            updateSlide(idx, { placement: val, product_line: lineNum });
+                          }}
                           className="bg-[#1E293B] border border-blue-500/40 text-amber-300 px-3 py-2 rounded-xl text-xs font-bold outline-none cursor-pointer"
                         >
                           {PLACEMENT_OPTIONS.map((opt) => (
@@ -597,6 +622,39 @@ export default function ShowcaseTab({
                           ))}
                         </select>
                       </div>
+
+                      {/* Custom / Configurable Product Line Row Input */}
+                      {(slide.placement === "custom_product_line" || slide.placement?.startsWith("below_product_line_")) && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5 shrink-0">
+                              🔢 Product Grid Row / Line Number:
+                            </span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={50}
+                              value={
+                                slide.product_line ??
+                                (slide.placement?.startsWith("below_product_line_")
+                                  ? parseInt(slide.placement.replace("below_product_line_", ""), 10)
+                                  : 2)
+                              }
+                              onChange={(e) => {
+                                const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+                                updateSlide(idx, {
+                                  product_line: val,
+                                  placement: "custom_product_line",
+                                });
+                              }}
+                              className="w-20 px-2.5 py-1 rounded-lg bg-[#0F172A] border border-amber-500/50 text-white text-xs font-extrabold text-center focus:ring-2 focus:ring-amber-500 outline-none"
+                            />
+                          </div>
+                          <span className="text-[11px] text-white/70">
+                            Banner will be placed after row #{slide.product_line ?? 2} (e.g. after {((slide.product_line ?? 2) * 2)} cards on mobile, {((slide.product_line ?? 2) * 6)} cards on desktop)
+                          </span>
+                        </div>
+                      )}
 
                       <div className="flex items-center justify-between pt-2 border-t border-white/10">
                         <span className="text-xs text-white/70 font-semibold">Slide Active Status</span>
@@ -681,8 +739,9 @@ export default function ShowcaseTab({
                             {slide.banner_size_ratio || "default"}
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                           {[
+                            { id: "1024x387", label: "1024 × 387", badge: "~2.6:1 Showcase", desc: "Flagship Banner (Reference Size)" },
                             { id: "default", label: "Default", badge: "Auto Fit", desc: "Standard ~600px" },
                             { id: "1080x1080", label: "1080 × 1080", badge: "1:1 Square", desc: "Square Box" },
                             { id: "860x270", label: "860 × 270", badge: "~3.2:1 Wide", desc: "Compact Strip" },
@@ -724,8 +783,9 @@ export default function ShowcaseTab({
                             {slide.banner_size_ratio_mobile || "default"}
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                           {[
+                            { id: "1024x387", label: "1024 × 387", badge: "~2.6:1 Showcase", desc: "Flagship Banner (Reference Size)" },
                             { id: "default", label: "Auto (Match Desktop)", badge: "Auto", desc: "Responsive Flow" },
                             { id: "1080x1080", label: "1080 × 1080", badge: "1:1 Square", desc: "Mobile Square" },
                             { id: "860x270", label: "860 × 270", badge: "~3.2:1 Wide", desc: "Slim Mobile Strip" },
@@ -814,8 +874,9 @@ export default function ShowcaseTab({
                                 {slide.banner_size_ratio || "default"}
                               </span>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                               {[
+                                { id: "1024x387", label: "1024 × 387", badge: "~2.6:1 Showcase", desc: "Flagship Banner (Reference Size)" },
                                 { id: "default", label: "Default", badge: "Auto Fit", desc: "Auto Product Flow" },
                                 { id: "1080x1080", label: "1080 × 1080", badge: "1:1 Square", desc: "Square Banner" },
                                 { id: "860x270", label: "860 × 270", badge: "~3.2:1 Wide", desc: "Slim Banner Strip" },
@@ -1551,7 +1612,7 @@ export default function ShowcaseTab({
                 <div className="flex items-center gap-1.5 truncate">
                   <span className="text-white/50 text-[11px]">Position:</span>
                   <span className="font-bold text-amber-300 text-[11px] truncate">
-                    {getPlacementDisplay(previewSlide.placement)}
+                    {getPlacementDisplay(previewSlide.placement, previewSlide.product_line)}
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -1595,8 +1656,25 @@ export default function ShowcaseTab({
                         }
                   }
                   className={`p-4 sm:p-5 pb-0 flex flex-col ${
-                    prevHasForeground ? "justify-between" : "justify-center py-10"
-                  } items-center select-none min-h-[450px] sm:min-h-[480px] relative overflow-hidden`}
+                    prevHasForeground ? "justify-between" : "justify-center py-8"
+                  } items-center select-none ${
+                    (previewDevice === "mobile"
+                      ? previewSlide.banner_size_ratio_mobile || previewSlide.banner_size_ratio
+                      : previewSlide.banner_size_ratio) === "1024x387" ||
+                    (previewDevice === "mobile"
+                      ? previewSlide.banner_size_ratio_mobile || previewSlide.banner_size_ratio
+                      : previewSlide.banner_size_ratio) === "widescreen"
+                      ? "aspect-[1024/387] min-h-[190px]"
+                      : (previewDevice === "mobile"
+                          ? previewSlide.banner_size_ratio_mobile || previewSlide.banner_size_ratio
+                          : previewSlide.banner_size_ratio) === "860x270"
+                      ? "aspect-[860/270] min-h-[160px]"
+                      : (previewDevice === "mobile"
+                          ? previewSlide.banner_size_ratio_mobile || previewSlide.banner_size_ratio
+                          : previewSlide.banner_size_ratio) === "1080x1080"
+                      ? "aspect-square min-h-[300px]"
+                      : "min-h-[420px] sm:min-h-[460px]"
+                  } relative overflow-hidden`}
                 >
                   {/* Full Background Image in Preview */}
                   {prevIsImageBg && prevBgImageUrl && (

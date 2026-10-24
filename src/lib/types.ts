@@ -957,9 +957,10 @@ export interface VisualShowcaseSlide {
   show_secondary_cta?: boolean;
   order?: number;
   placement?: ShowcasePlacement; // Per-slide placement position on homepage
+  product_line?: number;         // Custom line/row number in product catalogue (e.g. 2, 5, etc.)
   enable_animation?: boolean;    // Toggle floating image animation on/off
-  banner_size_ratio?: "default" | "1080x1080" | "860x270" | "1920x850" | "1080x1440";
-  banner_size_ratio_mobile?: "default" | "1080x1080" | "860x270" | "1920x850" | "1080x1440";
+  banner_size_ratio?: "default" | "1080x1080" | "860x270" | "1920x850" | "1080x1440" | "1024x387" | "widescreen";
+  banner_size_ratio_mobile?: "default" | "1080x1080" | "860x270" | "1920x850" | "1080x1440" | "1024x387" | "widescreen";
   product_id?: string;
   category_id?: string;
 }
@@ -994,7 +995,17 @@ export type ShowcasePlacement =
   | "below_why_choose"
   | "below_gallery"
   | "below_reviews"
-  | "above_location";
+  | "above_location"
+  // ── Product Catalogue Placements (Line/Row Based) ──
+  | "below_product_line_1"
+  | "below_product_line_2"
+  | "below_product_line_3"
+  | "below_product_line_4"
+  | "below_product_line_5"
+  | "below_product_line_6"
+  | "below_product_line_8"
+  | "below_product_line_10"
+  | "custom_product_line";
 
 export interface VisualShowcaseSettings {
   enabled: boolean;
