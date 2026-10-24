@@ -5,7 +5,6 @@ import "./globals.css";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import MobileNav from "@/components/layout/mobile-nav";
-import StreetAssistant from "@/components/assistant/StreetAssistant";
 import { AuthProvider } from "@/lib/auth-context";
 import { CartProvider } from "@/lib/cart-context";
 import { ToastProvider } from "@/components/ui/ToastProvider";
@@ -227,7 +226,6 @@ export default function RootLayout({
                   </main>
                   <Footer />
                   <MobileNav />
-                  <StreetAssistant />
                   <SearchOverlay />
                   <CampaignPopup />
                   <SpinWinModal />
