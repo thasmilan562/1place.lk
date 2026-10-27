@@ -84,6 +84,8 @@ import RepairsTab from "@/components/admin/tabs/RepairsTab";
 import CashFlowTab from "@/components/admin/tabs/CashFlowTab";
 import CouponsTab from "@/components/admin/tabs/CouponsTab";
 import CouponModal from "@/components/admin/CouponModal";
+import CategoriesTab from "@/components/admin/tabs/CategoriesTab";
+import CategoryModal from "@/components/admin/CategoryModal";
 import FeaturedGridBannerControl from "@/components/admin/FeaturedGridBannerControl";
 import WhatsAppMarketingTab from "@/components/admin/tabs/WhatsAppMarketingTab";
 import SpinWinTab from "@/components/admin/tabs/SpinWinTab";
@@ -94,6 +96,7 @@ import CustomAreaChart, { ChartDataPoint } from "@/components/admin/charts/Custo
 type Tab =
   | "overview"
   | "products"
+  | "categories"
   | "today-deal"
   | "repairs"
   | "cashflow"
@@ -113,6 +116,7 @@ type Tab =
 const VALID_ADMIN_TABS = new Set<string>([
   "overview",
   "products",
+  "categories",
   "today-deal",
   "repairs",
   "cashflow",
@@ -2465,6 +2469,25 @@ function DashboardContent() {
       )}
 
       {/* ════════════════════════════════════════════════════════════════════
+          TAB: CATEGORIES TAB
+      ════════════════════════════════════════════════════════════════════ */}
+      {activeTab === "categories" && (
+        <CategoriesTab
+          categories={categories}
+          products={products}
+          onAdd={() => {
+            setEditingCategory(null);
+            setIsCategoryModalOpen(true);
+          }}
+          onEdit={(cat: Category) => {
+            setEditingCategory(cat);
+            setIsCategoryModalOpen(true);
+          }}
+          onRefresh={refreshData}
+        />
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════
           TAB 3: ORDERS TAB
       ════════════════════════════════════════════════════════════════════ */}
       {activeTab === "orders" && (
@@ -2946,6 +2969,23 @@ function DashboardContent() {
         }}
         coupon={editingCoupon}
         onSaved={refreshData}
+      />
+
+      {/* Global Category Modal */}
+      <CategoryModal
+        key={editingCategory?.id ? `edit-${editingCategory.id}` : "new-category"}
+        isOpen={isCategoryModalOpen}
+        onClose={() => {
+          setIsCategoryModalOpen(false);
+          setEditingCategory(null);
+        }}
+        onSave={() => {
+          setIsCategoryModalOpen(false);
+          setEditingCategory(null);
+          refreshData();
+        }}
+        initialData={editingCategory}
+        allCategories={categories}
       />
 
       {/* Quick Add Stock Modal (POS Speed) */}

@@ -156,21 +156,36 @@ export async function getProducts(): Promise<Product[]> {
 }
 
 // ── 3. Categories ──
-export async function getCategories(): Promise<Category[]> {
-  return cachedFetch("categories:all", async () => {
+export async function getCategories(includeInactive = false): Promise<Category[]> {
+  const cacheKey = includeInactive ? "categories:all-admin" : "categories:public";
+  return cachedFetch(cacheKey, async () => {
     try {
       const q = query(collection(db, "categories"));
       const snapshot = await getDocs(q);
       const rawDocs = snapshot.docs.map((d) => {
         const data = d.data() as Category;
         const id = d.id;
-        const rawImageUrl = data.image_url !== undefined ? data.image_url : "";
+        const rawImageUrl = data.image_url || data.iconUrl || "";
         const image_url = normalizeImageUrl(rawImageUrl);
-        return { ...data, id, image_url };
+        const isActive = data.isActive !== undefined ? data.isActive : data.status !== "inactive";
+        const sortOrder = data.sortOrder !== undefined ? data.sortOrder : (data.sort_order ?? 0);
+        return {
+          ...data,
+          id,
+          image_url,
+          iconUrl: data.iconUrl || image_url,
+          iconType: data.iconType || (rawImageUrl ? "upload" : "library"),
+          iconName: data.iconName || data.icon,
+          isActive,
+          status: (isActive ? "active" : "inactive") as "active" | "inactive" | "deleted",
+          sort_order: sortOrder,
+          sortOrder,
+        };
       });
 
       const validDocs = rawDocs.filter((c) => {
         if ((c as any).isDeleted === true || c.status === "deleted") return false;
+        if (!includeInactive && c.isActive === false) return false;
         const cName = (c.name || "").toLowerCase();
         const cSlug = (c.slug || "").toLowerCase();
         return !KNOWN_BRAND_NAMES.some((b) => b.toLowerCase() === cName || b.toLowerCase() === cSlug);
@@ -178,7 +193,7 @@ export async function getCategories(): Promise<Category[]> {
 
       if (validDocs.length > 0) {
         const deduped = deduplicateCategories(validDocs);
-        return deduped.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        return deduped.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
       }
     } catch (e) {
       console.warn("Offline/Error fetching categories from Firestore:", e);
@@ -186,9 +201,17 @@ export async function getCategories(): Promise<Category[]> {
 
     // Fallback only if offline or empty
     const cleanFallbacks = fallbackCategories
-      .filter((c) => (c as any).isDeleted !== true && c.status !== "deleted")
-      .map((c) => ({ ...c, image_url: normalizeImageUrl(c.image_url || "") }));
-    return deduplicateCategories(cleanFallbacks).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      .filter((c) => {
+        if ((c as any).isDeleted === true || c.status === "deleted") return false;
+        if (!includeInactive && c.status === "inactive") return false;
+        return true;
+      })
+      .map((c) => ({
+        ...c,
+        image_url: normalizeImageUrl(c.image_url || ""),
+        isActive: c.status !== "inactive",
+      }));
+    return deduplicateCategories(cleanFallbacks).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   }, CACHE_TTL.CATEGORIES);
 }
 

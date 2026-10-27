@@ -242,11 +242,13 @@ export default function HeroSection() {
         ? (currentSlide.heading.includes(". ") ? currentSlide.heading.split(". ")[0] + "." : currentSlide.heading)
         : "Latest Smartphones.");
 
-  const rawLine2 = currentSlide.heading_line_2 !== undefined && currentSlide.heading_line_2 !== ""
-    ? currentSlide.heading_line_2
-    : (currentSlide.heading && !currentSlide.heading_line_1 && currentSlide.heading.includes(". ")
-        ? currentSlide.heading.split(". ").slice(1).join(". ")
-        : "Ultimate Performance.");
+  const rawLine2 = currentSlide.show_heading_line_2 === false || currentSlide.heading_line_2 === ""
+    ? ""
+    : (currentSlide.heading_line_2 !== undefined
+        ? currentSlide.heading_line_2
+        : (currentSlide.heading && !currentSlide.heading_line_1 && currentSlide.heading.includes(". ")
+            ? currentSlide.heading.split(". ").slice(1).join(". ")
+            : ""));
 
   // Text Case formatting helper
   const formatCasing = (text: string, casing?: "as_typed" | "uppercase" | "title_case") => {

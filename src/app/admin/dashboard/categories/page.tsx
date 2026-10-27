@@ -3,5 +3,5 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 export default function AdminCategoriesPage() {
-  redirect("/admin/dashboard");
+  redirect("/admin/dashboard?tab=categories");
 }

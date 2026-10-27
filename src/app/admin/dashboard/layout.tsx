@@ -90,6 +90,7 @@ const SIDEBAR_SECTIONS: NavSection[] = [
     icon: Package,
     items: [
       { id: "products", label: "Products", href: "/admin/dashboard?tab=products" },
+      { id: "categories", label: "Categories", href: "/admin/dashboard?tab=categories" },
       { id: "showcase", label: "Visual Showcase", href: "/admin/dashboard?tab=showcase" },
     ],
   },

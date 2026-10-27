@@ -3,6 +3,8 @@ import Link from "next/link";
 import { getCategories, getProducts } from "@/lib/firestore-client";
 import { ChevronRight, Grid } from "lucide-react";
 
+import CategoryIcon from "@/components/ui/CategoryIcon";
+
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -120,12 +122,17 @@ export default async function CategoriesPage() {
               <Link
                 key={cat.id || catSlug}
                 href={`/category/${catSlug}`}
-                className="group relative flex flex-col justify-between p-6 rounded-2xl bg-neutral-50 border border-neutral-200/80 hover:border-black/30 hover:bg-white hover:shadow-md transition-all duration-200"
+                className="group relative flex flex-col justify-between p-6 rounded-2xl bg-neutral-50 border border-neutral-200/80 hover:border-[#68122F]/40 hover:bg-white hover:shadow-md transition-all duration-200"
               >
                 <div>
-                  <h2 className="text-lg font-bold text-neutral-900 group-hover:text-black transition-colors">
-                    {cat.name}
-                  </h2>
+                  <div className="flex items-center gap-3.5 mb-2.5">
+                    <div className="w-11 h-11 rounded-full bg-white border border-neutral-200/80 flex items-center justify-center shrink-0 text-[#68122F] shadow-xs group-hover:bg-[#68122F] group-hover:text-white transition-colors">
+                      <CategoryIcon category={cat} size={22} className="w-5 h-5" />
+                    </div>
+                    <h2 className="text-lg font-bold text-neutral-900 group-hover:text-[#68122F] transition-colors">
+                      {cat.name}
+                    </h2>
+                  </div>
                   {cat.description && (
                     <p className="text-xs text-neutral-500 line-clamp-2 mt-1.5 font-normal">
                       {cat.description}

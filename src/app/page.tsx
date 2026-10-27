@@ -1,5 +1,6 @@
 import HeroSection from "@/components/home/hero-section";
 import CircularCategories from "@/components/home/circular-categories";
+import FeaturedProducts from "@/components/home/featured-products";
 import StoreBenefitsBar from "@/components/home/store-benefits-bar";
 import AnnouncementTicker from "@/components/home/announcement-ticker";
 import NewArrivalsSection from "@/components/home/new-arrivals-section";
@@ -91,8 +92,11 @@ export default async function HomePage() {
       {/* Visual Showcase: Below Hero Banner */}
       <VisualProductShowcase settings={showcaseSettings} placement="below_hero" />
 
-      {/* 2. Circular Category Navigation Strip (Overlaid 50% on bottom of Hero Banner) */}
+      {/* 2. Circular Category Navigation Strip */}
       <CircularCategories categories={categories} />
+
+      {/* 3. Featured Products (Matching UI References: 4 cards desktop / 2 cards mobile) */}
+      <FeaturedProducts initialProducts={products} />
 
       {/* Visual Showcase: Below Shop by Category */}
       <VisualProductShowcase settings={showcaseSettings} placement="below_category" />

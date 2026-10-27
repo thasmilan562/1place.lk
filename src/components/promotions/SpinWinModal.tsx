@@ -227,31 +227,7 @@ export default function SpinWinModal() {
 
   return (
     <>
-      {/* ── Persistent Floating Promotion Badge (Always available for discovery) ── */}
-      {!isOpen && (
-        <motion.button
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => {
-            setIsOpen(true);
-            setModalState("welcome");
-          }}
-          className="fixed bottom-20 left-4 z-40 flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-gradient-to-r from-[#64152F] to-[#8A1C3E] text-white shadow-[0_4px_20px_rgba(100,21,47,0.45)] border border-[#FFE875]/40 hover:border-[#FFE875] transition-all cursor-pointer group"
-          aria-label="Open Spin & Win Free Gift promotion"
-        >
-          <div className="w-6 h-6 rounded-full bg-[#FFE875] flex items-center justify-center text-[#64152F] text-xs font-black shadow-inner">
-            🎁
-          </div>
-          <div className="text-left leading-none">
-            <p className="text-[10px] text-[#FFE875] font-extrabold tracking-wider uppercase">
-              First Order Special
-            </p>
-            <p className="text-xs font-black tracking-tight mt-0.5">Spin & Win Free Gift</p>
-          </div>
-        </motion.button>
-      )}
+
 
       {/* ── Modal Backdrop & Dialog ── */}
       <AnimatePresence>
@@ -565,6 +541,21 @@ export default function SpinWinModal() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Floating Burgundy Gift Launcher Button (matching UI reference) */}
+      {!isOpen && (
+        <button
+          id="spin-win-floating-trigger"
+          onClick={() => {
+            setModalState("welcome");
+            setIsOpen(true);
+          }}
+          aria-label="Spin & Win Free Gifts"
+          className="hidden md:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#68122F] hover:bg-[#520d23] text-white items-center justify-center shadow-[0_8px_25px_rgba(104,18,47,0.45)] hover:scale-105 active:scale-95 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#68122F] focus:ring-offset-2"
+        >
+          <Gift className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+        </button>
+      )}
     </>
   );
 }

@@ -52,7 +52,10 @@ export function formatProductPrice(
     return fallback;
   }
 
-  const formattedNumber = Math.round(num).toLocaleString("en-US");
+  const formattedNumber = num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   return `${prefix}${formattedNumber}`;
 }
 

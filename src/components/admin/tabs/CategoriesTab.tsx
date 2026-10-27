@@ -11,87 +11,134 @@ import {
   EyeOff,
   ArrowUp,
   ArrowDown,
-  Copy,
   FolderOpen,
   AlertTriangle,
-  Sparkles,
-  X,
-  ExternalLink,
+  CheckCircle,
+  Package,
+  Layers,
+  ArrowRight,
+  Loader2,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, setDoc, addDoc, deleteDoc, collection } from "firebase/firestore";
-import { KNOWN_BRAND_NAMES } from "@/lib/migration-audit";
+import { doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
 import { useAdminTheme } from "@/app/admin/dashboard/layout";
-import {
-  deduplicateCategories,
-  generateCategorySlug,
-  getCategoryDocId,
-  normalizeCategoryName,
-} from "@/lib/category-utils";
+import CategoryIcon from "@/components/ui/CategoryIcon";
+import { clearDataCache } from "@/lib/data-cache";
 
 interface CategoriesTabProps {
   categories: Category[];
   products?: Product[];
   onAdd: () => void;
   onEdit: (category: Category) => void;
-  onDelete: (id: string) => void;
+  onRefresh?: () => void;
 }
 
 export default function CategoriesTab({
-  categories,
+  categories = [],
   products = [],
   onAdd,
   onEdit,
-  onDelete,
+  onRefresh,
 }: CategoriesTabProps) {
   const { isLight } = useAdminTheme();
 
+  // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "homepage">("all");
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [deleteWarningCategory, setDeleteWarningCategory] = useState<{ cat: Category; linkedCount: number } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
-  // Clean Categories filter with deterministic canonical deduplication
-  const cleanCategories = useMemo(() => {
-    return deduplicateCategories(categories || []);
-  }, [categories]);
+  // Notifications State
+  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Safe Delete Dialog State
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [reassignCategoryId, setReassignCategoryId] = useState<string>("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const showToast = (text: string, type: "success" | "error" = "success") => {
+    setToastMessage({ type, text });
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Compute product counts per category
+  const productCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    products.forEach((p) => {
+      const cId = p.category_id || p.categoryId;
+      const cName = (p.category_name || p.categoryName || "").toLowerCase().trim();
+      const cSlug = (p.category_slug || "").toLowerCase().trim();
+
+      categories.forEach((cat) => {
+        const catId = cat.id;
+        const catSlug = (cat.slug || "").toLowerCase().trim();
+        const catName = (cat.name || "").toLowerCase().trim();
+
+        if (
+          (cId && cId === catId) ||
+          (cSlug && cSlug === catSlug) ||
+          (cName && (cName === catName || cName === catSlug))
+        ) {
+          map[catId] = (map[catId] || 0) + 1;
+        }
+      });
+    });
+    return map;
+  }, [categories, products]);
 
   // Filtered & Sorted Categories List
   const displayedCategories = useMemo(() => {
-    return cleanCategories
+    return categories
       .filter((c) => {
+        if (!c || (c as any).isDeleted === true || c.status === "deleted") return false;
+
         const q = searchQuery.toLowerCase().trim();
         const matchesSearch =
           !q ||
           c.name.toLowerCase().includes(q) ||
-          c.slug.toLowerCase().includes(q) ||
+          (c.slug && c.slug.toLowerCase().includes(q)) ||
           (c.description && c.description.toLowerCase().includes(q));
 
         if (!matchesSearch) return false;
 
-        if (statusFilter === "active") return c.status !== "inactive";
-        if (statusFilter === "inactive") return c.status === "inactive";
-        if (statusFilter === "homepage") return c.show_on_homepage !== false;
+        const isActive = c.isActive !== undefined ? c.isActive : c.status !== "inactive";
+        if (statusFilter === "active") return isActive;
+        if (statusFilter === "inactive") return !isActive;
 
         return true;
       })
-      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-  }, [cleanCategories, searchQuery, statusFilter]);
+      .sort((a, b) => (a.sortOrder ?? a.sort_order ?? 0) - (b.sortOrder ?? b.sort_order ?? 0));
+  }, [categories, searchQuery, statusFilter]);
 
-  // Toggle Visibility Status directly on card
-  const handleToggleVisibility = async (cat: Category) => {
-    const updatedStatus = cat.show_on_homepage !== false ? false : true;
+  // Toggle Category Active/Inactive Status
+  const handleToggleActive = async (cat: Category) => {
+    const currentActive = cat.isActive !== undefined ? cat.isActive : cat.status !== "inactive";
+    const nextActive = !currentActive;
+
     try {
-      await setDoc(doc(db, "categories", cat.id), { show_on_homepage: updatedStatus }, { merge: true });
-      cat.show_on_homepage = updatedStatus;
-      window.location.reload();
-    } catch (e) {
-      console.error("Error toggling category visibility:", e);
-      alert("Failed to update visibility.");
+      await setDoc(
+        doc(db, "categories", cat.id),
+        {
+          isActive: nextActive,
+          status: nextActive ? "active" : "inactive",
+          show_on_homepage: nextActive,
+          show_in_selector: nextActive,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+      clearDataCache("categories");
+      showToast(
+        nextActive
+          ? `"${cat.name}" is now active and visible on the storefront.`
+          : `"${cat.name}" is now inactive and hidden from storefront navigation.`
+      );
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      console.error("Error toggling category status:", err);
+      showToast("Failed to update category status.", "error");
     }
   };
 
-  // Reordering Up / Down
+  // Reorder Up / Down
   const handleReorder = async (index: number, direction: "up" | "down") => {
     const targetIndex = direction === "up" ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= displayedCategories.length) return;
@@ -99,516 +146,321 @@ export default function CategoriesTab({
     const currentCat = displayedCategories[index];
     const targetCat = displayedCategories[targetIndex];
 
-    const currentOrder = currentCat.sort_order || index;
-    const targetOrder = targetCat.sort_order || targetIndex;
+    const currentOrder = currentCat.sortOrder ?? currentCat.sort_order ?? index;
+    const targetOrder = targetCat.sortOrder ?? targetCat.sort_order ?? targetIndex;
 
     try {
-      await setDoc(doc(db, "categories", currentCat.id), { sort_order: targetOrder }, { merge: true });
-      await setDoc(doc(db, "categories", targetCat.id), { sort_order: currentOrder }, { merge: true });
-      window.location.reload();
-    } catch (e) {
-      console.error("Reorder error:", e);
+      await setDoc(
+        doc(db, "categories", currentCat.id),
+        { sortOrder: targetOrder, sort_order: targetOrder, updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
+      await setDoc(
+        doc(db, "categories", targetCat.id),
+        { sortOrder: currentOrder, sort_order: currentOrder, updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
+      clearDataCache("categories");
+      showToast("Display order updated.");
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      console.error("Error reordering categories:", err);
+      showToast("Failed to reorder categories.", "error");
     }
   };
 
-  // Duplicate Category
-  // Duplicate Category with deterministic ID and normalized naming
-  const handleDuplicate = async (cat: Category) => {
-    const dupName = `${cat.name} Copy`;
-    const baseSlug = generateCategorySlug(cat.slug || cat.name);
-    const dupSlug = `${baseSlug}-copy`;
-    const docId = getCategoryDocId(dupSlug);
+  // Safe Deletion with Product Reassignment or Deactivation
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
 
-    const newCatData: Category = {
-      ...cat,
-      id: docId,
-      name: dupName,
-      slug: dupSlug,
-      sort_order: (cat.sort_order || 0) + 1,
-      status: "active",
-      show_on_homepage: cat.show_on_homepage !== false,
-    };
+    const linkedCount = productCountMap[deleteTarget.id] || 0;
 
-    try {
-      await setDoc(doc(db, "categories", docId), newCatData, { merge: true });
-      window.location.reload();
-    } catch (e) {
-      console.error("Duplicate error:", e);
-      alert("Failed to duplicate category.");
+    if (linkedCount > 0 && !reassignCategoryId) {
+      showToast("Please choose a category to reassign products to, or deactivate instead.", "error");
+      return;
     }
-  };
 
-  const handleCleanDuplicates = async () => {
-    if (!confirm("Are you sure you want to clean up duplicate categories? This will merge duplicates, preserve images/metadata, and update all linked products safely.")) return;
     try {
-      const grouped: Record<string, Category[]> = {};
-      categories.forEach(c => {
-        if (!c) return;
-        if ((c as any).isDeleted === true || c.status === "deleted") return;
-        const normKey = generateCategorySlug(c.slug || c.name);
-        if (!normKey) return;
-        if (!grouped[normKey]) grouped[normKey] = [];
-        grouped[normKey].push(c);
-      });
-      
-      let deleted = 0;
-      let updatedProducts = 0;
-      
-      for (const docs of Object.values(grouped)) {
-        if (docs.length > 1) {
-          // Sort categories by: 1) Has valid image, 2) Active status, 3) Product count
-          const sortedDocs = docs.map(cat => {
-            const count = products.filter(p => p.category_id === cat.id || p.categoryId === cat.id || p.category_name?.toLowerCase() === cat.name?.toLowerCase()).length;
-            const hasImage = Boolean(cat.image_url && cat.image_url.trim());
-            const isActive = cat.status !== "deleted" && (cat as any).isDeleted !== true;
-            return { cat, count, score: (hasImage ? 100 : 0) + (isActive ? 50 : 0) + count };
-          }).sort((a, b) => b.score - a.score);
-          
-          const keptCategory = sortedDocs[0].cat;
-          
-          for (let i = 1; i < sortedDocs.length; i++) {
-            const duplicateCat = sortedDocs[i].cat;
-            
-            // If duplicate has an image or description that keptCategory is missing, preserve it!
-            if (!keptCategory.image_url && duplicateCat.image_url) {
-              keptCategory.image_url = duplicateCat.image_url;
-              await setDoc(doc(db, "categories", keptCategory.id), { image_url: duplicateCat.image_url }, { merge: true });
-            }
-            if (!keptCategory.description && duplicateCat.description) {
-              keptCategory.description = duplicateCat.description;
-              await setDoc(doc(db, "categories", keptCategory.id), { description: duplicateCat.description }, { merge: true });
-            }
-            
-            // Update products that are pointing to the duplicate category
-            const orphaned = products.filter(p => p.category_id === duplicateCat.id || p.categoryId === duplicateCat.id);
-            for (const p of orphaned) {
-               await setDoc(doc(db, "products", p.id), {
-                 category_id: keptCategory.id,
-                 categoryId: keptCategory.id,
-                 category_slug: keptCategory.slug,
-                 category_name: keptCategory.name
-               }, { merge: true });
-               updatedProducts++;
-            }
-            
-            // Delete duplicate category
-            await deleteDoc(doc(db, "categories", duplicateCat.id));
-            deleted++;
-          }
+      setIsDeleting(true);
+
+      // 1. Reassign products if needed
+      if (linkedCount > 0 && reassignCategoryId) {
+        const targetCatObj = categories.find((c) => c.id === reassignCategoryId);
+        const assignedProducts = products.filter(
+          (p) =>
+            p.category_id === deleteTarget.id ||
+            p.category_id === deleteTarget.slug ||
+            p.category_name?.toLowerCase() === deleteTarget.name.toLowerCase()
+        );
+
+        for (const p of assignedProducts) {
+          await updateDoc(doc(db, "products", p.id), {
+            category_id: reassignCategoryId,
+            category_name: targetCatObj?.name || "",
+            category_slug: targetCatObj?.slug || "",
+          });
         }
       }
-      alert(`Successfully deleted ${deleted} duplicate categories and reassigned ${updatedProducts} products.`);
-      window.location.reload();
-    } catch(e) {
-      console.error(e);
-      alert("Failed to clean duplicates");
-    }
-  };
 
-  // Safe Delete Trigger with Linked Product Check
-  const triggerDeleteCheck = (cat: Category) => {
-    const categoryName = cat.name || "";
-    const categorySlug = cat.slug || "";
-    const linkedProducts = products.filter(
-      (p) =>
-        p.category_id === cat.id ||
-        p.category_id === categorySlug ||
-        p.category_name?.toLowerCase() === categoryName.toLowerCase()
-    );
+      // 2. Soft-delete or remove category document
+      await deleteDoc(doc(db, "categories", deleteTarget.id));
+      clearDataCache("categories");
+      clearDataCache("products");
 
-    if (linkedProducts.length > 0) {
-      setDeleteWarningCategory({ cat, linkedCount: linkedProducts.length });
-    } else {
-      if (confirm(`Are you sure you want to delete category "${categoryName}"?`)) {
-        onDelete(cat.id);
-      }
+      showToast(`Category "${deleteTarget.name}" deleted successfully.`);
+      setDeleteTarget(null);
+      setReassignCategoryId("");
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      console.error("Error deleting category:", err);
+      showToast(err.message || "Failed to delete category.", "error");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   return (
-    <div
-      className={`space-y-5 animate-fadeIn ${
-        isLight ? "text-slate-900" : "text-[#F8FAFC]"
-      }`}
-    >
-      {/* ──────────────────────────────────────────────────────────
-          1. PAGE HEADER
-          ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div
-            className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
-              isLight
-                ? "bg-blue-50 text-blue-600 border border-blue-100 shadow-sm"
-                : "bg-blue-600/10 text-blue-500 border border-blue-500/20"
-            }`}
-          >
-            <FolderOpen className="w-5 h-5" />
-          </div>
-          <div>
-            <h1
-              className={`text-2xl font-bold tracking-tight ${
-                isLight ? "text-slate-900" : "text-[#F8FAFC]"
-              }`}
-            >
-              Shop by Category
+    <div className="space-y-6">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs font-bold transition-all ${
+            toastMessage.type === "success"
+              ? "bg-[#68122F] text-white"
+              : "bg-red-600 text-white"
+          }`}
+        >
+          {toastMessage.type === "success" ? (
+            <CheckCircle className="w-4 h-4" />
+          ) : (
+            <AlertTriangle className="w-4 h-4" />
+          )}
+          <span>{toastMessage.text}</span>
+        </div>
+      )}
+
+      {/* Top Header & Add Category CTA */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-white/10">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-black text-neutral-900 dark:text-white tracking-tight">
+              Categories
             </h1>
-            <p
-              className={`text-[13px] font-normal mt-0.5 ${
-                isLight ? "text-slate-500" : "text-[#94A3B8]"
-              }`}
-            >
-              Manage, reorder, and customize the category sections on your homepage.
-            </p>
+            <span className="px-2.5 py-0.5 rounded-full bg-[#68122F]/10 dark:bg-[#68122F]/30 text-[#68122F] dark:text-[#E892A8] text-xs font-black">
+              {displayedCategories.length}
+            </span>
           </div>
+          <p className="text-xs text-neutral-500 mt-0.5">
+            Manage category icons, display order, visibility, and product associations.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => setShowPreviewModal(true)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium transition-all border ${
-              isLight
-                ? "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-sm"
-                : "bg-[#121A25] hover:bg-[#1A2535] text-[#F8FAFC] border-white/[0.08]"
-            }`}
-          >
-            <Eye className="w-3.5 h-3.5 text-blue-400" />
-            <span>Live Section Preview</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleCleanDuplicates}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium transition-all border ${
-              isLight
-                ? "bg-white hover:bg-slate-50 text-red-600 border-red-200 shadow-sm"
-                : "bg-[#121A25] hover:bg-[#1A2535] text-red-400 border-red-500/20"
-            }`}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Clean Duplicates</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onAdd}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-600/20 transition-all shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Category</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="px-4 py-2.5 rounded-xl bg-[#68122F] text-white text-xs font-bold hover:bg-[#520d24] transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Category</span>
+        </button>
       </div>
 
-      {/* ──────────────────────────────────────────────────────────
-          2. SEARCH + FILTER TOOLBAR
-          ────────────────────────────────────────────────────────── */}
-      <div
-        className={`rounded-2xl p-2.5 border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${
-          isLight
-            ? "bg-white border-slate-200 shadow-sm"
-            : "bg-[#0E141D] border-white/[0.08]"
-        }`}
-      >
-        {/* Left: Search Input */}
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search
-            className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${
-              isLight ? "text-slate-400" : "text-[#94A3B8]"
-            }`}
-          />
+      {/* Search & Filter Toolbar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        {/* Search Field */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
           <input
             type="text"
-            placeholder="Search category by name or slug..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={`w-full bg-transparent pl-10 pr-4 py-2 text-xs rounded-xl focus:outline-none transition-colors ${
-              isLight
-                ? "text-slate-900 placeholder-slate-400 focus:bg-slate-50"
-                : "text-[#F8FAFC] placeholder-slate-500 focus:bg-white/[0.03]"
-            }`}
+            placeholder="Search categories by name or slug..."
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-[#0E141D] text-xs text-neutral-900 dark:text-white outline-none focus:border-[#68122F] transition-colors"
           />
         </div>
 
-        {/* Right: Filter Buttons */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          {[
-            { id: "all", label: "All Categories" },
-            { id: "homepage", label: "Shown on Homepage" },
-            { id: "active", label: "Active" },
-            { id: "inactive", label: "Inactive" },
-          ].map((f) => {
-            const isActive = statusFilter === f.id;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setStatusFilter(f.id as any)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all border ${
-                  isActive
-                    ? "bg-[#2563EB] text-white border-[#2563EB] shadow-sm"
-                    : isLight
-                    ? "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
-                    : "bg-[#121A25] hover:bg-[#1A2535] text-[#94A3B8] hover:text-[#F8FAFC] border-white/[0.08]"
-                }`}
-              >
-                {f.label}
-              </button>
-            );
-          })}
+        {/* Status Filters */}
+        <div className="flex items-center gap-1.5 bg-neutral-100 dark:bg-white/5 p-1 rounded-xl self-start sm:self-auto text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setStatusFilter("all")}
+            className={`px-3 py-1.5 rounded-lg transition-all ${
+              statusFilter === "all"
+                ? "bg-white dark:bg-[#0E141D] text-[#68122F] dark:text-white shadow-xs font-bold"
+                : "text-neutral-600 dark:text-neutral-400 hover:text-black"
+            }`}
+          >
+            All ({categories.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("active")}
+            className={`px-3 py-1.5 rounded-lg transition-all ${
+              statusFilter === "active"
+                ? "bg-white dark:bg-[#0E141D] text-emerald-700 dark:text-emerald-400 shadow-xs font-bold"
+                : "text-neutral-600 dark:text-neutral-400 hover:text-black"
+            }`}
+          >
+            Active
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("inactive")}
+            className={`px-3 py-1.5 rounded-lg transition-all ${
+              statusFilter === "inactive"
+                ? "bg-white dark:bg-[#0E141D] text-neutral-800 dark:text-white shadow-xs font-bold"
+                : "text-neutral-600 dark:text-neutral-400 hover:text-black"
+            }`}
+          >
+            Inactive
+          </button>
         </div>
       </div>
 
-      {/* ──────────────────────────────────────────────────────────
-          3. CATEGORY COUNT
-          ────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between text-xs px-1">
-        <span
-          className={`font-medium ${
-            isLight ? "text-slate-500" : "text-[#94A3B8]"
-          }`}
-        >
-          {cleanCategories.length} Categories
-          {displayedCategories.length !== cleanCategories.length &&
-            ` (${displayedCategories.length} matching filter)`}
-        </span>
-      </div>
-
-      {/* ──────────────────────────────────────────────────────────
-          4. CATEGORY GRID (3 columns desktop, 2 tablet, 1 mobile)
-          ────────────────────────────────────────────────────────── */}
+      {/* Category List Cards */}
       {displayedCategories.length === 0 ? (
-        <div
-          className={`text-center py-16 rounded-2xl border ${
-            isLight
-              ? "bg-white border-slate-200 text-slate-500"
-              : "bg-[#0E141D] border-white/[0.08] text-slate-400"
-          }`}
-        >
-          <FolderOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <h3 className="text-base font-semibold">No matching categories found</h3>
-          <p className="text-xs mt-1 max-w-sm mx-auto opacity-70">
-            No categories match your search or filter. Try clearing the search query or adding a new category.
+        <div className="p-12 text-center rounded-2xl border border-dashed border-neutral-300 dark:border-white/15 bg-white dark:bg-[#0E141D]">
+          <FolderOpen className="w-10 h-10 mx-auto text-neutral-400 mb-3" />
+          <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
+            No categories found
+          </h3>
+          <p className="text-xs text-neutral-500 mt-1 mb-4">
+            {searchQuery
+              ? `No categories match "${searchQuery}".`
+              : "Get started by adding your first category."}
           </p>
           <button
+            type="button"
             onClick={onAdd}
-            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-sm transition-all"
+            className="px-4 py-2 rounded-xl bg-[#68122F] text-white text-xs font-bold hover:bg-[#520d24] transition-colors"
           >
-            + Add Category
+            Add Category
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {displayedCategories.map((cat, idx) => {
-            const linkedProductsCount = products.filter(
-              (p) =>
-                p.category_id === cat.id ||
-                p.category_id === cat.slug ||
-                p.category_name?.toLowerCase() === cat.name.toLowerCase()
-            ).length;
-
-            const isShownOnHomepage = cat.show_on_homepage !== false;
+            const productCount = productCountMap[cat.id] || 0;
+            const isActive = cat.isActive !== undefined ? cat.isActive : cat.status !== "inactive";
 
             return (
               <div
-                key={cat.id || idx}
-                className={`group rounded-2xl p-4.5 border flex flex-col justify-between transition-all duration-200 hover:shadow-lg ${
+                key={cat.id}
+                className={`p-4.5 rounded-2xl border transition-all flex flex-col justify-between ${
                   isLight
-                    ? "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 shadow-sm"
-                    : "bg-[#0E141D] border-white/[0.08] hover:bg-[#121A25] hover:border-white/[0.16]"
-                } ${!isShownOnHomepage ? "opacity-75" : ""}`}
+                    ? "bg-white border-neutral-200 shadow-xs hover:shadow-md"
+                    : "bg-[#0E141D] border-white/10 hover:border-white/20"
+                } ${!isActive ? "opacity-75" : ""}`}
               >
                 <div>
-                  {/* Top Bar: Order badge + Homepage status tag (TEXT ONLY, NO ICONS/IMAGES) */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-md font-mono font-bold uppercase tracking-wider ${
-                        isLight
-                          ? "bg-slate-100 text-slate-600 border border-slate-200"
-                          : "bg-white/5 text-[#94A3B8] border border-white/[0.08]"
-                      }`}
-                    >
-                      Order #{cat.sort_order ?? idx}
+                  {/* Top Row: Order Badge & Visibility Toggle */}
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
+                      Order #{cat.sortOrder ?? cat.sort_order ?? idx}
                     </span>
 
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
-                        isShownOnHomepage
-                          ? isLight
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                          : isLight
-                          ? "bg-slate-100 text-slate-500 border-slate-200"
-                          : "bg-white/5 text-slate-500 border-white/[0.06]"
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(cat)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors cursor-pointer ${
+                        isActive
+                          ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                          : "bg-neutral-100 dark:bg-white/5 text-neutral-500 border-neutral-200 dark:border-white/10"
                       }`}
+                      title={isActive ? "Click to deactivate" : "Click to activate"}
                     >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isShownOnHomepage ? "bg-emerald-500" : "bg-slate-400"
-                        }`}
-                      />
-                      <span>{isShownOnHomepage ? "Homepage" : "Hidden"}</span>
-                    </span>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500" : "bg-neutral-400"}`} />
+                      <span>{isActive ? "Active" : "Inactive"}</span>
+                    </button>
                   </div>
 
-                  {/* Category Name: 15-16px semibold */}
-                  <h3
-                    className={`text-[15px] font-semibold tracking-tight mt-3 leading-snug truncate uppercase ${
-                      isLight ? "text-slate-900" : "text-[#F8FAFC]"
-                    }`}
-                    title={cat.name}
-                  >
-                    {cat.name}
-                  </h3>
-
-                  {/* Slug: muted 11-12px text */}
-                  <p
-                    className={`text-xs font-mono truncate mt-0.5 ${
-                      isLight ? "text-slate-400" : "text-slate-500"
-                    }`}
-                  >
-                    /{cat.slug}
-                  </p>
-
-                  {/* Metadata: Product count & Homepage status */}
-                  <div className="flex items-center gap-3.5 mt-3 text-xs">
-                    {/* Products count badge */}
-                    <span
-                      className={`font-medium ${
-                        isLight ? "text-slate-600" : "text-[#94A3B8]"
+                  {/* Icon & Category Name */}
+                  <div className="flex items-center gap-3.5 mb-2.5">
+                    {/* Circular Icon Preview matching storefront */}
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 border transition-all ${
+                        isActive
+                          ? "bg-[#68122F] text-white border-[#68122F] shadow-xs"
+                          : "bg-[#F3F4F6] text-neutral-700 border-neutral-200"
                       }`}
                     >
-                      {linkedProductsCount} Products
-                    </span>
-
-                    {/* Homepage status indicator */}
-                    <span
-                      className={`inline-flex items-center gap-1.5 font-medium ${
-                        isShownOnHomepage
-                          ? isLight
-                            ? "text-emerald-600"
-                            : "text-[#10B981]"
-                          : isLight
-                          ? "text-slate-400"
-                          : "text-slate-500"
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isShownOnHomepage
-                            ? "bg-emerald-500 shadow-xs shadow-emerald-500/50"
-                            : "bg-slate-500"
-                        }`}
+                      <CategoryIcon
+                        category={cat}
+                        className={`w-6 h-6 stroke-[1.8] ${isActive ? "text-white" : "text-neutral-700"}`}
                       />
-                      <span>
-                        {isShownOnHomepage ? "Homepage" : "Hidden"}
-                      </span>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-bold text-sm text-neutral-900 dark:text-white truncate">
+                        {cat.name}
+                      </h3>
+                      <p className="text-xs font-mono text-neutral-500 truncate">
+                        /category/{cat.slug}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Description if present */}
+                  {cat.description && (
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-3">
+                      {cat.description}
+                    </p>
+                  )}
+
+                  {/* Metadata: Product Count */}
+                  <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400 pt-2 border-t border-neutral-100 dark:border-white/5">
+                    <Package className="w-3.5 h-3.5 text-neutral-400" />
+                    <span className="font-semibold text-neutral-800 dark:text-neutral-200">
+                      {productCount} {productCount === 1 ? "Product" : "Products"} assigned
                     </span>
                   </div>
                 </div>
 
-                {/* Bottom Row: Reorder (Left) & Actions (Right) */}
-                <div
-                  className={`mt-4 pt-3 border-t flex items-center justify-between gap-2 ${
-                    isLight ? "border-slate-100" : "border-white/[0.08]"
-                  }`}
-                >
+                {/* Bottom Row: Reorder & Actions */}
+                <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-white/10 flex items-center justify-between gap-2">
                   {/* Reorder Buttons */}
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => handleReorder(idx, "up")}
                       disabled={idx === 0}
-                      className={`p-1.5 rounded-lg border transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-                        isLight
-                          ? "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600"
-                          : "bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-slate-300"
-                      }`}
+                      onClick={() => handleReorder(idx, "up")}
+                      className="p-1.5 rounded-lg border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-600 dark:text-neutral-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                       title="Move Up"
                     >
                       <ArrowUp className="w-3.5 h-3.5" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleReorder(idx, "down")}
                       disabled={idx === displayedCategories.length - 1}
-                      className={`p-1.5 rounded-lg border transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-                        isLight
-                          ? "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600"
-                          : "bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-slate-300"
-                      }`}
+                      onClick={() => handleReorder(idx, "down")}
+                      className="p-1.5 rounded-lg border border-neutral-200 dark:border-white/10 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-600 dark:text-neutral-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                       title="Move Down"
                     >
                       <ArrowDown className="w-3.5 h-3.5" />
                     </button>
                   </div>
 
-                  {/* Actions */}
+                  {/* Action Buttons */}
                   <div className="flex items-center gap-1.5">
-                    {/* Visibility Toggle */}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleVisibility(cat)}
-                      className={`p-1.5 rounded-lg border transition-colors ${
-                        isShownOnHomepage
-                          ? isLight
-                            ? "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100"
-                            : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                          : isLight
-                          ? "bg-slate-100 text-slate-400 border-slate-200 hover:text-slate-600"
-                          : "bg-white/[0.04] text-slate-500 border-white/[0.08] hover:text-slate-300"
-                      }`}
-                      title={
-                        isShownOnHomepage
-                          ? "Hide from Homepage"
-                          : "Show on Homepage"
-                      }
-                    >
-                      {isShownOnHomepage ? (
-                        <Eye className="w-3.5 h-3.5" />
-                      ) : (
-                        <EyeOff className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-
-                    {/* Duplicate */}
-                    <button
-                      type="button"
-                      onClick={() => handleDuplicate(cat)}
-                      className={`p-1.5 rounded-lg border transition-colors ${
-                        isLight
-                          ? "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600"
-                          : "bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.08] text-slate-300"
-                      }`}
-                      title="Duplicate Category"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Edit */}
                     <button
                       type="button"
                       onClick={() => onEdit(cat)}
-                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                        isLight
-                          ? "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
-                          : "bg-[#141E2B] hover:bg-[#1C2A3C] text-slate-300 hover:text-white border-white/[0.08]"
-                      }`}
-                      title="Edit Category"
+                      className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-white/10 text-xs font-bold text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5"
                     >
-                      <Edit2 className="w-3 h-3 text-blue-400" />
+                      <Edit2 className="w-3.5 h-3.5 text-blue-500" />
                       <span>Edit</span>
                     </button>
 
-                    {/* Delete */}
                     <button
                       type="button"
-                      onClick={() => triggerDeleteCheck(cat)}
-                      className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-colors"
+                      onClick={() => {
+                        setDeleteTarget(cat);
+                        setReassignCategoryId("");
+                      }}
+                      className="p-1.5 rounded-lg border border-neutral-200 dark:border-white/10 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                       title="Delete Category"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -618,202 +470,107 @@ export default function CategoriesTab({
         </div>
       )}
 
-      {/* ──────────────────────────────────────────────────────────
-          SAFETY DELETION WARNING MODAL
-          ────────────────────────────────────────────────────────── */}
-      {deleteWarningCategory && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div
-            className={`w-full max-w-md rounded-2xl p-6 space-y-4 border shadow-2xl transition-all ${
-              isLight
-                ? "bg-white border-slate-200 text-slate-900"
-                : "bg-[#0E141D] border-white/[0.12] text-[#F8FAFC]"
-            }`}
-          >
-            <div
-              className={`flex items-center gap-3 pb-3 border-b ${
-                isLight ? "border-slate-100" : "border-white/[0.08]"
-              }`}
-            >
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+      {/* SAFE DELETE CONFIRMATION MODAL */}
+      {deleteTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs"
+        >
+          <div className="bg-white dark:bg-[#0E141D] border border-neutral-200 dark:border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/50 text-red-600 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-base">Category Deletion Warning</h3>
+              <div>
+                <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                  Delete Category &quot;{deleteTarget.name}&quot;?
+                </h3>
+                <p className="text-xs text-neutral-500">
+                  /{deleteTarget.slug}
+                </p>
+              </div>
             </div>
 
-            <p
-              className={`text-xs leading-relaxed ${
-                isLight ? "text-slate-600" : "text-slate-300"
-              }`}
-            >
-              Category <strong>&quot;{deleteWarningCategory.cat.name}&quot;</strong> has{" "}
-              <span className="font-bold text-blue-400">
-                {deleteWarningCategory.linkedCount} product(s)
-              </span>{" "}
-              assigned to it.
-            </p>
+            {/* Check Assigned Products */}
+            {(productCountMap[deleteTarget.id] || 0) > 0 ? (
+              <div className="space-y-3 p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-xs">
+                <p className="font-bold text-amber-800 dark:text-amber-300">
+                  ⚠️ {productCountMap[deleteTarget.id]} products are currently assigned to this category!
+                </p>
+                <p className="text-amber-700 dark:text-amber-400 text-[11px] leading-relaxed">
+                  To prevent orphaned products, you must reassign these products to another category before deleting, or deactivate this category instead.
+                </p>
 
-            <div
-              className={`p-3 rounded-xl border text-xs space-y-1 ${
-                isLight
-                  ? "bg-amber-50 border-amber-200 text-amber-800"
-                  : "bg-amber-500/10 border-amber-500/20 text-amber-300"
-              }`}
-            >
-              <p className="font-semibold flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                <span>Note</span>
+                <div>
+                  <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200 mb-1">
+                    Reassign products to:
+                  </label>
+                  <select
+                    value={reassignCategoryId}
+                    onChange={(e) => setReassignCategoryId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-amber-300 dark:border-amber-800 bg-white dark:bg-[#141E2B] text-neutral-800 dark:text-neutral-100 font-semibold outline-none text-xs"
+                  >
+                    <option value="">-- Select a replacement category --</option>
+                    {categories
+                      .filter((c) => c.id !== deleteTarget.id)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} (/{c.slug})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                This category has <strong>0 products assigned</strong>. It can be deleted directly.
               </p>
-              <p className="text-[11px] opacity-80">
-                You can hide this category from the homepage or permanently delete it. Linked products will remain safe in inventory.
-              </p>
-            </div>
+            )}
 
-            <div
-              className={`flex flex-wrap items-center justify-end gap-2 pt-3 border-t ${
-                isLight ? "border-slate-100" : "border-white/[0.08]"
-              }`}
-            >
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => setDeleteWarningCategory(null)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-colors ${
-                  isLight
-                    ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                    : "text-slate-400 hover:text-white hover:bg-white/5"
-                }`}
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-white/10 text-xs font-bold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/10"
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  await handleToggleVisibility(deleteWarningCategory.cat);
-                  setDeleteWarningCategory(null);
-                }}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-colors border ${
-                  isLight
-                    ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
-                    : "bg-[#141E2B] hover:bg-[#1C2A3C] text-slate-200 border-white/10"
-                }`}
-              >
-                Hide From Homepage
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const catId = deleteWarningCategory.cat.id;
-                  setDeleteWarningCategory(null);
-                  onDelete(catId);
-                }}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-500 text-white shadow-sm flex items-center gap-1.5 transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete Permanently</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* ──────────────────────────────────────────────────────────
-          LIVE HOMEPAGE CATEGORY CAROUSEL PREVIEW MODAL
-          ────────────────────────────────────────────────────────── */}
-      {showPreviewModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div
-            className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 border shadow-2xl ${
-              isLight
-                ? "bg-white border-slate-200 text-slate-900"
-                : "bg-[#0E141D] border-white/[0.12] text-[#F8FAFC]"
-            }`}
-          >
-            <div
-              className={`flex items-center justify-between pb-3 border-b ${
-                isLight ? "border-slate-100" : "border-white/[0.08]"
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                    isLight
-                      ? "bg-blue-50 text-blue-600"
-                      : "bg-blue-600/10 text-blue-500"
-                  }`}
+              {(productCountMap[deleteTarget.id] || 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await handleToggleActive(deleteTarget);
+                    setDeleteTarget(null);
+                  }}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-xl border border-neutral-300 dark:border-white/20 text-xs font-bold text-neutral-800 dark:text-white hover:bg-neutral-100 dark:hover:bg-white/10"
                 >
-                  <Eye className="w-4 h-4" />
-                </div>
-                <h3 className="font-bold text-base">
-                  Live Homepage Category Carousel Preview
-                </h3>
-              </div>
+                  Deactivate Instead
+                </button>
+              )}
+
               <button
-                onClick={() => setShowPreviewModal(false)}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  isLight
-                    ? "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                    : "text-slate-400 hover:text-white hover:bg-white/5"
-                }`}
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={
+                  isDeleting ||
+                  ((productCountMap[deleteTarget.id] || 0) > 0 && !reassignCategoryId)
+                }
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
-                <X className="w-4 h-4" />
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <span>Confirm Delete</span>
+                )}
               </button>
-            </div>
-
-            <div
-              className={`p-6 rounded-2xl border space-y-4 ${
-                isLight
-                  ? "bg-slate-50 border-slate-200"
-                  : "bg-[#080C12] border-white/[0.06]"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400">
-                  Homepage Carousel Preview
-                </span>
-                <span className="text-xs text-slate-400 font-medium">
-                  {
-                    displayedCategories.filter((c) => c.show_on_homepage !== false)
-                      .length
-                  }{" "}
-                  categories active on homepage
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {displayedCategories
-                  .filter((c) => c.show_on_homepage !== false)
-                  .map((cat) => (
-                    <div
-                      key={cat.id}
-                      className={`p-3.5 rounded-xl border text-center space-y-2 transition-all ${
-                        isLight
-                          ? "bg-white border-slate-200 shadow-sm"
-                          : "bg-[#0E141D] border-white/[0.08]"
-                      }`}
-                    >
-                      <div
-                        className={`w-12 h-12 mx-auto rounded-xl border p-2 flex items-center justify-center overflow-hidden ${
-                          isLight
-                            ? "bg-slate-50 border-slate-200 text-slate-700"
-                            : "bg-[#121A25] border-white/[0.08] text-slate-300"
-                        }`}
-                      >
-                        {cat.image_url ? (
-                          <img
-                            src={cat.image_url}
-                            alt={cat.name}
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <span className="text-2xl">{cat.icon || "📱"}</span>
-                        )}
-                      </div>
-                      <span className="text-xs font-semibold block truncate">
-                        {cat.name}
-                      </span>
-                    </div>
-                  ))}
-              </div>
             </div>
           </div>
         </div>

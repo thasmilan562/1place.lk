@@ -350,6 +350,11 @@ export interface Category {
   name: string;
   slug: string;
   icon?: string;
+  iconType?: "library" | "upload";
+  iconName?: string;
+  iconUrl?: string;
+  iconStoragePath?: string;
+  isActive?: boolean;
   image_url?: string;
   hover_icon_url?: string;
   icon_alt_text?: string;
@@ -357,6 +362,7 @@ export interface Category {
   destination_url?: string;
   target_category_id?: string;
   sort_order: number;
+  sortOrder?: number;
   mobile_sort_order?: number;
   description?: string;
   product_count?: number;
@@ -369,6 +375,8 @@ export interface Category {
   is_featured_in_menu?: boolean;
   parent_id?: string;
   subcategories?: Subcategory[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type MegaMenuDestinationType =
