@@ -11,10 +11,6 @@ import {
   List,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
-  Search,
-  Tag,
-  ArrowRight,
 } from "lucide-react";
 import { Product, Category, Brand } from "@/lib/types";
 import ProductCard from "@/components/products/ProductCard";
@@ -545,41 +541,14 @@ export default function ProductsClient({
           </Link>
           <span className="text-neutral-400">/</span>
           <span className="text-black font-bold">
-            {activePrimaryTab !== "all"
-              ? PRIMARY_CATEGORY_TABS.find((t) => t.id === activePrimaryTab)?.label || "Products"
-              : "Shop All"}
+            Shop All
           </span>
         </nav>
 
         {/* Accessible heading for SEO and screen readers */}
         <h1 className="sr-only">
-          {activePrimaryTab !== "all"
-            ? `${PRIMARY_CATEGORY_TABS.find((t) => t.id === activePrimaryTab)?.label || "Products"} in Sri Lanka`
-            : "Mobile Phones & Accessories in Sri Lanka"}
+          Mobile Phones &amp; Accessories in Sri Lanka
         </h1>
-
-        {/* ── 2. Primary Category Tabs ── */}
-        <div className="flex items-center justify-start border-b border-neutral-200 mb-4 sm:mb-6 overflow-x-auto whitespace-nowrap scrollbar-none">
-          <div className="flex items-center gap-1.5 sm:gap-4 pb-2 sm:pb-0">
-            {PRIMARY_CATEGORY_TABS.map((tab) => {
-              const isActive = activePrimaryTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => handlePrimaryTabChange(tab.id)}
-                  className={`relative py-2 sm:py-3.5 px-3.5 sm:px-4 rounded-full sm:rounded-none text-xs sm:text-sm font-bold transition-all cursor-pointer select-none shrink-0 ${
-                    isActive
-                      ? "bg-black text-white sm:bg-transparent sm:text-black sm:font-extrabold sm:border-b-2 sm:border-black sm:-mb-[1px] shadow-xs sm:shadow-none"
-                      : "bg-[#F5F5F7] text-neutral-600 hover:text-black hover:bg-neutral-200/80 sm:bg-transparent sm:border-b-2 sm:border-transparent"
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
         {/* ── 3. Compact Toolbar Row ── */}
         <div className="flex items-center justify-between gap-2.5 mb-4 sm:mb-6 flex-wrap">
