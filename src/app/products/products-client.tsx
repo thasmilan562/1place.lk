@@ -328,8 +328,14 @@ export default function ProductsClient({
           if (s === "headphones" || s === "headphone" || s === "cat-headphones" || s === "neckband") {
             return cName.includes("headphone") || cName.includes("neckband") || pName.includes("headphone") || pName.includes("headset") || pName.includes("neckband");
           }
-          if (s === "keyboards" || s === "keyboard" || s === "mouse" || s === "cat-keyboard" || s === "cat-mouse") {
-            return cName.includes("keyboard") || cName.includes("mouse") || pName.includes("keyboard") || pName.includes("mouse");
+          if (s === "keyboards-and-mouse" || s === "keyboards" || s === "keyboard" || s === "mouse" || s === "cat-keyboard" || s === "cat-mouse") {
+            return cName.includes("keyboard") || cName.includes("mouse") || cSlug.includes("keyboard") || pName.includes("keyboard") || pName.includes("mouse");
+          }
+          if (s === "beauty-skincare" || s === "beauty-and-skincare" || s === "beauty" || s === "skincare") {
+            return cName.includes("beauty") || cName.includes("skin") || cSlug.includes("beauty") || cSlug.includes("skin");
+          }
+          if (s === "toys-kids" || s === "toys" || s === "toy" || s === "toys-games" || s === "toys-and-games") {
+            return cName.includes("toy") || cSlug.includes("toy");
           }
           if (s === "gimbals" || s === "gimbal" || s === "tripod" || s === "stand" || s === "lights" || s === "selife-stick" || s === "cat--gimbal" || s === "cat-tripod" || s === "cat-stand" || s === "cat-lights") {
             return cName.includes("gimbal") || cName.includes("tripod") || cName.includes("stand") || cName.includes("light") || cName.includes("stick") || pName.includes("gimbal") || pName.includes("tripod") || pName.includes("stick") || pName.includes("light");
@@ -683,12 +689,12 @@ export default function ProductsClient({
                 </button>
               </div>
             ) : (
-              /* Product Grid (4 Columns Desktop) */
+              /* Product Grid (roomy premium cards on desktop) */
               <div>
                 <div
                   className={
                     viewMode === "grid"
-                      ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5 sm:gap-3.5 lg:gap-4"
+                      ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-5"
                       : "grid grid-cols-1 gap-3 sm:gap-4"
                   }
                 >

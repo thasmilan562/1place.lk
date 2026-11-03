@@ -1,7 +1,2 @@
 import { redirect } from "next/navigation";
-
-export const dynamic = "force-dynamic";
-
-export default function AdminGalleryPage() {
-  redirect("/admin/dashboard?tab=gallery");
-}
+export default function RetiredAdminPage() { redirect("/admin/dashboard"); }

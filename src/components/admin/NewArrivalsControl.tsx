@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  Sparkles,
+  CircleCheck as Sparkles,
   Save,
   CheckCircle2,
   Sliders,

@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, CircleCheck as Sparkles } from "lucide-react";
 
 export default function PromoBannerSplit() {
   return (

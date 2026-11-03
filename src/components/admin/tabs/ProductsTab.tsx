@@ -23,7 +23,7 @@ import {
   Smartphone, 
   CheckSquare, 
   Square, 
-  Sparkles, 
+  CircleCheck as Sparkles, 
   RefreshCw, 
   SlidersHorizontal,
   Layers, 
@@ -110,7 +110,7 @@ export default function ProductsTab({
   const { isLight } = useAdminTheme();
 
   // ── Mode Switch: "categories" (Category-First Flow) | "all_products" (Global Table) ──
-  const [catalogMode, setCatalogMode] = useState<"categories" | "all_products">("categories");
+  const [catalogMode, setCatalogMode] = useState<"categories" | "all_products">("all_products");
 
   // ── Navigation State: Category & Brand ──
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -194,7 +194,7 @@ export default function ProductsTab({
       const brandParam = params.get("brand");
       const modeParam = params.get("catalog_mode");
 
-      if (modeParam === "all_products") {
+      if (modeParam === "all_products" || (!modeParam && !catParam)) {
         setCatalogMode("all_products");
       } else {
         setCatalogMode("categories");
@@ -1623,9 +1623,7 @@ export default function ProductsTab({
               <h4 className="text-xl font-bold font-mono tracking-tight">
                 {totalCount}
               </h4>
-              <span className="text-[10px] font-semibold text-emerald-500 hidden sm:inline-flex items-center gap-0.5">
-                <TrendingUp className="w-2.5 h-2.5" /> 12%
-              </span>
+              
             </div>
           </div>
         </div>
@@ -1645,9 +1643,7 @@ export default function ProductsTab({
               <h4 className="text-xl font-bold font-mono tracking-tight text-amber-500 dark:text-amber-400">
                 {totalFeaturedCount}
               </h4>
-              <span className="text-[10px] font-semibold text-emerald-500 hidden sm:inline-flex items-center gap-0.5">
-                <TrendingUp className="w-2.5 h-2.5" /> 8%
-              </span>
+              
             </div>
           </div>
         </div>
@@ -1667,9 +1663,7 @@ export default function ProductsTab({
               <h4 className="text-xl font-bold font-mono tracking-tight text-purple-500 dark:text-purple-400">
                 {totalNewArrivalsCount}
               </h4>
-              <span className="text-[10px] font-semibold text-emerald-500 hidden sm:inline-flex items-center gap-0.5">
-                <TrendingUp className="w-2.5 h-2.5" /> 15%
-              </span>
+              
             </div>
           </div>
         </div>
@@ -1689,9 +1683,7 @@ export default function ProductsTab({
               <h4 className="text-xl font-bold font-mono tracking-tight text-emerald-500 dark:text-emerald-400">
                 {inStockCount}
               </h4>
-              <span className="text-[10px] font-semibold text-emerald-500 hidden sm:inline-flex items-center gap-0.5">
-                <TrendingUp className="w-2.5 h-2.5" /> 6%
-              </span>
+              
             </div>
           </div>
         </div>
@@ -1711,9 +1703,7 @@ export default function ProductsTab({
               <h4 className="text-xl font-bold font-mono tracking-tight text-amber-500 dark:text-amber-400">
                 {lowStockCount}
               </h4>
-              <span className="text-[10px] font-semibold text-red-500 hidden sm:inline-flex items-center gap-0.5">
-                <TrendingDown className="w-2.5 h-2.5" /> 3%
-              </span>
+              
             </div>
           </div>
         </div>
@@ -1733,9 +1723,7 @@ export default function ProductsTab({
               <h4 className="text-xl font-bold font-mono tracking-tight text-red-500 dark:text-red-400">
                 {outOfStockCount}
               </h4>
-              <span className="text-[10px] font-semibold text-red-500 hidden sm:inline-flex items-center gap-0.5">
-                <TrendingDown className="w-2.5 h-2.5" /> 2%
-              </span>
+              
             </div>
           </div>
         </div>

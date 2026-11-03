@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  Sparkles,
+  CircleCheck as Sparkles,
   Save,
   Check,
   Smartphone,
@@ -60,6 +60,7 @@ const PLACEMENT_OPTIONS: { value: ShowcasePlacement; label: string; icon: string
   { value: "below_reviews", label: 'Below "Reviews from Google"', icon: "⭐" },
   { value: "above_why_choose", label: 'Above "Why Choose 1PLACE.LK"', icon: "🛡️" },
   { value: "below_why_choose", label: 'Below "Why Choose 1PLACE.LK"', icon: "🛡️" },
+  { value: "benefits_banner_slot", label: "Shopping Benefits Replacement Banner (Compact Ad)", icon: "📣" },
   { value: "below_hero", label: "Below Hero Banner Slider", icon: "🌟" },
   { value: "below_new_arrivals", label: 'Below "New Arrivals"', icon: "🚀" },
   { value: "below_featured_phones", label: 'Below "Featured Mobile Phones"', icon: "📱" },

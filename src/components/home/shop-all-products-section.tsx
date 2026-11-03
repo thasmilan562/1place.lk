@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Package, RefreshCw, ArrowRight, Check } from "lucide-react";
+import Link from "next/link";
+import { Package, ArrowRight } from "lucide-react";
 import ProductCard from "@/components/products/ProductCard";
 import TodayDealSection from "@/components/home/today-deal-section";
 import VisualProductShowcase from "@/components/home/visual-product-showcase";
@@ -18,8 +19,6 @@ interface ShopAllProductsSectionProps {
   showcaseSettings?: VisualShowcaseSettings | null;
 }
 
-const ITEMS_PER_BATCH = 18; // 3 full rows of 6 cards on desktop
-
 export default function ShopAllProductsSection({
   initialProducts = [],
   todayDealSettings,
@@ -28,29 +27,16 @@ export default function ShopAllProductsSection({
   const [productsList, setProductsList] = useState<Product[]>(() =>
     deduplicateProductsBySlug(initialProducts)
   );
-  const [visibleCount, setVisibleCount] = useState<number>(ITEMS_PER_BATCH);
-  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
-  const [colsCount, setColsCount] = useState<number>(6);
+  const [colsCount, setColsCount] = useState<number>(4);
   const [liveShowcaseSettings, setLiveShowcaseSettings] = useState<VisualShowcaseSettings | null>(() => {
     return showcaseSettings || DEFAULT_SHOWCASE_SETTINGS;
   });
   const sectionRef = useRef<HTMLElement>(null);
 
-  // Responsive column detection (2 cols on mobile, 3 sm, 4 md, 5 lg, 6 xl)
+  // Match the Featured Products card frame: four columns on desktop, two on mobile.
   useEffect(() => {
     const handleResize = () => {
-      const w = window.innerWidth;
-      if (w >= 1280) {
-        setColsCount(6);
-      } else if (w >= 1024) {
-        setColsCount(5);
-      } else if (w >= 768) {
-        setColsCount(4);
-      } else if (w >= 640) {
-        setColsCount(3);
-      } else {
-        setColsCount(2);
-      }
+      setColsCount(window.innerWidth >= 768 ? 4 : 2);
     };
     handleResize();
     window.addEventListener("resize", handleResize);
@@ -64,13 +50,11 @@ export default function ShopAllProductsSection({
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          if (!snapshot.empty) {
+          {
             const liveDocs = snapshot.docs.map((d) =>
               normalizeProduct({ ...d.data(), id: d.id } as Product)
             );
-            if (liveDocs.length > 0) {
-              setProductsList(deduplicateProductsBySlug(liveDocs));
-            }
+            setProductsList(deduplicateProductsBySlug(liveDocs));
           }
         },
         (err) => {
@@ -121,10 +105,8 @@ export default function ShopAllProductsSection({
     });
   }, [productsList]);
 
-  // Currently visible products slice (Pagination)
-  const displayedProducts = useMemo(() => {
-    return publishedProducts.slice(0, visibleCount);
-  }, [publishedProducts, visibleCount]);
+  // Show the complete published catalog in the same card grid as Featured Products.
+  const displayedProducts = publishedProducts;
 
   // ── 4. Collect Showcase Banners Grouped by Target Product Line ──
   const showcaseBannersByLine = useMemo(() => {
@@ -236,17 +218,6 @@ export default function ShopAllProductsSection({
     return result;
   }, [displayedProducts, colsCount, showcaseBannersByLine, todayDealSettings]);
 
-  const hasMore = visibleCount < publishedProducts.length;
-  const remainingCount = Math.max(0, publishedProducts.length - visibleCount);
-
-  const handleLoadMore = () => {
-    setIsLoadingMore(true);
-    setTimeout(() => {
-      setVisibleCount((prev) => prev + ITEMS_PER_BATCH);
-      setIsLoadingMore(false);
-    }, 250);
-  };
-
   if (publishedProducts.length === 0) {
     return null;
   }
@@ -258,13 +229,31 @@ export default function ShopAllProductsSection({
       aria-label="Shop All Products"
       className="w-full py-6 sm:py-8 font-sans"
     >
+      <div className="premium-section-heading">
+        <div>
+          <p className="premium-eyebrow">THE COLLECTION</p>
+          <h2>All Products</h2>
+          <p>Explore the full collection in one place.</p>
+        </div>
+        <Link href="/products" className="premium-text-link">Browse catalogue <ArrowRight size={16} /></Link>
+      </div>
       {/* ── Interleaved Product Grids & Showcase Banners ── */}
       {segments.map((segment, segIdx) => (
         <React.Fragment key={`segment-${segIdx}`}>
           {/* Product Cards Grid Chunk */}
           {segment.products.length > 0 && (
             <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6 sm:mb-8">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3.5 lg:gap-4">
+              <div
+                className={
+                  segment.products.length === 1
+                    ? "premium-product-grid premium-product-grid--one"
+                    : segment.products.length === 2
+                    ? "premium-product-grid premium-product-grid--two"
+                    : segment.products.length <= 4
+                    ? "premium-product-grid"
+                    : "premium-product-grid"
+                }
+              >
                 {segment.products.map((product) => (
                   <div key={product.id} className="h-full">
                     <ProductCard product={product} />
@@ -308,69 +297,8 @@ export default function ShopAllProductsSection({
         </div>
       )}
 
-      {/* ── Progress Bar & Load More Products Section ── */}
       {publishedProducts.length > 0 && (
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mt-12 sm:mt-16 flex flex-col items-center justify-center max-w-sm sm:max-w-md mx-auto text-center font-sans px-4">
-            {/* Progress Header: Showing X of Y products & Percentage */}
-            <div className="w-full flex items-center justify-between text-xs sm:text-[13px] font-medium text-neutral-600 mb-2">
-              <span>
-                Showing <span className="font-bold text-neutral-900">{Math.min(displayedProducts.length, publishedProducts.length)}</span> of <span className="font-bold text-neutral-900">{publishedProducts.length}</span> products
-              </span>
-              <span className="font-bold text-neutral-900">
-                {publishedProducts.length > 0
-                  ? Math.min(100, Math.round((Math.min(displayedProducts.length, publishedProducts.length) / publishedProducts.length) * 100))
-                  : 100}%
-              </span>
-            </div>
-
-            {/* Thin Progress Bar with Burgundy Fill */}
-            <div className="w-full h-1.5 sm:h-2 bg-neutral-200/90 rounded-full overflow-hidden mb-6">
-              <div
-                className="h-full bg-[#64152F] rounded-full transition-all duration-500 ease-out"
-                style={{
-                  width: `${
-                    publishedProducts.length > 0
-                      ? Math.min(100, Math.round((Math.min(displayedProducts.length, publishedProducts.length) / publishedProducts.length) * 100))
-                      : 100
-                  }%`,
-                }}
-                role="progressbar"
-                aria-valuenow={
-                  publishedProducts.length > 0
-                    ? Math.min(100, Math.round((Math.min(displayedProducts.length, publishedProducts.length) / publishedProducts.length) * 100))
-                    : 100
-                }
-                aria-valuemin={0}
-                aria-valuemax={100}
-              />
-            </div>
-
-            {/* Load More Button */}
-            {hasMore ? (
-              <button
-                onClick={handleLoadMore}
-                disabled={isLoadingMore}
-                className="px-8 sm:px-10 py-3 sm:py-3.5 bg-[#64152F] hover:bg-[#4E0F23] text-white text-xs sm:text-sm font-bold rounded-full shadow-md hover:shadow-lg transition-all duration-200 active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2.5 group disabled:opacity-70 disabled:cursor-not-allowed"
-                aria-label={`Load ${remainingCount} more products`}
-              >
-                <RefreshCw className={`w-4 h-4 text-white shrink-0 ${isLoadingMore ? "animate-spin" : "opacity-90"}`} />
-                <span>Load More Products</span>
-                {remainingCount > 0 && (
-                  <span className="text-white/80 font-normal text-xs">
-                    ({remainingCount} remaining)
-                  </span>
-                )}
-                <ArrowRight className="w-4 h-4 text-white transition-transform group-hover:translate-x-1 shrink-0" />
-              </button>
-            ) : (
-              <div className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-neutral-100 border border-neutral-200/70 text-neutral-600 text-xs font-semibold">
-                <Check className="w-4 h-4 text-[#64152F]" />
-                <span>All {publishedProducts.length} products loaded</span>
-              </div>
-            )}
-          </div>
-        </div>
+        <p className="premium-catalog-summary">Showing all {publishedProducts.length} products in the collection.</p>
       )}
     </section>
   );

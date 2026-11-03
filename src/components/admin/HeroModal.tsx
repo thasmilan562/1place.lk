@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Image as ImageIcon, Check, Upload, Sparkles, Sliders, Layers, Monitor, Smartphone, Calendar, Link as LinkIcon } from "lucide-react";
+import { X, Image as ImageIcon, Check, Upload, CircleCheck as Sparkles, Sliders, Layers, Monitor, Smartphone, Calendar, Link as LinkIcon } from "lucide-react";
 import { HeroSlide } from "@/lib/types";
 import { uploadImageWithFallback } from "@/lib/upload-utils";
 
@@ -44,30 +44,15 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
   const [showHeadingLine2, setShowHeadingLine2] = useState(true);
   const [headingLine1Color, setHeadingLine1Color] = useState("#FFFFFF");
   const [headingLine2Color, setHeadingLine2Color] = useState("#FFFFFF");
-  const [headingLine1Size, setHeadingLine1Size] = useState("clamp(48px, 3.25vw, 62px)");
-  const [headingLine2Size, setHeadingLine2Size] = useState("clamp(48px, 3.25vw, 62px)");
-  const [headingLine1Weight, setHeadingLine1Weight] = useState("800");
-  const [headingLine2Weight, setHeadingLine2Weight] = useState("800");
   const [headingLine1Casing, setHeadingLine1Casing] = useState<"as_typed" | "uppercase" | "title_case">("as_typed");
   const [headingLine2Casing, setHeadingLine2Casing] = useState<"as_typed" | "uppercase" | "title_case">("as_typed");
   const [showDescription, setShowDescription] = useState(true);
   const [showPrimaryButton, setShowPrimaryButton] = useState(true);
-  const [showTrustStrip, setShowTrustStrip] = useState(true);
-  const [trustItem1, setTrustItem1] = useState("Genuine Products");
-  const [trustItem2, setTrustItem2] = useState("Islandwide Delivery");
-  const [trustItem3, setTrustItem3] = useState("Secure Payments");
-
-  const [badgeTextColor, setBadgeTextColor] = useState("#FFFFFF");
-  const [badgeBgColor, setBadgeBgColor] = useState("#10B981");
-  const [headingColor, setHeadingColor] = useState("#FFFFFF");
   const [descriptionColor, setDescriptionColor] = useState("#D1D5DB");
   const [buttonTextColor, setButtonTextColor] = useState("#000000");
   const [buttonBgColor, setButtonBgColor] = useState("#FFFFFF");
-  const [secondaryButtonTextColor, setSecondaryButtonTextColor] = useState("#FFFFFF");
-  const [secondaryButtonBgColor, setSecondaryButtonBgColor] = useState("rgba(255,255,255,0.1)");
-  const [secondaryButtonBorderColor, setSecondaryButtonBorderColor] = useState("rgba(255,255,255,0.25)");
   const [overlayColor, setOverlayColor] = useState("#000000");
-  const [overlayOpacity, setOverlayOpacity] = useState<number>(40);
+  const [overlayOpacity, setOverlayOpacity] = useState<number>(0);
   const [desktopImagePosition, setDesktopImagePosition] = useState("center");
   const [mobileImagePosition, setMobileImagePosition] = useState("center");
 
@@ -89,25 +74,20 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
   const [hideButtonsOnMobile, setHideButtonsOnMobile] = useState(false);
 
   // Full-Width Banner & Image Fit Controls
-  const [bannerBgColor, setBannerBgColor] = useState("#64152F");
-  const [desktopBannerHeight, setDesktopBannerHeight] = useState("620px");
-  const [mobileBannerHeight, setMobileBannerHeight] = useState("440px");
-  const [imageFitMode, setImageFitMode] = useState<"contain" | "cover">("cover");
   const [descriptionSize, setDescriptionSize] = useState("16px");
+  const [buttonSize, setButtonSize] = useState<"small" | "medium" | "large">("medium");
   const [autoplayDuration, setAutoplayDuration] = useState<number>(5.5);
 
   const [desktopFile, setDesktopFile] = useState<File | null>(null);
   const [mobileFile, setMobileFile] = useState<File | null>(null);
   const [desktopPreview, setDesktopPreview] = useState<string>("");
   const [mobilePreview, setMobilePreview] = useState<string>("");
-  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
-  const [bannerSizeRatio, setBannerSizeRatio] = useState<"1080x1080" | "860x270" | "1920x850" | "1080x1440" | "default">("default");
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
 
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (slide) {
-      setBannerSizeRatio(slide.banner_size_ratio || slide.bannerSizeRatio || "default");
       setImageUrl(slide.desktop_image_url || slide.image_url || "");
       setMobileImageUrl(slide.mobile_image_url || "");
       setDesktopPreview(slide.desktop_image_url || slide.image_url || "");
@@ -121,10 +101,6 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
       setShowHeadingLine2(slide.show_heading_line_2 ?? true);
       setHeadingLine1Color(slide.heading_line_1_color || slide.headingLine1Color || slide.heading_color || "#FFFFFF");
       setHeadingLine2Color(slide.heading_line_2_color || slide.headingLine2Color || slide.heading_color || "#FFFFFF");
-      setHeadingLine1Size(slide.heading_line_1_size || "clamp(48px, 3.25vw, 62px)");
-      setHeadingLine2Size(slide.heading_line_2_size || "clamp(48px, 3.25vw, 62px)");
-      setHeadingLine1Weight(slide.heading_line_1_weight || "800");
-      setHeadingLine2Weight(slide.heading_line_2_weight || "800");
       setHeadingLine1Casing(slide.heading_line_1_casing || "as_typed");
       setHeadingLine2Casing(slide.heading_line_2_casing || "as_typed");
       setDescription(slide.description || "");
@@ -135,10 +111,6 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
       setShowDescription(slide.show_description ?? true);
       setShowPrimaryButton(slide.show_primary_button ?? true);
       setShowSecondaryButton(slide.show_secondary_button ?? false);
-      setShowTrustStrip(slide.show_trust_strip ?? true);
-      setTrustItem1(slide.trust_item_1 || "Genuine Products");
-      setTrustItem2(slide.trust_item_2 || "Islandwide Delivery");
-      setTrustItem3(slide.trust_item_3 || "Secure Payments");
       setSecondaryButtonText(slide.secondary_button_text || "View Product");
       setSecondaryButtonUrl(slide.secondary_button_url || "");
       setStartDate(slide.start_date || "");
@@ -151,26 +123,16 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
       setHideTextOnMobile(slide.hide_text_on_mobile ?? false);
       setHideButtonsOnMobile(slide.hide_buttons_on_mobile ?? false);
 
-      // Full-Width Banner & Image Fit Controls
-      setBannerBgColor(slide.banner_bg_color || slide.bg_color || "#64152F");
-      setDesktopBannerHeight(slide.desktop_banner_height || "620px");
-      setMobileBannerHeight(slide.mobile_banner_height || "440px");
-      setImageFitMode(slide.image_fit_mode || "cover");
       setDescriptionSize(slide.description_size || "16px");
+      setButtonSize(slide.button_size || "medium");
       setAutoplayDuration(slide.autoplay_duration ?? 5.5);
 
       // Custom Styling
-      setBadgeTextColor(slide.badge_text_color || "#FFFFFF");
-      setBadgeBgColor(slide.badge_bg_color || "#10B981");
-      setHeadingColor(slide.heading_color || "#FFFFFF");
       setDescriptionColor(slide.description_color || "#D1D5DB");
       setButtonTextColor(slide.button_text_color || "#000000");
       setButtonBgColor(slide.button_bg_color || "#FFFFFF");
-      setSecondaryButtonTextColor(slide.secondary_button_text_color || "#FFFFFF");
-      setSecondaryButtonBgColor(slide.secondary_button_bg_color || "rgba(255,255,255,0.1)");
-      setSecondaryButtonBorderColor(slide.secondary_button_border_color || "rgba(255,255,255,0.25)");
       setOverlayColor(slide.overlay_color || "#000000");
-      setOverlayOpacity(slide.overlay_opacity ?? 40);
+      setOverlayOpacity(slide.overlay_opacity ?? 0);
       setDesktopImagePosition(slide.desktop_image_position || "center");
       setMobileImagePosition(slide.mobile_image_position || "center");
 
@@ -199,10 +161,6 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
       setShowHeadingLine2(true);
       setHeadingLine1Color("#FFFFFF");
       setHeadingLine2Color("#FFFFFF");
-      setHeadingLine1Size("clamp(48px, 3.25vw, 62px)");
-      setHeadingLine2Size("clamp(48px, 3.25vw, 62px)");
-      setHeadingLine1Weight("800");
-      setHeadingLine2Weight("800");
       setHeadingLine1Casing("as_typed");
       setHeadingLine2Casing("as_typed");
       setDescription("");
@@ -226,25 +184,16 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
       setHideButtonsOnMobile(false);
 
       // Full-Width Banner & Image Fit Controls Defaults
-      setBannerBgColor("#64152F");
-      setDesktopBannerHeight("620px");
-      setMobileBannerHeight("440px");
-      setImageFitMode("contain");
       setDescriptionSize("16px");
+      setButtonSize("medium");
       setAutoplayDuration(5.5);
 
       // Default Custom Styling
-      setBadgeTextColor("#FFFFFF");
-      setBadgeBgColor("#10B981");
-      setHeadingColor("#FFFFFF");
       setDescriptionColor("#D1D5DB");
       setButtonTextColor("#000000");
       setButtonBgColor("#FFFFFF");
-      setSecondaryButtonTextColor("#FFFFFF");
-      setSecondaryButtonBgColor("rgba(255,255,255,0.1)");
-      setSecondaryButtonBorderColor("rgba(255,255,255,0.25)");
       setOverlayColor("#000000");
-      setOverlayOpacity(40);
+      setOverlayOpacity(0);
       setDesktopImagePosition("center");
       setMobileImagePosition("center");
 
@@ -320,10 +269,6 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
         headingLine1Color: headingLine1Color,
         heading_line_2_color: headingLine2Color,
         headingLine2Color: headingLine2Color,
-        heading_line_1_size: headingLine1Size,
-        heading_line_2_size: headingLine2Size,
-        heading_line_1_weight: headingLine1Weight,
-        heading_line_2_weight: headingLine2Weight,
         heading_line_1_casing: headingLine1Casing,
         heading_line_2_casing: headingLine2Casing,
         description: description.trim(),
@@ -334,10 +279,6 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
         show_description: showDescription,
         show_primary_button: showPrimaryButton,
         show_secondary_button: showSecondaryButton,
-        show_trust_strip: showTrustStrip,
-        trust_item_1: trustItem1.trim(),
-        trust_item_2: trustItem2.trim(),
-        trust_item_3: trustItem3.trim(),
         secondary_button_text: secondaryButtonText.trim() || "View Product",
         secondary_button_url: secondaryButtonUrl.trim(),
         start_date: startDate,
@@ -351,15 +292,9 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
         hide_buttons_on_mobile: hideButtonsOnMobile,
 
         // Custom Styling
-        badge_text_color: badgeTextColor,
-        badge_bg_color: badgeBgColor,
-        heading_color: headingColor,
         description_color: descriptionColor,
         button_text_color: buttonTextColor,
         button_bg_color: buttonBgColor,
-        secondary_button_text_color: secondaryButtonTextColor,
-        secondary_button_bg_color: secondaryButtonBgColor,
-        secondary_button_border_color: secondaryButtonBorderColor,
         overlay_color: overlayColor,
         overlay_opacity: Number(overlayOpacity) ?? 40,
         desktop_image_position: desktopImagePosition,
@@ -375,16 +310,11 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
         font_weight: fontWeight,
         line_height: lineHeight,
         letter_spacing: letterSpacing,
-        banner_size_ratio: bannerSizeRatio,
-        bannerSizeRatio: bannerSizeRatio,
+        banner_layout: "full_image",
 
         // Full-Width Banner & Image Fit Controls
-        banner_bg_color: bannerBgColor.trim(),
-        bg_color: bannerBgColor.trim(),
-        desktop_banner_height: desktopBannerHeight,
-        mobile_banner_height: mobileBannerHeight,
-        image_fit_mode: imageFitMode,
         description_size: descriptionSize,
+        button_size: buttonSize,
         autoplay_duration: Number(autoplayDuration) || 5.5,
       });
 
@@ -457,17 +387,15 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
             {/* Live Banner Box */}
             <div
               className={`relative w-full rounded-2xl overflow-hidden border border-white/20 shadow-xl transition-all ${
-                previewDevice === "mobile" ? "aspect-[9/11] max-w-xs mx-auto" : "aspect-[21/9]"
+                previewDevice === "mobile" ? "aspect-video w-full" : "aspect-[2200/675]"
               }`}
-              style={{ background: bannerBgColor }}
+              style={{ background: "#f0eeeb" }}
             >
               {/* Background / Product Image */}
               <img
                 src={currentPreviewImage}
                 alt="Banner preview"
-                className={`absolute inset-0 w-full h-full transition-all ${
-                  imageFitMode === "contain" ? "object-contain" : "object-cover"
-                }`}
+                className="absolute inset-0 w-full h-full object-cover transition-all"
                 style={{
                   objectPosition: previewDevice === "mobile" ? mobileImagePosition : desktopImagePosition,
                 }}
@@ -486,23 +414,30 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
               />
 
               {/* Text Layer */}
-              <div className="relative z-20 p-5 sm:p-7 h-full flex flex-col justify-between pointer-events-none">
-                <div className="max-w-md space-y-1.5">
+              <div
+                className="absolute inset-0 z-20 p-5 sm:p-7 flex flex-col pointer-events-none"
+                style={{
+                  justifyContent: contentVerticalPosition === "top" ? "flex-start" : contentVerticalPosition === "bottom" ? "flex-end" : "center",
+                  alignItems: contentHorizontalPosition === "left" ? "flex-start" : contentHorizontalPosition === "right" ? "flex-end" : "center",
+                  textAlign,
+                }}
+              >
+                <div className="space-y-1.5" style={{ width: "min(100%, " + (contentMaxWidth === "full" ? "100%" : contentMaxWidth) + ")" }}>
                   {campaignLabel && showBadge && (
                     <span
                       className="inline-block px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-md"
-                      style={{ color: badgeTextColor, backgroundColor: badgeBgColor }}
+                      style={{ color: "#805166", backgroundColor: "transparent" }}
                     >
                       {campaignLabel}
                     </span>
                   )}
                   <h4
-                    className="text-base sm:text-xl font-black leading-tight tracking-tight drop-shadow-md"
-                    style={{ color: headingLine1Color || headingColor }}
+                    className="font-black leading-tight tracking-tight drop-shadow-md"
+                    style={{ color: headingLine1Color, fontSize: previewDevice === "mobile" ? mobileHeadingSize : desktopHeadingSize, lineHeight, letterSpacing, fontFamily, fontWeight }}
                   >
                     {headingLine1 || heading || "Banner Heading"}
                     {headingLine2 && (
-                      <span className="block" style={{ color: headingLine2Color || headingColor }}>
+                      <span className="block" style={{ color: headingLine2Color }}>
                         {headingLine2}
                       </span>
                     )}
@@ -525,17 +460,17 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 pt-2">
+                <div className="flex items-center gap-2 pt-2 w-full" style={{ justifyContent: contentHorizontalPosition === "left" ? "flex-start" : contentHorizontalPosition === "right" ? "flex-end" : "center" }}>
                   {showPrimaryButton && (
                     <span
-                      className="px-4 py-1.5 text-xs font-bold rounded-full shadow-sm"
-                      style={{ color: buttonTextColor, backgroundColor: buttonBgColor }}
+                      className="font-bold rounded-md shadow-sm"
+                      style={{ color: buttonTextColor, backgroundColor: buttonBgColor, fontSize: buttonSize === "small" ? "11px" : buttonSize === "large" ? "16px" : "13px", padding: buttonSize === "small" ? "6px 14px" : buttonSize === "large" ? "12px 28px" : "8px 20px" }}
                     >
                       {primaryButtonText || "Shop Now"}
                     </span>
                   )}
                   {showSecondaryButton && (
-                    <span className="px-3.5 py-1.5 border border-white/30 text-white text-xs font-bold rounded-full bg-black/30 backdrop-blur-md">
+                    <span className="border border-white/30 text-white font-bold rounded-full bg-black/30 backdrop-blur-md" style={{ fontSize: buttonSize === "small" ? "10px" : buttonSize === "large" ? "15px" : "12px", padding: buttonSize === "small" ? "5px 12px" : buttonSize === "large" ? "11px 24px" : "7px 18px" }}>
                       {secondaryButtonText || "View"}
                     </span>
                   )}
@@ -557,141 +492,9 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
               </span>
             </div>
 
-            {/* Background Color & Blending */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-white/90">
-                  Banner Background Color (Blends with Uploaded Artwork)
-                </label>
-                <span className="text-[10px] text-white/50 font-mono">{bannerBgColor}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={bannerBgColor.startsWith("#") ? bannerBgColor : "#64152F"}
-                  onChange={(e) => setBannerBgColor(e.target.value)}
-                  className="w-10 h-10 rounded-xl border border-white/20 cursor-pointer bg-transparent shrink-0"
-                />
-                <input
-                  type="text"
-                  value={bannerBgColor}
-                  onChange={(e) => setBannerBgColor(e.target.value)}
-                  placeholder="#64152F"
-                  className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs font-mono font-bold focus:ring-1 focus:ring-rose-500 outline-none uppercase"
-                />
-              </div>
-
-              {/* Quick Brand Color Presets */}
-              <div className="flex items-center gap-1.5 pt-1 flex-wrap">
-                <span className="text-[10px] text-white/50 font-medium mr-1">Brand Presets:</span>
-                {[
-                  { label: "1PLACE Burgundy", color: "#64152F" },
-                  { label: "Deep Wine", color: "#4A0E22" },
-                  { label: "Jet Black", color: "#111111" },
-                  { label: "Midnight Slate", color: "#0F172A" },
-                  { label: "Pure White", color: "#FFFFFF" },
-                ].map((preset) => (
-                  <button
-                    key={preset.color}
-                    type="button"
-                    onClick={() => setBannerBgColor(preset.color)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 transition-all cursor-pointer"
-                  >
-                    <span
-                      className="w-2.5 h-2.5 rounded-full border border-white/20"
-                      style={{ backgroundColor: preset.color }}
-                    />
-                    <span>{preset.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Image Fit Mode: Contain vs Cover */}
-            <div className="pt-3 border-t border-white/10 space-y-2">
-              <label className="block text-xs font-bold text-white/90">
-                Image Fit Mode (Display Mode for Uploaded Image)
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setImageFitMode("cover")}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1 ${
-                    imageFitMode === "cover"
-                      ? "bg-rose-600/30 border-rose-500 text-white shadow-md ring-1 ring-rose-500"
-                      : "bg-black/30 border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-xs text-white">Cover (Full Frame)</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500 text-white">Recommended</span>
-                  </div>
-                  <p className="text-[10px] text-white/60 leading-tight">
-                    Fills the entire hero section edge-to-edge as a background image with text overlaid on top.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setImageFitMode("contain")}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1 ${
-                    imageFitMode === "contain"
-                      ? "bg-rose-600/30 border-rose-500 text-white shadow-md ring-1 ring-rose-500"
-                      : "bg-black/30 border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-xs text-white">Contain (Letterboxed)</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-neutral-600 text-white">No Crop</span>
-                  </div>
-                  <p className="text-[10px] text-white/60 leading-tight">
-                    Preserves original aspect ratio without cropping, blending with the background color.
-                  </p>
-                </button>
-              </div>
-            </div>
-
-            {/* Desktop & Mobile Banner Heights */}
-            <div className="pt-3 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-white/80 mb-1">
-                  Desktop Banner Height
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <select
-                    value={desktopBannerHeight}
-                    onChange={(e) => setDesktopBannerHeight(e.target.value)}
-                    className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs font-semibold focus:ring-1 focus:ring-rose-500 outline-none"
-                  >
-                    <option value="560px">560px (Compact)</option>
-                    <option value="600px">600px (Medium)</option>
-                    <option value="620px">620px (Default Standard)</option>
-                    <option value="680px">680px (Spacious)</option>
-                    <option value="740px">740px (Hero Cinematic)</option>
-                    <option value="auto">Auto</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-white/80 mb-1">
-                  Mobile Banner Height
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <select
-                    value={mobileBannerHeight}
-                    onChange={(e) => setMobileBannerHeight(e.target.value)}
-                    className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs font-semibold focus:ring-1 focus:ring-rose-500 outline-none"
-                  >
-                    <option value="380px">380px (Compact)</option>
-                    <option value="420px">420px (Standard)</option>
-                    <option value="440px">440px (Default Balanced)</option>
-                    <option value="480px">480px (Large)</option>
-                    <option value="520px">520px (Tall Showcase)</option>
-                    <option value="auto">Auto</option>
-                  </select>
-                </div>
-              </div>
+            <div className="pt-3 border-t border-white/10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3">
+              <p className="text-xs font-bold text-white">Responsive image fit</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-white/60">Desktop fills the full-width hero. Mobile uses a zoomed 16:9 crop; adjust the mobile focal position below.</p>
             </div>
 
             {/* Autoplay Duration & Description Font Size */}
@@ -728,49 +531,21 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                   <option value="20px">20px (Lead Prominent)</option>
                 </select>
               </div>
-            </div>
-          </div>
 
-          {/* ── BANNER SIZE / ASPECT RATIO SELECTOR ── */}
-          <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Sliders className="w-3.5 h-3.5" /> Banner Size &amp; Aspect Ratio Preset
-              </label>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold">
-                {bannerSizeRatio}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-              {[
-                { id: "default", label: "Default", badge: "1920×640", desc: "Responsive Standard Hero" },
-                { id: "1080x1080", label: "1080 × 1080", badge: "1:1 Square", desc: "Square Banner Frame" },
-                { id: "860x270", label: "860 × 270", badge: "~3.2:1 Wide", desc: "Wide Banner Strip" },
-                { id: "1920x850", label: "1920 × 850", badge: "~2.3:1 Wide", desc: "Cinematic Panoramic Frame" },
-                { id: "1080x1440", label: "1080 × 1440", badge: "3:4 Portrait", desc: "Tall Story / Vertical Poster" },
-              ].map((preset) => {
-                const isSelected = bannerSizeRatio === preset.id;
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => setBannerSizeRatio(preset.id as any)}
-                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1 ${
-                      isSelected
-                        ? "bg-emerald-600/30 border-emerald-500 text-white shadow-md ring-1 ring-emerald-500"
-                        : "bg-black/30 border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-[11px] text-white">{preset.label}</span>
-                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${isSelected ? "bg-emerald-500 text-white" : "bg-white/10 text-white/50"}`}>
-                        {preset.badge}
-                      </span>
-                    </div>
-                    <p className="text-[9px] leading-tight text-white/50 line-clamp-1">{preset.desc}</p>
-                  </button>
-                );
-              })}
+              <div>
+                <label className="block text-[11px] font-bold text-white/80 mb-1">
+                  Hero Button Size
+                </label>
+                <select
+                  value={buttonSize}
+                  onChange={(e) => setButtonSize(e.target.value as "small" | "medium" | "large")}
+                  className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs font-semibold focus:ring-1 focus:ring-rose-500 outline-none"
+                >
+                  <option value="small">Small</option>
+                  <option value="medium">Medium (Default)</option>
+                  <option value="large">Large</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -808,60 +583,6 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
 
             {/* Colors Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-white/70 mb-1">Badge Text</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={badgeTextColor}
-                    onChange={(e) => setBadgeTextColor(e.target.value)}
-                    className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent"
-                  />
-                  <input
-                    type="text"
-                    value={badgeTextColor}
-                    onChange={(e) => setBadgeTextColor(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white font-mono text-[11px]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-white/70 mb-1">Badge Background</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={badgeBgColor}
-                    onChange={(e) => setBadgeBgColor(e.target.value)}
-                    className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent"
-                  />
-                  <input
-                    type="text"
-                    value={badgeBgColor}
-                    onChange={(e) => setBadgeBgColor(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white font-mono text-[11px]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-white/70 mb-1">Heading Color</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={headingColor}
-                    onChange={(e) => setHeadingColor(e.target.value)}
-                    className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent"
-                  />
-                  <input
-                    type="text"
-                    value={headingColor}
-                    onChange={(e) => setHeadingColor(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white font-mono text-[11px]"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label className="block text-[11px] font-bold text-white/70 mb-1">Description Color</label>
                 <div className="flex items-center gap-2">
@@ -1303,54 +1024,6 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
               />
             </div>
 
-            {/* Trust Strip Manager Section */}
-            <div className="p-3.5 bg-white/5 border border-white/10 rounded-xl space-y-3 pt-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-white/90">Trust Strip Badges</label>
-                <label className="flex items-center gap-1.5 text-xs font-medium text-white/70 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showTrustStrip}
-                    onChange={(e) => setShowTrustStrip(e.target.checked)}
-                    className="w-3.5 h-3.5 accent-emerald-500 rounded"
-                  />
-                  Show Trust Strip
-                </label>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div>
-                  <label className="block text-[11px] font-semibold text-white/70 mb-1">Item 1</label>
-                  <input
-                    type="text"
-                    value={trustItem1}
-                    onChange={(e) => setTrustItem1(e.target.value)}
-                    placeholder="e.g. Genuine Products"
-                    className="w-full px-3 py-1.5 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-white/70 mb-1">Item 2</label>
-                  <input
-                    type="text"
-                    value={trustItem2}
-                    onChange={(e) => setTrustItem2(e.target.value)}
-                    placeholder="e.g. Islandwide Delivery"
-                    className="w-full px-3 py-1.5 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-white/70 mb-1">Item 3</label>
-                  <input
-                    type="text"
-                    value={trustItem3}
-                    onChange={(e) => setTrustItem3(e.target.value)}
-                    placeholder="e.g. Secure Payments"
-                    className="w-full px-3 py-1.5 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs"
-                  />
-                </div>
-              </div>
-            </div>
-
             {/* Responsive Typography Sizes */}
             <div className="pt-3 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
@@ -1651,3 +1324,4 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
     </div>
   );
 }
+

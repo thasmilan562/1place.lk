@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import { useDialogFocus } from "@/lib/use-dialog-focus";
+import { buildOrdersCSV } from "@/lib/order-admin-utils";
 import {
   normalizeOrder,
   formatLKR,
@@ -56,12 +58,12 @@ import {
   Bike,
   AlertTriangle,
   Layers,
-  Sparkles,
+  CircleCheck as Sparkles,
 } from "lucide-react";
 
 interface OrdersTabProps {
   orders: any[];
-  onUpdateStatus?: (id: string, newStatus: string) => void;
+  onUpdateStatus?: (id: string, newStatus: string) => Promise<void> | void;
   onDeleteOrder?: (id: string) => Promise<boolean | void> | void;
   onBulkDeleteOrders?: (ids: string[]) => Promise<{ deletedCount: number; failedCount: number }>;
   onRefresh?: () => void;
@@ -75,13 +77,7 @@ export default function OrdersTab({
   onRefresh,
 }: OrdersTabProps) {
   // Theme context (default dark SaaS styling, adapts to light mode cleanly)
-  let isLight = false;
-  try {
-    const themeContext = useAdminTheme();
-    isLight = themeContext?.isLight ?? false;
-  } catch {
-    isLight = false;
-  }
+  const { isLight } = useAdminTheme();
 
   // 1. Normalize All Orders (Guarantees customer name, delivery info, and items are safe)
   const normalizedOrders = useMemo(() => {
@@ -114,14 +110,8 @@ export default function OrdersTab({
   // Real-time Last Updated String
   const [lastUpdatedTime, setLastUpdatedTime] = useState("");
   useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setLastUpdatedTime(`Today, ${now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`);
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    setLastUpdatedTime(new Date().toLocaleTimeString("en-LK", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Colombo" }));
+  }, [rawOrders]);
 
   // Close row action menus when clicking outside
   useEffect(() => {
@@ -150,12 +140,15 @@ export default function OrdersTab({
   const [bulkDeleteProgress, setBulkDeleteProgress] = useState<{ current: number; total: number } | null>(null);
   const [bulkStatusModalOpen, setBulkStatusModalOpen] = useState(false);
   const [bulkOrderStatus, setBulkOrderStatus] = useState<NormalizedOrder["orderStatus"]>("Processing");
-  const [bulkPaymentStatus, setBulkPaymentStatus] = useState<NormalizedOrder["paymentStatus"]>("Paid");
+  const [bulkPaymentStatus, setBulkPaymentStatus] = useState<NormalizedOrder["paymentStatus"] | "unchanged">("unchanged");
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [savingBulkStatus, setSavingBulkStatus] = useState(false);
   const [statusConfirmModal, setStatusConfirmModal] = useState<{
     isOpen: boolean;
     orderId: string;
     newStatus: NormalizedOrder["orderStatus"];
   }>({ isOpen: false, orderId: "", newStatus: "Processing" });
+  const orderDrawerRef = useDialogFocus(isDrawerOpen && !statusConfirmModal.isOpen && !deleteModalOrder && !bulkStatusModalOpen && !cancelModalOpen, () => setIsDrawerOpen(false));
 
   // In-app toast notification
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
@@ -198,16 +191,10 @@ export default function OrdersTab({
 
   // 4. KPI Cards Configuration
   const KPI_CONFIGS = [
-    { key: "all", label: "All Orders", icon: ShoppingCart, count: kpiCounts.all, trend: "↑ 12%", trendColor: "text-emerald-400" },
-    { key: "pending", label: "Pending", icon: Clock, count: kpiCounts.pending, trend: "↑ 8%", trendColor: "text-emerald-400" },
-    { key: "confirmed", label: "Confirmed", icon: CheckCircle2, count: kpiCounts.confirmed, trend: "↑ 15%", trendColor: "text-emerald-400" },
-    { key: "processing", label: "Processing", icon: Settings, count: kpiCounts.processing, trend: "↓ 3%", trendColor: "text-red-400" },
-    { key: "packed", label: "Packed", icon: Package, count: kpiCounts.packed, trend: "↑ 6%", trendColor: "text-emerald-400" },
-    { key: "shipped", label: "Shipped", icon: Truck, count: kpiCounts.shipped, trend: "↑ 21%", trendColor: "text-emerald-400" },
-    { key: "out for delivery", label: "Out for Delivery", icon: Bike, count: kpiCounts["out for delivery"], trend: "↑ 18%", trendColor: "text-emerald-400" },
-    { key: "delivered", label: "Delivered", icon: CheckCheck, count: kpiCounts.delivered, trend: "↑ 18%", trendColor: "text-emerald-400" },
-    { key: "cancelled", label: "Cancelled", icon: XCircle, count: kpiCounts.cancelled, trend: "↓ 5%", trendColor: "text-red-400" },
-    { key: "returned", label: "Returned", icon: RotateCcw, count: kpiCounts.returned, trend: "↓ 2%", trendColor: "text-red-400" },
+    { key: "all", label: "All orders", icon: ShoppingCart, count: kpiCounts.all },
+    { key: "pending", label: "Pending", icon: Clock, count: kpiCounts.pending },
+    { key: "shipped", label: "Shipped", icon: Truck, count: kpiCounts.shipped },
+    { key: "delivered", label: "Delivered", icon: CheckCheck, count: kpiCounts.delivered },
   ];
 
   // 5. Status Tabs Configuration
@@ -254,7 +241,7 @@ export default function OrdersTab({
       const now = new Date();
       list = list.filter((o) => {
         const d = new Date(o.createdAt);
-        if (isNaN(d.getTime())) return true;
+        if (isNaN(d.getTime())) return false;
         if (dateRange === "today") return d.toDateString() === now.toDateString();
         if (dateRange === "week") {
           const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -270,7 +257,12 @@ export default function OrdersTab({
 
     // Payment method filter
     if (paymentMethodFilter !== "all") {
-      list = list.filter((o) => o.paymentMethod.toLowerCase() === paymentMethodFilter.toLowerCase());
+      list = list.filter((o) => {
+        const method = o.paymentMethod.toLowerCase();
+        if (paymentMethodFilter === "card") return /card|payhere/.test(method);
+        if (paymentMethodFilter === "bank") return method.includes("bank");
+        return method === paymentMethodFilter.toLowerCase();
+      });
     }
 
     // Delivery method filter
@@ -378,10 +370,11 @@ export default function OrdersTab({
 
   // Selection Checkbox Handlers
   const handleToggleSelectAll = () => {
-    if (selectedRowIds.length === paginatedOrders.length && paginatedOrders.length > 0) {
-      setSelectedRowIds([]);
+    const pageIds = paginatedOrders.map((order) => order.id);
+    if (pageIds.length > 0 && pageIds.every((id) => selectedRowIds.includes(id))) {
+      setSelectedRowIds((previous) => previous.filter((id) => !pageIds.includes(id)));
     } else {
-      setSelectedRowIds(paginatedOrders.map((o) => o.id));
+      setSelectedRowIds((previous) => Array.from(new Set([...previous, ...pageIds])));
     }
   };
 
@@ -394,14 +387,18 @@ export default function OrdersTab({
   };
 
   // Copy helper with feedback
-  const handleCopyText = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    setCopyFeedback(label);
-    setTimeout(() => setCopyFeedback(null), 2000);
+  const handleCopyText = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback(label);
+      setTimeout(() => setCopyFeedback(null), 2000);
+    } catch { showToast("Couldn't copy. Select and copy the text manually.", "error"); }
   };
 
   // 9. Real-Time Status Update Handlers
   const executeOrderStatusUpdate = async (orderId: string, newOrderStatus: NormalizedOrder["orderStatus"]) => {
+    if (updatingOrderId) return;
+    setUpdatingOrderId(orderId);
     try {
       const currentOrder = normalizedOrders.find((o) => o.id === orderId);
       const auditEntry: OrderAuditEntry = {
@@ -411,20 +408,22 @@ export default function OrdersTab({
         timestamp: new Date().toISOString(),
       };
 
-      await updateDoc(doc(db, "orders", orderId), {
-        orderStatus: newOrderStatus,
-        status: newOrderStatus,
-        updatedAt: new Date().toISOString(),
-        statusHistory: arrayUnion(auditEntry),
-      });
-
       if (onUpdateStatus) {
-        onUpdateStatus(orderId, newOrderStatus);
+        await onUpdateStatus(orderId, newOrderStatus);
+      } else {
+        await updateDoc(doc(db, "orders", orderId), {
+          orderStatus: newOrderStatus, status: newOrderStatus,
+          updatedAt: new Date().toISOString(), statusHistory: arrayUnion(auditEntry),
+        });
+        onRefresh?.();
       }
       setStatusConfirmModal({ isOpen: false, orderId: "", newStatus: "Processing" });
+      showToast("Order status updated.");
     } catch (e) {
       console.error("Error updating order status:", e);
-      alert("Failed to update order status. Please check your connection.");
+      showToast("Couldn't update the status. Please try again.", "error");
+    } finally {
+      setUpdatingOrderId(null);
     }
   };
 
@@ -439,6 +438,10 @@ export default function OrdersTab({
   const handleUpdatePaymentStatus = async (orderId: string, newPaymentStatus: NormalizedOrder["paymentStatus"]) => {
     try {
       const currentOrder = normalizedOrders.find((o) => o.id === orderId);
+      if (currentOrder && /card|payhere/i.test(currentOrder.paymentMethod) && newPaymentStatus === "Paid" && currentOrder.paymentStatus !== "Paid") {
+        showToast("Online payments are confirmed by the payment provider. This payment is not verified yet.", "error");
+        return;
+      }
       const auditEntry: OrderAuditEntry = {
         action: "Payment Status Updated",
         previousStatus: currentOrder?.paymentStatus || "Pending",
@@ -473,11 +476,11 @@ export default function OrdersTab({
         internalNotes: editingNotes,
         updatedAt: new Date().toISOString(),
       });
-      alert("Tracking number and admin notes saved!");
+      showToast("Tracking and notes saved.");
       if (onRefresh) onRefresh();
     } catch (e) {
       console.error("Error saving order details:", e);
-      alert("Failed to save order details.");
+      showToast("Couldn't save tracking and notes. Please try again.", "error");
     } finally {
       setSavingDetails(false);
     }
@@ -497,7 +500,7 @@ export default function OrdersTab({
       await updateDoc(doc(db, "orders", selectedOrder.id), {
         orderStatus: "Cancelled",
         status: "Cancelled",
-        paymentStatus: "Cancelled",
+        ...(selectedOrder.paymentStatus === "Paid" || selectedOrder.paymentStatus === "Refunded" ? {} : { paymentStatus: "Cancelled" }),
         cancellationReason: cancelReason,
         updatedAt: new Date().toISOString(),
         statusHistory: arrayUnion(auditEntry),
@@ -619,74 +622,35 @@ export default function OrdersTab({
         ? normalizedOrders.filter((o) => selectedRowIds.includes(o.id))
         : filteredOrders;
 
-    const headers = [
-      "Order ID",
-      "Order Date",
-      "Customer Name",
-      "Email",
-      "Primary Phone",
-      "Alternative Phone",
-      "Delivery Address",
-      "City",
-      "District",
-      "Payment Method",
-      "Payment Status",
-      "Order Status",
-      "Subtotal (LKR)",
-      "Delivery Fee (LKR)",
-      "COD Fee (LKR)",
-      "Grand Total (LKR)",
-    ];
-
-    const rows = listToExport.map((o) => [
-      `"${o.id}"`,
-      `"${new Date(o.createdAt).toLocaleString()}"`,
-      `"${o.customerName}"`,
-      `"${o.customerEmail}"`,
-      `"${o.primaryPhone}"`,
-      `"${o.alternativePhone}"`,
-      `"${o.deliveryAddress.address}"`,
-      `"${o.deliveryAddress.city}"`,
-      `"${o.deliveryAddress.district}"`,
-      `"${o.paymentMethod}"`,
-      `"${o.paymentStatus}"`,
-      `"${o.orderStatus}"`,
-      `"${o.subtotal}"`,
-      `"${o.deliveryFee}"`,
-      `"${o.codFee}"`,
-      `"${o.grandTotal}"`,
-    ]);
-
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const blob = new Blob([buildOrdersCSV(listToExport)], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `street-mobile-orders-${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    link.href = url;
+    link.download = `oneplace-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link); link.click(); link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const handleApplyBulkStatus = async () => {
-    if (selectedRowIds.length === 0) return;
-    try {
-      const promises = selectedRowIds.map((id) =>
-        updateDoc(doc(db, "orders", id), {
-          orderStatus: bulkOrderStatus,
-          status: bulkOrderStatus,
-          paymentStatus: bulkPaymentStatus,
-          updatedAt: new Date().toISOString(),
-        })
-      );
-      await Promise.all(promises);
-      setBulkStatusModalOpen(false);
-      setSelectedRowIds([]);
-      alert(`Updated status for ${selectedRowIds.length} orders!`);
-      if (onRefresh) onRefresh();
-    } catch (e) {
-      console.error("Error applying bulk status update:", e);
-      alert("Failed to apply bulk status update.");
+    if (!selectedRowIds.length || savingBulkStatus) return;
+    const selectedOrders = normalizedOrders.filter((order) => selectedRowIds.includes(order.id));
+    if (bulkPaymentStatus === "Paid" && selectedOrders.some((order) => /card|payhere/i.test(order.paymentMethod) && order.paymentStatus !== "Paid")) {
+      showToast("Online payments must be verified by the payment provider. Keep their current payment status.", "error"); return;
     }
+    setSavingBulkStatus(true);
+    try {
+      const batch = writeBatch(db);
+      selectedOrders.forEach((order) => batch.update(doc(db, "orders", order.id), {
+        orderStatus: bulkOrderStatus, status: bulkOrderStatus,
+        ...(bulkPaymentStatus === "unchanged" ? {} : { paymentStatus: bulkPaymentStatus }),
+        updatedAt: new Date().toISOString(),
+        statusHistory: arrayUnion({ action: "Bulk Status Updated", previousStatus: order.orderStatus, newStatus: bulkOrderStatus, timestamp: new Date().toISOString() }),
+      }));
+      await batch.commit();
+      setBulkStatusModalOpen(false); setSelectedRowIds([]);
+      showToast(`${selectedOrders.length} orders updated.`); onRefresh?.();
+    } catch { showToast("Couldn't update selected orders. No partial batch was saved.", "error"); }
+    finally { setSavingBulkStatus(false); }
   };
 
   // Order Status Badge Visual Helper
@@ -832,7 +796,7 @@ export default function OrdersTab({
   };
 
   return (
-    <div className={`space-y-4 font-sans ${isLight ? "text-slate-900" : "text-[#F8FAFC]"}`}>
+    <div data-orders-workspace data-more-filters={showMoreFilters ? "true" : "false"} className={`space-y-4 font-sans ${isLight ? "text-slate-900" : "text-[#F8FAFC]"}`}>
       {/* ════════════════════════════════════════════════════════════════════
          1. ORDERS MANAGEMENT TOP HEADER
       ════════════════════════════════════════════════════════════════════ */}
@@ -842,9 +806,9 @@ export default function OrdersTab({
             <ShoppingCart className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Orders Management</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Orders</h1>
             <p className={`text-xs mt-0.5 ${isLight ? "text-slate-500" : "text-[#94A3B8]"}`}>
-              Process customer purchases, track deliveries, manage cash collections and issue invoices.
+              Review purchases, prepare deliveries and keep customers informed.
             </p>
           </div>
         </div>
@@ -856,7 +820,7 @@ export default function OrdersTab({
               isLight ? "bg-white border-slate-200 text-slate-500" : "bg-[#0E141D] border-white/[0.08] text-[#94A3B8]"
             }`}>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span>Last updated {lastUpdatedTime}</span>
+              <span>Data received {lastUpdatedTime}</span>
             </div>
           )}
 
@@ -887,7 +851,7 @@ export default function OrdersTab({
             title="Export order records as CSV"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Export All</span>
+            <span>{selectedRowIds.length ? "Export selected" : "Export results"}</span>
           </button>
         </div>
       </div>
@@ -895,7 +859,7 @@ export default function OrdersTab({
       {/* ════════════════════════════════════════════════════════════════════
          2. STATUS KPI CARDS (10 Compact Cards, Real Dynamic Counts)
       ════════════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10 gap-2">
+      <div className="orders-summary-grid">
         {KPI_CONFIGS.map((kpi) => {
           const Icon = kpi.icon;
           const isActive = activeStatusTab === kpi.key;
@@ -904,6 +868,7 @@ export default function OrdersTab({
           return (
             <button
               key={kpi.key}
+              aria-pressed={isActive}
               type="button"
               onClick={() => {
                 setActiveStatusTab(kpi.key);
@@ -929,11 +894,7 @@ export default function OrdersTab({
                 }`}>
                   <Icon className="w-3 h-3" />
                 </div>
-                {!isZero && (
-                  <span className={`text-[9px] font-bold ${kpi.trendColor}`}>
-                    {kpi.trend}
-                  </span>
-                )}
+
               </div>
 
               <div>
@@ -956,48 +917,16 @@ export default function OrdersTab({
       {/* ════════════════════════════════════════════════════════════════════
          3. STATUS TABS (Horizontal scrolling pill bar)
       ════════════════════════════════════════════════════════════════════ */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-        {STATUS_TABS.map((tab) => {
-          const isActive = activeStatusTab === tab.key;
-          const isZero = tab.count === 0;
-
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => {
-                setActiveStatusTab(tab.key);
-                setCurrentPage(1);
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                isActive
-                  ? "bg-[#2563EB] text-white shadow-md shadow-blue-600/20"
-                  : isLight
-                  ? "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-xs"
-                  : isZero
-                  ? "bg-[#0E141D] hover:bg-[#121A25] text-slate-500 hover:text-slate-300 border border-white/[0.06]"
-                  : "bg-[#0E141D] hover:bg-[#121A25] text-[#94A3B8] hover:text-white border border-white/[0.08]"
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                isActive
-                  ? "bg-white/20 text-white"
-                  : isZero
-                  ? "bg-white/5 text-slate-500"
-                  : "bg-white/10 text-slate-300"
-              }`}>
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <label className="orders-status-filter">Order status
+        <select aria-label="Filter by order status" value={activeStatusTab} onChange={(event) => { setActiveStatusTab(event.target.value); setCurrentPage(1); }}>
+          {STATUS_TABS.map((item) => <option key={item.key} value={item.key}>{item.label} ({item.count})</option>)}
+        </select>
+      </label>
 
       {/* ════════════════════════════════════════════════════════════════════
          4. SEARCH + FILTER TOOLBAR
       ════════════════════════════════════════════════════════════════════ */}
-      <div className="flex flex-col lg:flex-row lg:items-center gap-2.5">
+      <div className="orders-toolbar flex flex-col lg:flex-row lg:items-center gap-2.5">
         {/* Search Input */}
         <div className="relative flex-1">
           <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${
@@ -1010,7 +939,8 @@ export default function OrdersTab({
               setSearchQuery(e.target.value);
               setCurrentPage(1);
             }}
-            placeholder="Search Order ID, Customer, Phone, Email..."
+            aria-label="Search orders"
+            placeholder="Search orders, customers or phone numbers…"
             className={`w-full pl-10 pr-9 py-2.5 rounded-xl text-xs font-medium outline-none border transition-all ${
               isLight
                 ? "bg-white border-[#E5E7EB] text-[#111827] placeholder-slate-400 focus:border-blue-500"
@@ -1072,7 +1002,7 @@ export default function OrdersTab({
           </div>
 
           {/* Delivery Method Dropdown */}
-          <div className="relative">
+          <div data-order-extra-filter className="relative">
             <select
               value={deliveryMethodFilter}
               onChange={(e) => {
@@ -1091,7 +1021,7 @@ export default function OrdersTab({
           </div>
 
           {/* Amount Range Dropdown */}
-          <div className="relative">
+          <div data-order-extra-filter className="relative">
             <select
               value={amountRangeFilter}
               onChange={(e) => {
@@ -1204,7 +1134,7 @@ export default function OrdersTab({
                   <input
                     type="checkbox"
                     aria-label="Select all orders"
-                    checked={selectedRowIds.length === paginatedOrders.length && paginatedOrders.length > 0}
+                    checked={paginatedOrders.length > 0 && paginatedOrders.every((order) => selectedRowIds.includes(order.id))}
                     onChange={handleToggleSelectAll}
                     className="rounded border-white/20 text-blue-600 focus:ring-0 cursor-pointer"
                   />
@@ -1252,10 +1182,10 @@ export default function OrdersTab({
                   const orderDate = new Date(ord.createdAt);
                   const dateStr = !isNaN(orderDate.getTime())
                     ? orderDate.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })
-                    : "Sep 06, 2026";
+                    : "Date unavailable";
                   const timeStr = !isNaN(orderDate.getTime())
                     ? orderDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-                    : "01:03 PM";
+                    : "";
 
                   const cleanPhone = (ord.primaryPhone || "").replace(/[^0-9]/g, "");
                   const whatsappMsg = `Hello ${ord.customerName}, regarding your 1PLACE.LK order #${ord.id.slice(-8)}...`;
@@ -1590,7 +1520,7 @@ export default function OrdersTab({
 
           {/* Drawer Container */}
           <div className="absolute inset-y-0 right-0 max-w-full flex pl-6">
-            <div className={`w-screen max-w-md sm:max-w-[480px] shadow-2xl border-l flex flex-col animate-in slide-in-from-right duration-300 ${
+            <div ref={orderDrawerRef} role="dialog" aria-modal="true" aria-label="Order details" tabIndex={-1} data-order-drawer className={`w-screen max-w-md sm:max-w-[480px] shadow-2xl border-l flex flex-col animate-in slide-in-from-right duration-300 ${
               isLight ? "bg-white border-[#E5E7EB]" : "bg-[#0E141D] border-white/[0.1] text-white"
             }`}>
               {/* Drawer Top Header */}
@@ -2135,7 +2065,7 @@ export default function OrdersTab({
                   onClick={() => handleRequestStatusChange(selectedOrder.id, "Processing")}
                   className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/25 transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
-                  <Sparkles className="w-4 h-4" />
+                  <RefreshCw className="w-4 h-4" />
                   <span>Update Status</span>
                 </button>
 
@@ -2176,10 +2106,11 @@ export default function OrdersTab({
               </button>
               <button
                 type="button"
+                disabled={!!updatingOrderId}
                 onClick={() => executeOrderStatusUpdate(statusConfirmModal.orderId, statusConfirmModal.newStatus)}
                 className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md cursor-pointer"
               >
-                Confirm Update
+                {updatingOrderId ? "Updating…" : "Confirm update"}
               </button>
             </div>
           </div>
@@ -2391,6 +2322,7 @@ export default function OrdersTab({
                   onChange={(e) => setBulkPaymentStatus(e.target.value as any)}
                   className="w-full p-2.5 bg-black/40 border border-white/15 rounded-xl text-xs text-white font-bold outline-none cursor-pointer"
                 >
+                  <option value="unchanged">Keep current payment status</option>
                   <option value="Paid">Paid</option>
                   <option value="Pending">Pending</option>
                   <option value="Refunded">Refunded</option>
@@ -2408,6 +2340,7 @@ export default function OrdersTab({
               </button>
               <button
                 type="button"
+                disabled={savingBulkStatus}
                 onClick={handleApplyBulkStatus}
                 className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md cursor-pointer"
               >

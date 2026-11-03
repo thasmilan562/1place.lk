@@ -1,7 +1,2 @@
 import { redirect } from "next/navigation";
-
-export const dynamic = "force-dynamic";
-
-export default function AdminSettingsPage() {
-  redirect("/admin/dashboard");
-}
+export default function SettingsPage() { redirect("/admin/dashboard?tab=settings"); }

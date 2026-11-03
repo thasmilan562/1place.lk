@@ -633,8 +633,8 @@ export interface HeroSlide {
   font_weight?: string;
   line_height?: string;
   letter_spacing?: string;
-  banner_size_ratio?: "1080x1080" | "860x270" | "1920x850" | "1080x1440" | "default";
-  bannerSizeRatio?: "1080x1080" | "860x270" | "1920x850" | "1080x1440" | "default";
+  banner_size_ratio?: "2200x675" | "1080x1080" | "860x270" | "1920x850" | "1080x1440" | "default";
+  bannerSizeRatio?: "2200x675" | "1080x1080" | "860x270" | "1920x850" | "1080x1440" | "default";
 
   // Full-width Admin Banner Controls
   banner_bg_color?: string;
@@ -644,6 +644,7 @@ export interface HeroSlide {
   image_fit_mode?: "contain" | "cover";
   banner_layout?: "split" | "full_image" | "auto";
   description_size?: string;
+  button_size?: "small" | "medium" | "large";
   autoplay_duration?: number;
 }
 
@@ -1004,6 +1005,7 @@ export type ShowcasePlacement =
   | "below_gallery"
   | "below_reviews"
   | "above_location"
+  | "benefits_banner_slot"
   // ── Product Catalogue Placements (Line/Row Based) ──
   | "below_product_line_1"
   | "below_product_line_2"

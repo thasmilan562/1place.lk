@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Image as ImageIcon, Video, Upload, Eye, Calendar, Sparkles, Copy, Check, Tag, Clock, Smartphone, Monitor } from "lucide-react";
+import { X, Image as ImageIcon, Video, Upload, Eye, Calendar, CircleCheck as Sparkles, Copy, Check, Tag, Clock, Smartphone, Monitor } from "lucide-react";
 import { OfferBanner, BannerPlacement, BannerStatus } from "@/lib/types";
 
 interface OfferBannerModalProps {

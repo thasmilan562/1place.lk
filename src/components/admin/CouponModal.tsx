@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Sparkles, Tag, Percent, DollarSign, Truck, Calendar, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
+import { X, CircleCheck as Sparkles, Tag, Percent, DollarSign, Truck, Calendar, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
 import { Coupon, CouponDiscountType } from "@/lib/types";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, addDoc, collection } from "firebase/firestore";

@@ -12,7 +12,7 @@ import {
   CheckCircle2,
   Trash2,
   ArrowRight,
-  Sparkles,
+  CircleCheck as Sparkles,
   ShoppingBag,
   Plus,
   Minus,
@@ -428,6 +428,12 @@ export default function CheckoutClient() {
       return;
     }
 
+    const hasUnpriced = itemsToUse.some((it) => !it.isFreeGift && (typeof it.price !== "number" || it.price <= 0 || isNaN(it.price)));
+    if (hasUnpriced) {
+      alert("One or more items in your shopping bag does not have an active price assigned and cannot be purchased. Please return to your bag to remove unpriced items.");
+      setSubmitting(false);
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -700,7 +706,7 @@ export default function CheckoutClient() {
   }
 
   return (
-    <div className="bg-[#FAFAFA] min-h-screen pt-[80px] sm:pt-[92px] pb-28 sm:pb-32 text-neutral-950 font-sans">
+    <div className="bg-[#FAFAFA] min-h-screen pt-6 sm:pt-10 pb-28 sm:pb-32 text-neutral-950 font-sans">
       {/* ── 1. Compact Responsive Progress Indicator ── */}
       <CheckoutProgress currentStep={currentProgressStep} />
 

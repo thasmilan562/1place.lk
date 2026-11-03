@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Sparkles, Save, Check, Image as ImageIcon, Eye, RefreshCw, Smartphone, Monitor, Upload, Trash2, Calendar, Link as LinkIcon, AlertCircle, CheckCircle2 } from "lucide-react";
+import { CircleCheck as Sparkles, Save, Check, Image as ImageIcon, Eye, RefreshCw, Smartphone, Monitor, Upload, Trash2, Calendar, Link as LinkIcon, AlertCircle, CheckCircle2 } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Product, Category } from "@/lib/types";

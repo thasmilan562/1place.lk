@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useDialogFocus } from "@/lib/use-dialog-focus";
 import {
   X,
   Upload,
@@ -15,7 +16,7 @@ import {
   Save,
   Eye,
   Check,
-  Sparkles,
+  CircleCheck as Sparkles,
   Search,
   Layers,
   DollarSign,
@@ -152,8 +153,23 @@ export default function ProductModal({
 }: ProductModalProps) {
   // Active Tab Index (1: Basic, 2: Media & Colours, 3: Variants & Stock, 4: Specifications, 5: Warranty, 6: Payments, 7: SEO)
   const [activeTab, setActiveTab] = useState<number>(1);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [editorError, setEditorError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const requestClose = () => {
+    if (isSubmitting) return;
+    if (hasUnsavedChanges && !window.confirm("Discard your unsaved product changes?")) return;
+    onClose();
+  };
+  const editorRef = useDialogFocus(isOpen, requestClose);
+  useEffect(() => { if (activeTab > 3) setShowAdvanced(true); }, [activeTab]);
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [isOpen]);
 
   // Form Fields State
   const [name, setName] = useState("");
@@ -259,6 +275,8 @@ export default function ProductModal({
   useEffect(() => {
     if (!isOpen) return;
     setActiveTab(1);
+    setShowAdvanced(false);
+    setEditorError("");
 
     let isMounted = true;
     async function loadLiveTaxonomies() {
@@ -352,7 +370,7 @@ export default function ProductModal({
       setHasColorVariants(true);
       setHasStorageVariants(true);
     } else {
-      setHasColorVariants(true);
+      setHasColorVariants(false);
       const isStorageDevice = /storage|pen drive|flash drive|sd card|hard disk|ssd|memory card/i.test(formattedName);
       setHasStorageVariants(isStorageDevice);
     }
@@ -593,25 +611,25 @@ export default function ProductModal({
     } else {
       // Reset New Product
       setName("");
-      setCode(`1P-${Math.floor(1000 + Math.random() * 9000)}`);
+      setCode(`1P-${Date.now().toString(36).toUpperCase()}`);
       setSlug("");
-      const defaultCatId = categories[0]?.id || "";
-      const defaultCatName = categories[0]?.name || "Smartphones";
+      const defaultCatId = "";
+      const defaultCatName = "";
       const detected = detectProductType(defaultCatName);
 
       setProductType(detected);
-      setHasColorVariants(true);
+      setHasColorVariants(false);
       setHasStorageVariants(detected === "laptop" || detected === "phone");
 
       setCategoryId(defaultCatId);
-      setBrand("Apple");
+      setBrand("");
       setDescription("");
       setShortDesc("");
       setFeatured(false);
       setStatus("active");
       setBasePrice(0);
       setBaseOldPrice(null);
-      setBaseStock(10);
+      setBaseStock(0);
       setAllowCod(true);
       setAllowCard(true);
       setAllowWhatsapp(true);
@@ -716,6 +734,10 @@ export default function ProductModal({
       }
 
       // Default to empty warranty options (No warranty shown unless admin explicitly adds a plan)
+      setGeneralImages([]);
+      setColorVariants([]);
+      setVariantCombos([]);
+      setAvailableStorage([]);
       setWarrantyOptions([]);
     }
 
@@ -876,8 +898,15 @@ export default function ProductModal({
 
   // Save Product Handler
   const handleSaveProduct = async (publishStatus: "active" | "draft" = "active") => {
+    if (isSubmitting) return;
+    setEditorError("");
+    if (publishStatus === "active" && !brand.trim() && !customBrandName.trim()) {
+      setEditorError("Choose a brand, or add your store name as the brand.");
+      setActiveTab(1);
+      return;
+    }
     if (!name.trim()) {
-      alert("Please enter a Product Name.");
+      setEditorError("Add a product name to continue.");
       setActiveTab(1);
       return;
     }
@@ -974,6 +1003,40 @@ export default function ProductModal({
         primaryOldPrice = null;
       }
 
+      // ── AUDIT VALIDATION: Enforce draft vs publish requirements ──
+      if (publishStatus === "active") {
+        if (!isCustomCategory && !categoryId) {
+          alert("Please select a category for this product before publishing, or save as Draft.");
+          setActiveTab(1);
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (finalImages.length === 0) {
+          alert("Please add at least one product image in Tab 2 before publishing to the storefront, or save as Draft.");
+          setActiveTab(2);
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (!hasAnyVariants) {
+          if (basePrice <= 0) {
+            alert("A product cannot be published with an empty or zero price. Please enter a valid selling price in Tab 1, or save as Draft.");
+            setActiveTab(1);
+            setIsSubmitting(false);
+            return;
+          }
+        } else {
+          const hasZeroPrice = variantCombos.some((v) => !v.price || Number(v.price) <= 0);
+          if (hasZeroPrice || primaryPrice <= 0) {
+            alert("Every variant combination must have a valid selling price (> 0) to be published. Please update variant pricing in Tab 3, or save as Draft.");
+            setActiveTab(3);
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
+
       // Enrich every variant combo with full variant metadata (color_hex, image_ref, warranty, storage, stock, sku, price)
       const enrichedVariantCombos: ProductVariantCombo[] = !hasAnyVariants
         ? []
@@ -1029,6 +1092,7 @@ export default function ProductModal({
         brandName: finalBrand,
         brandSlug: finalBrandSlug,
 
+        status: publishStatus,
         price: primaryPrice,
         old_price: primaryOldPrice,
         description: description.trim(),
@@ -1080,27 +1144,30 @@ export default function ProductModal({
       onClose();
     } catch (e) {
       console.error("Error saving product:", e);
-      alert("Failed to save product. Please check network connection.");
+      setEditorError("Could not save this product. Check your connection and try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-white text-gray-900 overflow-hidden flex flex-col animate-in fade-in">
+    <div className="product-editor-overlay">
+      <div className="product-editor-backdrop" aria-hidden="true" onClick={requestClose} />
+      <div ref={editorRef} role="dialog" aria-modal="true" aria-labelledby="product-editor-title" tabIndex={-1} data-product-editor data-advanced={showAdvanced ? "true" : "false"} className="product-editor bg-white text-gray-900 overflow-hidden flex flex-col">
       {/* ── TOP STICKY EDITOR BAR ── */}
       <div className="bg-white border-b border-gray-200 px-6 py-3.5 flex items-center justify-between shadow-xs shrink-0 select-none">
         <div className="flex items-center gap-3">
           <button
-            onClick={onClose}
+            onClick={requestClose}
+            aria-label="Close product editor"
             className="p-2 text-gray-500 hover:text-gray-900 rounded-xl hover:bg-gray-100 transition-colors"
             title="Close Editor"
           >
             <X className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-base font-black text-gray-900 tracking-tight flex items-center gap-2">
-              {initialData && initialData.id ? `Edit Product: ${name || initialData.name || "Product"}` : "Create New Product"}
+            <h2 id="product-editor-title" className="text-base font-black text-gray-900 tracking-tight flex items-center gap-2">
+              {initialData && initialData.id ? `Edit product: ${name || initialData.name || "Product"}` : "Add a product"}
               {hasUnsavedChanges && (
                 <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
                   Unsaved Changes
@@ -1108,7 +1175,7 @@ export default function ProductModal({
               )}
             </h2>
             <p className="text-xs text-gray-500 font-medium">
-              Full-page variant manager, colour galleries & warranty config
+              Start with the basics. Add photos, then publish when ready.
             </p>
           </div>
         </div>
@@ -1120,7 +1187,7 @@ export default function ProductModal({
             disabled={isSubmitting}
             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl transition-all border border-gray-200"
           >
-            Save Draft
+            Save draft
           </button>
           <button
             onClick={() => handleSaveProduct("active")}
@@ -1128,38 +1195,33 @@ export default function ProductModal({
             className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-600/30 flex items-center gap-2"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {Boolean(initialData && initialData.id) ? "Update Product" : "Publish Product"}
+            {Boolean(initialData && initialData.id) ? "Save changes" : "Publish product"}
           </button>
         </div>
       </div>
 
       {/* ── TAB NAVIGATION HEADER ── */}
       <div className="bg-gray-50 border-b border-gray-200 px-6 overflow-x-auto shrink-0 select-none">
-        <div className="flex items-center gap-1 min-w-[720px]">
+        <div className="product-editor-tabs flex items-center gap-1">
           {[
-            { id: 1, label: "1. Basic Info & Pricing", icon: Tag },
-            { id: 2, label: hasColorVariants ? "2. Media & Colours" : "2. Media & Photos", icon: Palette },
+            { id: 1, label: "Basics", icon: Tag },
+            { id: 2, label: "Photos", icon: Palette },
             {
               id: 3,
-              label: productType === "laptop"
-                ? "3. RAM & Storage Variants"
-                : productType === "phone"
-                ? "3. Storage & Variants"
-                : hasStorageVariants || hasColorVariants
-                ? "3. Variants & Stock"
-                : "3. Inventory & Stock",
+              label: "Variants",
               icon: Sliders,
             },
-            { id: 4, label: "4. Specifications", icon: Cpu },
-            { id: 5, label: "5. Warranty", icon: ShieldCheck },
-            { id: 6, label: "6. Payments & Delivery", icon: Truck },
-            { id: 7, label: "7. SEO & Publishing", icon: Globe },
-          ].map((tab) => {
+            { id: 4, label: "Specifications", icon: Cpu },
+            { id: 5, label: "Warranty", icon: ShieldCheck },
+            { id: 6, label: "Delivery & payment", icon: Truck },
+            { id: 7, label: "Search & publishing", icon: Globe },
+          ].filter((tab) => tab.id < 3 || (tab.id === 3 && (hasColorVariants || hasStorageVariants || activeTab === 3)) || (tab.id > 3 && showAdvanced) || tab.id === activeTab).map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                aria-pressed={isActive}
                 onClick={() => setActiveTab(tab.id)}
                 className={`py-3 px-4 font-bold text-xs border-b-2 flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
                   isActive
@@ -1172,12 +1234,14 @@ export default function ProductModal({
               </button>
             );
           })}
+          <button type="button" className="product-editor-more" aria-expanded={showAdvanced} onClick={() => { if (showAdvanced && activeTab > 3) setActiveTab(1); setShowAdvanced(!showAdvanced); }}>{showAdvanced ? "Less" : "More options"}</button>
         </div>
       </div>
 
       {/* ── TAB BODY CONTENT AREA (SCROLLABLE) ── */}
-      <div className="flex-1 overflow-y-auto p-6 bg-gray-50/40">
+      <div className="product-editor-body flex-1 overflow-y-auto p-6 bg-gray-50/40" data-lenis-prevent>
         <div className="max-w-5xl mx-auto space-y-6">
+          {editorError && <p role="alert" className="product-editor-error">{editorError}</p>}
 
           {/* ════════════════════════════════════════════════════════════════
               TAB 1: BASIC INFORMATION
@@ -1199,8 +1263,8 @@ export default function ProductModal({
                   />
                 </div>
 
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">Product Code / SKU Prefix *</label>
+                <div data-product-extra>
+                  <label className="block font-bold text-gray-700 mb-1">Product code / SKU</label>
                   <input
                     type="text"
                     value={code}
@@ -1210,7 +1274,7 @@ export default function ProductModal({
                   />
                 </div>
 
-                <div>
+                <div data-product-extra>
                   <label className="block font-bold text-gray-700 mb-1">URL Slug</label>
                   <input
                     type="text"
@@ -1289,7 +1353,7 @@ export default function ProductModal({
                           setHasColorVariants(true);
                           setHasStorageVariants(true);
                         } else {
-                          setHasColorVariants(true);
+                          setHasColorVariants(false);
                           const isStorageDevice = /storage|pen drive|flash drive|sd card|hard disk|ssd|memory card/i.test(catName);
                           setHasStorageVariants(isStorageDevice);
                         }
@@ -1297,6 +1361,7 @@ export default function ProductModal({
                       }}
                       className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-900 outline-none focus:border-blue-500 cursor-pointer"
                     >
+                      <option value="">Choose a category</option>
                       {mergedCategories.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
@@ -1373,6 +1438,7 @@ export default function ProductModal({
                       }}
                       className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-900 outline-none focus:border-blue-500 cursor-pointer"
                     >
+                      <option value="">Choose a brand</option>
                       {brandOptions.map((b) => (
                         <option key={b} value={b}>
                           {b}
@@ -1386,7 +1452,8 @@ export default function ProductModal({
                 </div>
 
                 {/* ── Product Type & Variant Feature Flags Block ── */}
-                <div className="md:col-span-2 bg-gradient-to-r from-blue-50/60 via-slate-50 to-indigo-50/60 border border-blue-100/80 rounded-2xl p-4 space-y-3.5">
+                <details className="product-variant-options md:col-span-2 border rounded-2xl p-4 space-y-3.5">
+                  <summary>Colours, sizes & variants <span>Optional</span></summary>
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="font-extrabold text-xs text-gray-900 flex items-center gap-2">
@@ -1812,11 +1879,11 @@ export default function ProductModal({
                       )}
                     </div>
                   )}
-                </div>
+                </details>
 
                 {/* Old / Regular Price */}
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">Old Price (Regular Price LKR)</label>
+                <div data-product-extra>
+                  <label className="block font-bold text-gray-700 mb-1">Compare-at price (LKR) · optional</label>
                   <input
                     type="number"
                     min={0}
@@ -1839,7 +1906,7 @@ export default function ProductModal({
                 {/* Offer / Selling Price */}
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">
-                    Offer Price (Selling Price LKR) <span className="text-gray-400 font-normal">(Optional if variants added)</span>
+                    Selling price (LKR) <span className="text-gray-400 font-normal">Required to publish</span>
                   </label>
                   <input
                     type="number"
@@ -1861,7 +1928,7 @@ export default function ProductModal({
                 </div>
 
                 {/* Offer Percentage (%) */}
-                <div>
+                <div data-product-extra>
                   <label className="block font-bold text-gray-700 mb-1">Offer Discount (%)</label>
                   <div className="relative">
                     <input
@@ -1888,7 +1955,7 @@ export default function ProductModal({
                 {/* Stock Quantity (Primary for accessories / fallback) */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block font-bold text-gray-700">Stock Quantity (Units) *</label>
+                    <label className="block font-bold text-gray-700">Available stock *</label>
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                         baseStock === 0
@@ -2024,7 +2091,7 @@ export default function ProductModal({
 
                 {/* Individual Image Input Slots */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  {(generalImages.length > 0 ? generalImages : ["", "", "", ""]).map((imgUrl, i) => (
+                  {(generalImages.length > 0 ? generalImages : [""]).map((imgUrl, i) => (
                     <div key={i} className="bg-white border border-gray-200 rounded-xl p-3 flex items-center gap-3 shadow-2xs">
                       {/* Thumbnail Preview */}
                       <div className="w-12 h-12 shrink-0 bg-gray-50 border border-gray-200 rounded-lg overflow-hidden flex items-center justify-center p-0.5 relative">
@@ -3237,6 +3304,7 @@ export default function ProductModal({
           )}
 
         </div>
+      </div>
       </div>
     </div>
   );

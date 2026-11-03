@@ -31,7 +31,7 @@ import {
   Copy,
   Upload,
   Link as LinkIcon,
-  Sparkles,
+  CircleCheck as Sparkles,
   Image as ImageIcon,
   AlertCircle,
   ShieldAlert,

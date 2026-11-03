@@ -11,7 +11,7 @@ import {
   Armchair,
   Home,
   Heart,
-  Sparkles,
+  CircleCheck as Sparkles,
   Gamepad2,
   Headphones,
   Watch,

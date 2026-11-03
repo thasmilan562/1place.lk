@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Variants } from "framer-motion";
-import { X, ZoomIn, Camera, Wrench, Users, LayoutGrid, ChevronLeft, ChevronRight, ImageIcon, ExternalLink, Play, Download, Loader2, Sparkles } from "lucide-react";
+import { X, ZoomIn, Camera, Wrench, Users, LayoutGrid, ChevronLeft, ChevronRight, ImageIcon, ExternalLink, Play, Download, Loader2, CircleCheck as Sparkles } from "lucide-react";
 import { GalleryImage } from "@/lib/types";
 import { getPlatformMeta } from "@/components/admin/tabs/GalleryTab";
 

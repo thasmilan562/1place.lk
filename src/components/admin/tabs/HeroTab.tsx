@@ -2,7 +2,7 @@
 
 import React from "react";
 import { HeroSlide } from "@/lib/types";
-import { Plus, Edit, Trash2, Sparkles, CheckCircle2, XCircle, Image as ImageIcon, Copy, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Edit, Trash2, CircleCheck as Sparkles, CheckCircle2, XCircle, Image as ImageIcon } from "lucide-react";
 import { useAdminTheme } from "@/app/admin/dashboard/layout";
 
 interface HeroTabProps {
@@ -10,12 +10,10 @@ interface HeroTabProps {
   onAdd: () => void;
   onEdit: (slide: HeroSlide) => void;
   onDelete: (id: string) => void;
-  onDuplicate?: (slide: HeroSlide) => void;
   onToggleStatus?: (id: string, active: boolean) => void;
-  onReorder?: (id: string, direction: "up" | "down") => void;
 }
 
-export default function HeroTab({ slides, onAdd, onEdit, onDelete, onDuplicate, onToggleStatus, onReorder }: HeroTabProps) {
+export default function HeroTab({ slides, onAdd, onEdit, onDelete, onToggleStatus }: HeroTabProps) {
   const { isLight } = useAdminTheme();
 
   return (
@@ -27,7 +25,7 @@ export default function HeroTab({ slides, onAdd, onEdit, onDelete, onDuplicate, 
             <Sparkles className="w-5 h-5 text-blue-600" /> Homepage Hero Slider Manager
           </h3>
           <p className={`text-xs mt-0.5 ${isLight ? "text-slate-500" : "text-[#94A3B8]"}`}>
-            Add, edit, reorder, duplicate and manage full-width hero banner slides
+            Add, upload, edit, and enable homepage hero banners. Desktop artwork works best at 2200 × 675.
           </p>
         </div>
 
@@ -56,7 +54,7 @@ export default function HeroTab({ slides, onAdd, onEdit, onDelete, onDuplicate, 
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {slides.map((slide, idx) => (
+          {slides.map((slide) => (
             <div
               key={slide.id}
               className={`rounded-2xl border overflow-hidden transition-all flex flex-col justify-between group shadow-xs ${
@@ -64,11 +62,11 @@ export default function HeroTab({ slides, onAdd, onEdit, onDelete, onDuplicate, 
               }`}
             >
               {/* Media Preview Box */}
-              <div className="relative aspect-[16/9] bg-black overflow-hidden">
+              <div className="relative aspect-[2200/675] overflow-hidden" style={{ backgroundColor: "#f0eeeb" }}>
                 <img
                   src={slide.image_url}
                   alt={slide.alt || "Hero slide preview"}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="w-full h-full object-contain"
                   style={{ objectPosition: slide.desktop_image_position || "center" }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
@@ -92,28 +90,6 @@ export default function HeroTab({ slides, onAdd, onEdit, onDelete, onDuplicate, 
                   </button>
                 </div>
 
-                {/* Reorder & Sorting Controls */}
-                <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/70 backdrop-blur-md px-1.5 py-1 rounded-lg border border-white/10">
-                  <span className="text-[10px] text-white/80 font-mono font-bold px-1">#{slide.sort_order ?? idx + 1}</span>
-                  <button
-                    type="button"
-                    onClick={() => onReorder?.(slide.id, "up")}
-                    disabled={idx === 0}
-                    className="p-1 text-white/60 hover:text-white disabled:opacity-30 cursor-pointer"
-                    title="Move Up"
-                  >
-                    <ArrowUp className="w-3 h-3" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onReorder?.(slide.id, "down")}
-                    disabled={idx === slides.length - 1}
-                    className="p-1 text-white/60 hover:text-white disabled:opacity-30 cursor-pointer"
-                    title="Move Down"
-                  >
-                    <ArrowDown className="w-3 h-3" />
-                  </button>
-                </div>
               </div>
 
               {/* Info Body */}
@@ -140,15 +116,6 @@ export default function HeroTab({ slides, onAdd, onEdit, onDelete, onDuplicate, 
                       }`}
                     >
                       <Edit className="w-3.5 h-3.5" /> Edit
-                    </button>
-                    <button
-                      onClick={() => onDuplicate?.(slide)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                        isLight ? "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700" : "bg-white/5 hover:bg-white/15 border-white/10 text-white/80"
-                      }`}
-                      title="Duplicate Slide"
-                    >
-                      <Copy className="w-3.5 h-3.5 text-blue-500" /> Copy
                     </button>
                   </div>
 

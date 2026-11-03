@@ -18,7 +18,7 @@ import {
   LayoutGrid,
   List,
   Check,
-  Sparkles,
+  CircleCheck as Sparkles,
   ArrowUpDown,
   CheckCircle2,
 } from "lucide-react";

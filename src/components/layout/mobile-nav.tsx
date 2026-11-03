@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, LayoutGrid, Heart, User } from "lucide-react";
+import { Home, LayoutGrid, Heart, User, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWishlist } from "@/lib/wishlist-context";
 import { useAuth } from "@/lib/auth-context";
@@ -16,12 +16,15 @@ export default function MobileNav() {
   // Hide bottom nav on admin and checkout pages
   if (
     pathname.startsWith("/admin") ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/products/") ||
     pathname.startsWith("/checkout")
   ) {
     return null;
   }
 
   const isHome = pathname === "/";
+  const isShopAll = pathname === "/products" || pathname.startsWith("/products?");
   const isCategories = pathname.startsWith("/categories") || pathname.startsWith("/category/");
   const isWishlist = pathname.startsWith("/wishlist");
   const isAccount =
@@ -36,7 +39,7 @@ export default function MobileNav() {
       aria-label="Mobile Navigation"
       className="fixed bottom-0 left-0 right-0 z-[70] lg:hidden bg-white/95 backdrop-blur-md border-t border-[#E8E8E8] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] safe-bottom select-none font-sans"
     >
-      <div className="grid grid-cols-4 items-center h-15 px-2 max-w-md mx-auto">
+      <div className="grid grid-cols-5 items-center h-15 px-1 max-w-lg mx-auto">
         {/* 1. Home */}
         <Link
           href="/"
@@ -54,9 +57,27 @@ export default function MobileNav() {
           <span>Home</span>
         </Link>
 
-        {/* 2. Categories */}
+        {/* 2. Shop All */}
         <Link
-          href="/categories"
+          href="/products"
+          className={cn(
+            "flex flex-col items-center justify-center gap-1 text-[11px] transition-all relative py-1.5 min-h-[48px]",
+            isShopAll ? "text-[#68122F] font-bold" : "text-[#666666] hover:text-[#111111] font-medium"
+          )}
+        >
+          <ShoppingBag
+            className={cn(
+              "w-5 h-5 transition-transform",
+              isShopAll ? "text-[#68122F] stroke-[2.4]" : "text-[#666666] stroke-[1.8]"
+            )}
+          />
+          <span>Shop All</span>
+        </Link>
+
+        {/* 3. Categories */}
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent("open-categories-menu"))}
           className={cn(
             "flex flex-col items-center justify-center gap-1 text-[11px] transition-all relative py-1.5 min-h-[48px]",
             isCategories ? "text-[#68122F] font-bold" : "text-[#666666] hover:text-[#111111] font-medium"
@@ -69,9 +90,9 @@ export default function MobileNav() {
             )}
           />
           <span>Categories</span>
-        </Link>
+        </button>
 
-        {/* 3. Wishlist */}
+        {/* 4. Wishlist */}
         <Link
           href="/wishlist"
           className={cn(
@@ -95,7 +116,7 @@ export default function MobileNav() {
           <span>Wishlist</span>
         </Link>
 
-        {/* 4. Account */}
+        {/* 5. Account */}
         {user ? (
           <Link
             href="/orders"

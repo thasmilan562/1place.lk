@@ -1,5 +1,5 @@
 import { Category } from "./types";
-import { isBrandName, cleanCatalogString, STANDARD_CATEGORIES, CATEGORY_ALIASES } from "./catalog-utils";
+import { isBrandName, cleanCatalogString, STANDARD_CATEGORIES, CATEGORY_ALIASES, resolveCanonicalCategory } from "./catalog-utils";
 import { Firestore, doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 /**
@@ -202,16 +202,19 @@ export function deduplicateCategories(categories: Category[]): Category[] {
     if (isBrandName(clean)) return;
 
     const normName = normalizeCategoryName(clean);
-    const slug = generateCategorySlug(cat.slug || normName);
+    const canonical = resolveCanonicalCategory(cat.slug) || resolveCanonicalCategory(clean) || resolveCanonicalCategory(cat.id);
+    const slug = canonical ? canonical.canonicalSlug : generateCategorySlug(cat.slug || normName);
+    const name = canonical ? canonical.canonicalName : formatCategoryTitle(cat.name);
+    const id = canonical ? canonical.canonicalId : (cat.id || getCategoryDocId(slug));
     const key = slug;
 
     const existing = map.get(key);
     if (!existing) {
       map.set(key, {
         ...cat,
-        id: cat.id || getCategoryDocId(slug),
-        name: formatCategoryTitle(cat.name),
-        slug: slug,
+        id,
+        name,
+        slug,
       });
     } else {
       // Merge best metadata: keep whichever has richer image, icon, sort order

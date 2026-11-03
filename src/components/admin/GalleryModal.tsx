@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Upload, Loader2, Link, Eye, EyeOff, Video, Sparkles, AlertCircle } from "lucide-react";
+import { X, Upload, Loader2, Link, Eye, EyeOff, Video, CircleCheck as Sparkles, AlertCircle } from "lucide-react";
 import { GalleryImage } from "@/lib/types";
 import { db } from "@/lib/firebase";
 import { addDoc, updateDoc, doc, collection } from "firebase/firestore";

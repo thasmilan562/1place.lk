@@ -36,7 +36,7 @@ export default function StoreBenefitsBar() {
   return (
     <section
       aria-label="Shopping Benefits"
-      className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 select-none font-sans"
+      className="premium-benefits w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 select-none font-sans"
     >
       <div className="w-full bg-white border border-[#E8E8E8] rounded-2xl sm:rounded-3xl p-5 sm:p-7 lg:p-8 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:border-neutral-300 transition-colors duration-200">
         {/* Desktop: 4 Columns with Vertical Dividers */}

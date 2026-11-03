@@ -14,6 +14,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  RotateCw,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
@@ -95,8 +96,54 @@ export default function SpinWinModal() {
   // Terms Modal Toggle
   const [showTerms, setShowTerms] = useState(false);
 
+  const lastFocusedElement = useRef<HTMLElement | null>(null);
+
+  // Suppress promotion modal on administrative, auth, and checkout routes
+  const isBlockedRoute = useMemo(() => {
+    return Boolean(
+      pathname?.startsWith("/admin") ||
+      pathname?.startsWith("/checkout") ||
+      pathname?.startsWith("/login") ||
+      pathname?.startsWith("/register")
+    );
+  }, [pathname]);
+
+  // Coordinate overlays: close spin modal if auth modal or cart opens
+  useEffect(() => {
+    const handleSuppress = () => {
+      setIsOpen(false);
+    };
+    window.addEventListener("auth-modal-opened", handleSuppress);
+    window.addEventListener("open-auth-modal", handleSuppress);
+    window.addEventListener("open-cart-drawer", handleSuppress);
+    window.addEventListener("open-categories-menu", handleSuppress);
+    return () => {
+      window.removeEventListener("auth-modal-opened", handleSuppress);
+      window.removeEventListener("open-auth-modal", handleSuppress);
+      window.removeEventListener("open-cart-drawer", handleSuppress);
+      window.removeEventListener("open-categories-menu", handleSuppress);
+    };
+  }, []);
+
+  // Keyboard accessibility: Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
   // 1. Fetch promotion settings on mount
   useEffect(() => {
+    if (isBlockedRoute) {
+      setIsOpen(false);
+      return;
+    }
+
     fetch("/api/spin-and-win/settings")
       .then((res) => res.json())
       .then((data) => {
@@ -106,23 +153,29 @@ export default function SpinWinModal() {
           // Check if modal should auto-open
           if (data.settings.enabled && data.settings.popupEnabled) {
             try {
+              if (document.body.dataset.authModalOpen === "true") {
+                return; // Auth modal is currently open, suppress promotion
+              }
               const dismissedAt = localStorage.getItem(DISMISSED_STORAGE_KEY);
               const oneDayMs = 24 * 60 * 60 * 1000;
               if (!dismissedAt || Date.now() - Number(dismissedAt) > oneDayMs) {
-                // Auto show after a gentle 1.5s delay
+                // Auto show after a gentle 2.5s delay
                 const timer = setTimeout(() => {
-                  setIsOpen(true);
-                }, 1500);
+                  if (document.body.dataset.authModalOpen !== "true") {
+                    lastFocusedElement.current = document.activeElement as HTMLElement;
+                    setIsOpen(true);
+                  }
+                }, 2500);
                 return () => clearTimeout(timer);
               }
             } catch (e) {
-              setIsOpen(true);
+              // Ignore storage errors
             }
           }
         }
       })
       .catch((err) => console.warn("Failed to load spin settings:", err));
-  }, []);
+  }, [isBlockedRoute]);
 
   // 2. Prevent body scroll when open
   useEffect(() => {
@@ -142,6 +195,11 @@ export default function SpinWinModal() {
     try {
       localStorage.setItem(DISMISSED_STORAGE_KEY, Date.now().toString());
     } catch {}
+    if (lastFocusedElement.current) {
+      try {
+        lastFocusedElement.current.focus();
+      } catch {}
+    }
   };
 
   // 3. Initiate Spin
@@ -223,7 +281,7 @@ export default function SpinWinModal() {
     }
   };
 
-  if (!settings.enabled || pathname?.startsWith("/admin")) return null;
+  if (!settings.enabled || isBlockedRoute) return null;
 
   return (
     <>
@@ -244,7 +302,7 @@ export default function SpinWinModal() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={handleClose}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity"
+              className="fixed inset-0 bg-black/35 backdrop-blur-sm transition-opacity"
             />
 
             {/* Modal Box */}
@@ -253,9 +311,9 @@ export default function SpinWinModal() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 20 }}
               transition={{ type: "spring", stiffness: 350, damping: 28 }}
-              className="relative w-full max-w-[860px] max-h-[92vh] overflow-y-auto rounded-[28px] sm:rounded-[36px] bg-gradient-to-b from-[#1C050D] via-[#111111] to-[#0A0A0A] border border-[#64152F]/70 shadow-[0_25px_70px_rgba(0,0,0,0.85)] text-white z-10 scrollbar-thin"
+              className="relative w-full max-w-[860px] max-h-[92vh] overflow-y-auto rounded-[28px] sm:rounded-[36px] bg-[#FAFAFA] border border-[#E5E5E7] shadow-[0_24px_80px_rgba(0,0,0,0.2)] text-[#1D1D1F] z-10 scrollbar-thin"
               style={{
-                boxShadow: "0 0 50px rgba(100, 21, 47, 0.35), 0 20px 40px rgba(0,0,0,0.9)",
+                boxShadow: "0 24px 80px rgba(0,0,0,0.2)",
               }}
             >
               {/* Confetti Explosion on confirmed win */}
@@ -265,7 +323,7 @@ export default function SpinWinModal() {
               <button
                 onClick={handleClose}
                 aria-label="Close promotion popup"
-                className="absolute top-4 right-4 z-40 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all cursor-pointer backdrop-blur-md border border-white/10"
+                className="absolute top-4 right-4 z-40 p-2.5 rounded-full bg-white hover:bg-[#F0F0F2] text-[#6E6E73] hover:text-[#1D1D1F] transition-all cursor-pointer border border-[#E5E5E7]"
               >
                 <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
@@ -279,7 +337,7 @@ export default function SpinWinModal() {
                   {/* Brand & Badge Header */}
                   <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2.5">
                     <BrandLogo variant="auth" />
-                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-[#64152F] to-[#8A1C3E] border border-[#FFE875]/40 text-[#FFE875] text-[10px] sm:text-xs font-black tracking-widest uppercase shadow-md">
+                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#F2E9ED] border border-[#E7D8DF] text-[#68122F] text-[10px] sm:text-xs font-bold tracking-widest uppercase">
                       <span>{settings.badgeText || "FIRST ORDER SPECIAL"}</span>
                     </div>
                   </div>
@@ -290,11 +348,11 @@ export default function SpinWinModal() {
                       <div>
                         <h2
                           id="promo-heading"
-                          className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight leading-[1.15] bg-gradient-to-r from-white via-white to-white/75 bg-clip-text text-transparent"
+                          className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight leading-[1.15] text-[#1D1D1F]"
                         >
                           {settings.heading || "YOUR FIRST ORDER DESERVES A GIFT!"}
                         </h2>
-                        <p className="text-white/70 text-xs sm:text-sm mt-2 sm:mt-3 leading-relaxed max-w-md mx-auto lg:mx-0">
+                        <p className="text-[#6E6E73] text-xs sm:text-sm mt-2 sm:mt-3 leading-relaxed max-w-md mx-auto lg:mx-0">
                           {settings.description ||
                             "Place your first order and unlock your chance to WIN A FREE GIFT! Every spin is guaranteed to reward you."}
                         </p>
@@ -302,21 +360,21 @@ export default function SpinWinModal() {
 
                       {/* Reward Teasers Grid */}
                       <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-1">
-                        <div className="p-2 sm:p-3 rounded-2xl bg-white/[0.04] border border-white/10 text-center flex flex-col items-center">
+                        <div className="p-2 sm:p-3 rounded-2xl bg-white border border-[#E5E5E7] text-center flex flex-col items-center">
                           <span className="text-xl sm:text-2xl mb-1">🎁</span>
-                          <span className="text-[10px] sm:text-[11px] font-bold text-white/90 leading-tight">
+                          <span className="text-[10px] sm:text-[11px] font-semibold text-[#424245] leading-tight">
                             Free Gift Box
                           </span>
                         </div>
-                        <div className="p-2 sm:p-3 rounded-2xl bg-white/[0.04] border border-white/10 text-center flex flex-col items-center">
+                        <div className="p-2 sm:p-3 rounded-2xl bg-white border border-[#E5E5E7] text-center flex flex-col items-center">
                           <span className="text-xl sm:text-2xl mb-1">🚚</span>
-                          <span className="text-[10px] sm:text-[11px] font-bold text-white/90 leading-tight">
+                          <span className="text-[10px] sm:text-[11px] font-semibold text-[#424245] leading-tight">
                             Free Delivery
                           </span>
                         </div>
-                        <div className="p-2 sm:p-3 rounded-2xl bg-white/[0.04] border border-white/10 text-center flex flex-col items-center">
+                        <div className="p-2 sm:p-3 rounded-2xl bg-white border border-[#E5E5E7] text-center flex flex-col items-center">
                           <span className="text-xl sm:text-2xl mb-1">🎧</span>
-                          <span className="text-[10px] sm:text-[11px] font-bold text-white/90 leading-tight">
+                          <span className="text-[10px] sm:text-[11px] font-semibold text-[#424245] leading-tight">
                             Accessories
                           </span>
                         </div>
@@ -328,7 +386,7 @@ export default function SpinWinModal() {
                           id="spin-now-btn"
                           onClick={handleSpinClick}
                           disabled={isWheelSpinning || spinningLoading}
-                          className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#D90429] via-[#EF233C] to-[#D90429] text-white font-black text-sm sm:text-base tracking-wide uppercase transition-all shadow-[0_8px_25px_rgba(217,4,41,0.45)] hover:shadow-[0_10px_35px_rgba(217,4,41,0.6)] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer border border-[#FF8597]/40 relative overflow-hidden group"
+                          className="w-full py-4 px-6 rounded-2xl bg-[#68122F] hover:bg-[#520D23] text-white font-semibold text-sm sm:text-base tracking-wide transition-all shadow-[0_6px_18px_rgba(104,18,47,0.18)] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer relative overflow-hidden group"
                         >
                           {spinningLoading ? (
                             <>
@@ -359,21 +417,21 @@ export default function SpinWinModal() {
                             handleClose();
                             router.push("/products");
                           }}
-                          className="w-full py-3 px-5 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] text-white/90 font-bold text-xs sm:text-sm tracking-wide uppercase transition-all border border-white/10 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+                          className="w-full py-3 px-5 rounded-2xl bg-white hover:bg-[#F5F5F7] text-[#1D1D1F] font-semibold text-xs sm:text-sm tracking-wide transition-all border border-[#E5E5E7] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
                         >
                           <span>SHOP NOW &amp; UNLOCK YOUR SPIN</span>
                           <ArrowRight className="w-4 h-4" />
                         </button>
 
-                        <div className="flex items-center justify-center lg:justify-start gap-3 text-[11px] text-white/40">
+                        <div className="flex items-center justify-center lg:justify-start gap-3 text-[11px] text-[#86868B]">
                           <span className="flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> 100% Genuine Tech
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> 100% Genuine Tech
                           </span>
                           <span>•</span>
                           <button
                             type="button"
                             onClick={() => setShowTerms(!showTerms)}
-                            className="underline hover:text-white/70 transition-colors cursor-pointer"
+                            className="underline hover:text-[#1D1D1F] transition-colors cursor-pointer"
                           >
                             Terms &amp; Conditions
                           </button>
@@ -390,10 +448,10 @@ export default function SpinWinModal() {
                       className="space-y-4"
                     >
                       <div>
-                        <span className="text-amber-400 text-xs sm:text-sm font-extrabold tracking-widest uppercase">
+                        <span className="text-[#68122F] text-xs sm:text-sm font-semibold tracking-widest uppercase">
                           🎉 CONGRATULATIONS!
                         </span>
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white mt-1">
+                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-[#1D1D1F] mt-1">
                           {wonReward.rewardType === "gift"
                             ? `YOU WON A ${wonReward.productName || wonReward.segmentLabel}!`
                             : wonReward.rewardType === "free_shipping"
@@ -403,8 +461,8 @@ export default function SpinWinModal() {
                       </div>
 
                       {/* Automatic Cart Success Card */}
-                      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#64152F]/40 to-[#111111]/80 border border-[#FFE875]/40 shadow-xl flex items-center gap-4 text-left">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-black/40 border border-[#FFE875]/30 p-2 shrink-0 flex items-center justify-center overflow-hidden relative">
+                      <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E5E7] shadow-sm flex items-center gap-4 text-left">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-[#F5F5F7] border border-[#E5E5E7] p-2 shrink-0 flex items-center justify-center overflow-hidden relative">
                           <img
                             src={wonReward.productImage || "/assets/promo/gift-box.png"}
                             alt={wonReward.productName || "Reward"}
@@ -418,23 +476,23 @@ export default function SpinWinModal() {
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-extrabold uppercase mb-1">
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold uppercase mb-1">
                             ✓ Automatically Added to Bag
                           </span>
-                          <h4 className="text-sm sm:text-base font-bold text-white truncate">
+                          <h4 className="text-sm sm:text-base font-semibold text-[#1D1D1F] truncate">
                             {wonReward.productName || wonReward.segmentLabel}
                           </h4>
-                          <p className="text-xs font-black text-emerald-400 mt-0.5">
+                          <p className="text-xs font-semibold text-emerald-700 mt-0.5">
                             Price: LKR 0 (Promotional Gift)
                           </p>
                         </div>
                       </div>
 
                       {/* Important Redemption Notice */}
-                      <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 text-[11px] sm:text-xs text-white/70 text-left flex items-start gap-2.5">
-                        <HelpCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="p-3 rounded-xl bg-white border border-[#E5E5E7] text-[11px] sm:text-xs text-[#6E6E73] text-left flex items-start gap-2.5">
+                        <HelpCircle className="w-4 h-4 text-[#68122F] shrink-0 mt-0.5" />
                         <p>
-                          <strong className="text-white">Redemption Policy:</strong> Simply add any regular smartphone, audio, or tech item to your bag to checkout with your free gift.
+                          <strong className="text-[#1D1D1F]">Redemption Policy:</strong> Simply add any regular smartphone, audio, or tech item to your bag to checkout with your free gift.
                         </p>
                       </div>
 
@@ -457,7 +515,7 @@ export default function SpinWinModal() {
                             handleClose();
                             router.push("/products");
                           }}
-                          className="py-3.5 px-4 rounded-xl bg-[#64152F] hover:bg-[#8A1C3E] text-white font-extrabold text-xs sm:text-sm border border-[#FFE875]/40 transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="py-3.5 px-4 rounded-xl bg-[#F2E9ED] hover:bg-[#E9D9E0] text-[#68122F] font-semibold text-xs sm:text-sm border border-[#E7D8DF] transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                           <span>Shop Products</span>
                           <ArrowRight className="w-4 h-4" />
@@ -473,14 +531,14 @@ export default function SpinWinModal() {
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-4"
                     >
-                      <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto lg:mx-0">
+                      <div className="w-12 h-12 rounded-2xl bg-[#F2E9ED] border border-[#E7D8DF] flex items-center justify-center text-[#68122F] mx-auto lg:mx-0">
                         <AlertCircle className="w-6 h-6" />
                       </div>
                       <div>
-                        <h3 className="text-xl sm:text-2xl font-black text-white">
+                        <h3 className="text-xl sm:text-2xl font-semibold text-[#1D1D1F]">
                           First Order Offer Notice
                         </h3>
-                        <p className="text-xs sm:text-sm text-white/70 mt-1 leading-relaxed">
+                        <p className="text-xs sm:text-sm text-[#6E6E73] mt-1 leading-relaxed">
                           {ineligibleReason ||
                             "This exclusive promotion is valid only for new customers placing their first qualifying order."}
                         </p>
@@ -491,7 +549,7 @@ export default function SpinWinModal() {
                             handleClose();
                             router.push("/products");
                           }}
-                          className="w-full py-3.5 px-6 rounded-2xl bg-white text-black font-extrabold text-sm hover:bg-neutral-200 transition-all active:scale-95 cursor-pointer"
+                          className="w-full py-3.5 px-6 rounded-2xl bg-[#68122F] text-white font-semibold text-sm hover:bg-[#520D23] transition-all active:scale-95 cursor-pointer"
                         >
                           Explore Best Deals
                         </button>
@@ -505,9 +563,9 @@ export default function SpinWinModal() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="mt-3 p-3.5 rounded-2xl bg-black/60 border border-white/10 text-[11px] text-white/60 text-left max-h-[140px] overflow-y-auto whitespace-pre-line scrollbar-thin"
+                      className="mt-3 p-3.5 rounded-2xl bg-white border border-[#E5E5E7] text-[11px] text-[#6E6E73] text-left max-h-[140px] overflow-y-auto whitespace-pre-line scrollbar-thin"
                     >
-                      <p className="font-bold text-white text-xs mb-1">Terms &amp; Conditions</p>
+                      <p className="font-semibold text-[#1D1D1F] text-xs mb-1">Terms &amp; Conditions</p>
                       {settings.termsAndConditions || DEFAULT_SPIN_SETTINGS.termsAndConditions}
                     </motion.div>
                   )}
@@ -527,7 +585,7 @@ export default function SpinWinModal() {
                   </div>
 
                   {/* Subtle helper text beneath wheel on mobile */}
-                  <p className="text-[10px] text-white/40 text-center mt-3 tracking-wider uppercase font-semibold">
+                  <p className="text-[10px] text-[#86868B] text-center mt-3 tracking-wider uppercase font-semibold">
                     {modalState === "spinning"
                       ? "Spinning... Good luck!"
                       : modalState === "won"
@@ -542,7 +600,7 @@ export default function SpinWinModal() {
         )}
       </AnimatePresence>
 
-      {/* Floating Burgundy Gift Launcher Button (matching UI reference) */}
+      {/* Premium Spin & Win launcher */}
       {!isOpen && (
         <button
           id="spin-win-floating-trigger"
@@ -551,9 +609,10 @@ export default function SpinWinModal() {
             setIsOpen(true);
           }}
           aria-label="Spin & Win Free Gifts"
-          className="hidden md:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#68122F] hover:bg-[#520d23] text-white items-center justify-center shadow-[0_8px_25px_rgba(104,18,47,0.45)] hover:scale-105 active:scale-95 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#68122F] focus:ring-offset-2"
+          className="flex fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-4 md:bottom-6 md:right-6 z-40 h-12 w-12 md:w-auto gap-2 rounded-full border border-[#E5E5E7] bg-white/95 px-0 md:px-4 text-[#68122F] items-center justify-center shadow-[0_5px_20px_rgba(29,29,31,0.14)] hover:shadow-[0_8px_24px_rgba(29,29,31,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#68122F] focus:ring-offset-2"
         >
-          <Gift className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          <RotateCw className="w-4 h-4" />
+          <span className="hidden md:inline text-xs font-semibold tracking-wide">Spin &amp; Win</span>
         </button>
       )}
     </>

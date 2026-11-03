@@ -11,7 +11,7 @@ import {
   Star,
   Eye,
   EyeOff,
-  Sparkles,
+  CircleCheck as Sparkles,
   ChevronUp,
   ChevronDown,
   ExternalLink,

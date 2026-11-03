@@ -13,7 +13,7 @@ import {
   Save,
   Check,
   RotateCcw,
-  Sparkles,
+  CircleCheck as Sparkles,
   Sliders,
   Gauge,
   Hand,

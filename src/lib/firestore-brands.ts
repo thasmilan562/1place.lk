@@ -222,6 +222,7 @@ export async function deleteBrandFromDb(id: string, brandInfo?: Partial<Brand>):
     clearDataCache("brands");
   } catch (e) {
     console.warn("Error deleting brand from Firestore:", e);
+    throw e;
   }
 }
 

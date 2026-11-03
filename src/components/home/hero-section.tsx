@@ -501,7 +501,11 @@ export default function HeroSection() {
                 className="select-none"
                 style={{
                   objectFit: imageFitMode,
-                  objectPosition: currentSlide.desktop_image_position || "center",
+                  objectPosition:
+                    currentSlide.desktop_image_position && currentSlide.desktop_image_position !== "center"
+                      ? currentSlide.desktop_image_position
+                      : (desktopBg?.includes("Playful") || desktopBg?.includes("gift") ? "center 15%" : "center"),
+                  transform: desktopBg?.includes("Playful") || desktopBg?.includes("gift") ? "scale(1.06)" : undefined,
                 }}
               />
             </motion.div>
@@ -533,7 +537,7 @@ export default function HeroSection() {
         {/* ── Overlaid Hero Content (Layered Directly on Top of the Background Image) ── */}
         <div
           ref={heroContentRef}
-          className={`relative z-20 max-w-[1440px] mx-auto px-8 lg:px-16 w-full pt-14 lg:pt-20 pb-28 lg:pb-36 flex flex-col ${
+          className={`relative z-20 max-w-[1440px] mx-auto px-10 sm:px-14 md:px-18 lg:px-24 xl:px-28 w-full pt-14 lg:pt-20 pb-28 lg:pb-36 flex flex-col ${
             verticalPosition === "top"
               ? "justify-start"
               : verticalPosition === "bottom"
@@ -730,7 +734,7 @@ export default function HeroSection() {
               type="button"
               onClick={handlePrev}
               aria-label="Previous Slide"
-              className="absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-white text-neutral-900 shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer"
+              className="absolute left-3 lg:left-5 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-white/95 text-neutral-900 shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer backdrop-blur-md"
             >
               <ChevronLeft className="w-5 h-5 stroke-[2.2]" />
             </button>
@@ -738,7 +742,7 @@ export default function HeroSection() {
               type="button"
               onClick={handleNext}
               aria-label="Next Slide"
-              className="absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-white text-neutral-900 shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer"
+              className="absolute right-3 lg:right-5 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-white/95 text-neutral-900 shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer backdrop-blur-md"
             >
               <ChevronRight className="w-5 h-5 stroke-[2.2]" />
             </button>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Sparkles, X, User } from "lucide-react";
+import { Check, CircleCheck as Sparkles, X, User } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import UserAvatar from "@/components/ui/UserAvatar";
 

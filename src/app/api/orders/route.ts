@@ -214,6 +214,32 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+
+      // Server-side database verification if productId provided
+      if (item.productId) {
+        try {
+          const pDoc = await getDoc(doc(db, "products", item.productId));
+          if (pDoc.exists()) {
+            const pData = pDoc.data();
+            if (pData.status === "draft") {
+              return NextResponse.json(
+                { success: false, error: `Product "${pData.name || item.name}" is a draft and not for sale.` },
+                { status: 400 }
+              );
+            }
+            const dbBasePrice = Number(pData.price) || 0;
+            const hasCombos = Array.isArray(pData.variant_combos) && pData.variant_combos.length > 0;
+            if (dbBasePrice <= 0 && !hasCombos) {
+              return NextResponse.json(
+                { success: false, error: `Product "${pData.name || item.name}" does not have an active price assigned.` },
+                { status: 400 }
+              );
+            }
+          }
+        } catch (dbErr) {
+          console.warn("Could not check product doc in DB:", dbErr);
+        }
+      }
       if (isNaN(itemQty) || itemQty <= 0) {
         return NextResponse.json(
           {

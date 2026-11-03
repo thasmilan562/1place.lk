@@ -22,7 +22,7 @@ import {
   ShieldCheck,
   RotateCcw,
   HelpCircle,
-  Sparkles,
+  CircleCheck as Sparkles,
   ArrowRight,
   LayoutGrid,
   SlidersHorizontal,
@@ -32,21 +32,22 @@ import { useAuth } from "@/lib/auth-context";
 import { useCart } from "@/lib/cart-context";
 import { useWishlist } from "@/lib/wishlist-context";
 import AuthModal from "@/components/auth/AuthModal";
-import CartDrawer from "@/components/cart/CartDrawer";
+import CartDrawer from "@/components/cart/PremiumCartDrawer";
 import { categories as fallbackCategories } from "@/lib/data";
 import { getCategories } from "@/lib/firestore-client";
 import { Category } from "@/lib/types";
 import { KNOWN_BRAND_NAMES } from "@/lib/migration-audit";
 import UserAvatar from "@/components/ui/UserAvatar";
 import BrandLogo from "@/components/ui/BrandLogo";
-import CategoryIcon from "@/components/ui/CategoryIcon";
 import { BUSINESS_INFO } from "@/lib/business-info";
+import CategoryMenu from "./CategoryMenu";
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCategoriesDropdownOpen, setIsCategoriesDropdownOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [authTab, setAuthTab] = useState<"signin" | "signup">("signin");
   const [cartOpen, setCartOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [catList, setCatList] = useState<Category[]>(fallbackCategories);
@@ -114,15 +115,22 @@ export default function Header() {
 
   // Event bus listeners for search / cart / auth
   useEffect(() => {
-    const handleOpenAuth = () => setAuthOpen(true);
+    const handleOpenAuth = () => { setAuthTab("signin"); setAuthOpen(true); };
     const handleOpenCart = () => setCartOpen(true);
+    const handleOpenCategories = () => { setAuthOpen(false); setCartOpen(false); setIsCategoriesDropdownOpen(true); setIsMobileMenuOpen(false); };
+    window.addEventListener("open-categories-menu", handleOpenCategories);
     window.addEventListener("open-auth-modal", handleOpenAuth);
     window.addEventListener("open-cart-drawer", handleOpenCart);
     return () => {
+      window.removeEventListener("open-categories-menu", handleOpenCategories);
       window.removeEventListener("open-auth-modal", handleOpenAuth);
       window.removeEventListener("open-cart-drawer", handleOpenCart);
     };
   }, []);
+
+  useEffect(() => {
+    if (authOpen || cartOpen) setIsCategoriesDropdownOpen(false);
+  }, [authOpen, cartOpen]);
 
   // Close categories dropdown on outside click or escape
   useEffect(() => {
@@ -240,6 +248,7 @@ export default function Header() {
               >
                 <input
                   type="text"
+                  aria-label="Search products"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search for products, brands and categories..."
@@ -337,7 +346,7 @@ export default function Header() {
                 ) : (
                   <div className={cn("flex items-center gap-1.5 font-semibold text-neutral-800 transition-all duration-300", isScrolled ? "text-[11px]" : "text-xs")}>
                     <button
-                      onClick={() => setAuthOpen(true)}
+                      onClick={() => { setAuthTab("signin"); setAuthOpen(true); }}
                       className="flex items-center gap-1.5 hover:text-[#68122F] px-2 py-1.5 rounded-md hover:bg-neutral-50 transition-colors cursor-pointer"
                     >
                       <User className={cn("text-neutral-600 transition-all", isScrolled ? "w-3.5 h-3.5" : "w-4 h-4")} />
@@ -345,7 +354,7 @@ export default function Header() {
                     </button>
                     <span className="text-neutral-300">|</span>
                     <button
-                      onClick={() => setAuthOpen(true)}
+                      onClick={() => { setAuthTab("signup"); setAuthOpen(true); }}
                       className="hover:text-[#68122F] px-2 py-1.5 rounded-md hover:bg-neutral-50 transition-colors cursor-pointer"
                     >
                       <span>Sign Up</span>
@@ -408,6 +417,7 @@ export default function Header() {
               <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 stroke-[2] pointer-events-none" />
               <input
                 type="text"
+                aria-label="Search products"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search for products, brands and categories..."
@@ -420,34 +430,30 @@ export default function Header() {
         {/* ── Desktop Category Navigation Sub-Header Row Matching Desktop Reference Image ── */}
         <div className="hidden lg:block border-t border-[#F0F0F0] bg-white">
           <div className="max-w-7xl mx-auto px-4 lg:px-8">
-            <nav className="flex items-center justify-center gap-6 xl:gap-8 py-2.5 text-xs font-semibold">
-              {uniqueNavCategories.slice(0, 8).map((cat) => {
-                const isActive = pathname === `/category/${cat.slug}` || pathname.includes(`category=${cat.slug}`);
-                return (
-                  <Link
-                    key={cat.id || cat.slug}
-                    href={`/category/${cat.slug}`}
-                    className={cn(
-                      "transition-colors whitespace-nowrap py-0.5",
-                      isActive
-                        ? "text-[#68122F] font-bold border-b-2 border-[#68122F]"
-                        : "text-[#333333] hover:text-[#68122F]"
-                    )}
-                  >
-                    {cat.name}
-                  </Link>
-                );
-              })}
+            <nav aria-label="Store navigation" className="flex items-center justify-center gap-8 py-2.5 text-xs font-semibold">
               <Link
-                href="/categories"
+                href="/products"
+                className={cn(
+                  "transition-colors whitespace-nowrap py-0.5",
+                  pathname.startsWith("/products") ? "text-[#68122F] font-bold" : "text-[#333333] hover:text-[#68122F]"
+                )}
+              >
+                Shop All
+              </Link>
+              <button
+                type="button"
+                aria-expanded={isCategoriesDropdownOpen}
+                aria-haspopup="dialog"
+                onClick={() => setIsCategoriesDropdownOpen((open) => !open)}
                 className="text-[#666666] hover:text-[#68122F] transition-colors whitespace-nowrap py-0.5"
               >
-                More
-              </Link>
+                Categories <ChevronDown className="inline w-3 h-3 ml-1" />
+              </button>
             </nav>
           </div>
         </div>
       </header>
+      <CategoryMenu open={isCategoriesDropdownOpen} onClose={() => setIsCategoriesDropdownOpen(false)} categories={uniqueNavCategories} />
 
       {/* ── 4. Mobile Navigation Drawer ── */}
       <AnimatePresence>
@@ -495,7 +501,7 @@ export default function Header() {
                   <ChevronRight className="w-4 h-4 text-neutral-400" />
                 </Link>
                 <Link
-                  href="/categories"
+                  href="/#categories-strip"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="flex items-center justify-between px-3.5 py-3 rounded-lg text-sm font-semibold text-[#111111] hover:bg-[#F7F7F7] transition-colors"
                 >
@@ -543,40 +549,6 @@ export default function Header() {
                   <ChevronRight className="w-4 h-4 text-neutral-400" />
                 </Link>
 
-                {/* Categories Shortcut List */}
-                <div className="pt-4 border-t border-[#E8E8E8]">
-                  <div className="flex items-center justify-between px-3.5 mb-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
-                      Shop By Category
-                    </span>
-                    <Link
-                      href="/categories"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="text-[11px] font-bold text-[#68122F] hover:underline"
-                    >
-                      View All
-                    </Link>
-                  </div>
-                  {uniqueNavCategories.slice(0, 8).map((c) => (
-                    <Link
-                      key={c.id || c.slug}
-                      href={`/category/${c.slug}`}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center justify-between px-3.5 py-2 text-xs font-medium text-neutral-700 hover:text-[#68122F] hover:bg-[#F7F7F7] rounded-xl transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-full bg-[#F3F4F6] flex items-center justify-center shrink-0">
-                          <CategoryIcon
-                            category={c}
-                            className="w-3.5 h-3.5 text-neutral-700"
-                          />
-                        </div>
-                        <span className="font-semibold text-neutral-800">{c.name}</span>
-                      </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-neutral-300" />
-                    </Link>
-                  ))}
-                </div>
               </div>
 
               {/* Drawer Bottom Actions */}
@@ -633,7 +605,7 @@ export default function Header() {
       </AnimatePresence>
 
       {/* Auth Modal */}
-      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+      <AuthModal isOpen={authOpen} initialTab={authTab} onClose={() => setAuthOpen(false)} />
 
       {/* Cart Drawer */}
       <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />

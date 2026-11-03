@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   Gift,
   Truck,
-  Sparkles,
+  CircleCheck as Sparkles,
   Save,
   CheckCircle2,
   AlertCircle,

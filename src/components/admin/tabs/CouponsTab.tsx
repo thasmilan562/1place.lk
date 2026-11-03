@@ -13,7 +13,7 @@ import {
   Copy,
   Check,
   Power,
-  Sparkles,
+  CircleCheck as Sparkles,
   Calendar,
   AlertCircle,
   Clock,

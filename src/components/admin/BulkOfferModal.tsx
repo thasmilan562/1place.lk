@@ -22,7 +22,7 @@ import {
   Percent,
   DollarSign,
   RotateCcw,
-  Sparkles,
+  CircleCheck as Sparkles,
   CheckCircle2,
   AlertCircle,
   Package,

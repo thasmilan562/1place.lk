@@ -53,6 +53,7 @@ export default function VisualProductShowcase({ settings, placement, singleSlide
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   const totalSlides = activeSlides.length;
+  const isBenefitsBannerSlot = placement === "benefits_banner_slot";
   const autoSlide = showcase.auto_slide ?? true;
   const slideInterval = showcase.slide_interval ?? 6000;
 
@@ -182,7 +183,7 @@ export default function VisualProductShowcase({ settings, placement, singleSlide
     <>
       {/* ── Mobile Layout (< 768px): Full-Width Edge-to-Edge Showcase Banner ── */}
       <section
-        className="md:hidden relative w-full max-w-full overflow-hidden select-none border-0 m-0 p-0 rounded-none shadow-none"
+        className={`md:hidden relative w-full max-w-full overflow-hidden select-none border-0 m-0 p-0 rounded-none shadow-none ${className || ""}`}
         style={backgroundStyle}
         aria-label={showcase.section_title || "Featured Visual Showcase"}
         onTouchStart={onTouchStart}
@@ -212,7 +213,7 @@ export default function VisualProductShowcase({ settings, placement, singleSlide
           const mobileRatio = currentSlide.banner_size_ratio_mobile || (currentSlide as any).bannerSizeRatioMobile || currentSlide.banner_size_ratio || "default";
           return (
             <div
-              className={`relative w-full ${
+              className={`relative w-full ${isBenefitsBannerSlot ? "aspect-[2.2/1] min-h-[170px] justify-center px-4 py-3" : `
                 mobileRatio === "1080x1080"
                   ? "aspect-square min-h-[380px] justify-center"
                   : mobileRatio === "860x270"
@@ -225,8 +226,9 @@ export default function VisualProductShowcase({ settings, placement, singleSlide
                   ? "aspect-[1024/387] min-h-[200px] justify-center"
                   : hasForegroundImage
                   ? "min-h-[420px] justify-between"
-                  : "min-h-[300px] justify-center"
-              } border-0 rounded-none shadow-none flex flex-col items-center pt-6 px-4 pb-4 z-10`}
+                  : "min-h-[300px] justify-center"}`
+              } border-0 rounded-none shadow-none flex flex-col items-center ${isBenefitsBannerSlot ? "" : "pt-6 px-4 pb-4"} z-10`}
+              style={isBenefitsBannerSlot ? { aspectRatio: "2.2 / 1", minHeight: "170px" } : undefined}
             >
           {/* Top Content Block: Badge -> Heading -> Subtitle -> Action CTAs */}
           <div className={`relative z-10 w-full flex flex-col max-w-md mx-auto space-y-2 ${alignClass}`}>
@@ -300,7 +302,7 @@ export default function VisualProductShowcase({ settings, placement, singleSlide
 
           {/* Lower Product Visual: Only rendered if foreground product image exists */}
           {hasForegroundImage && (
-            <div className="relative w-full flex-1 flex items-end justify-center overflow-visible min-h-[260px] sm:min-h-[300px] pt-4 pb-2 mt-auto">
+            <div className={`relative w-full flex-1 flex items-end justify-center overflow-visible ${isBenefitsBannerSlot ? "min-h-0 py-0" : "min-h-[260px] sm:min-h-[300px] pt-4 pb-2"} mt-auto`}>
               <Link
                 href={targetProductUrl}
                 aria-label={`View ${currentSlide.title || "featured product"}`}
@@ -310,7 +312,7 @@ export default function VisualProductShowcase({ settings, placement, singleSlide
                   src={mobileImg || desktopImg || "/placeholder-phone.webp"}
                   alt={currentSlide.title || "Featured Visual"}
                   loading="lazy"
-                  className="max-h-[290px] sm:max-h-[340px] w-auto max-w-[96%] object-contain object-bottom drop-shadow-[0_15px_30px_rgba(0,0,0,0.15)]"
+                  className={`${isBenefitsBannerSlot ? "max-h-[110px]" : "max-h-[290px] sm:max-h-[340px]"} w-auto max-w-[96%] object-contain object-bottom drop-shadow-[0_15px_30px_rgba(0,0,0,0.15)]`}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = "/placeholder-phone.webp";
                   }}
@@ -345,7 +347,7 @@ export default function VisualProductShowcase({ settings, placement, singleSlide
       {/* ── Desktop Layout (>= 768px) ── */}
       <section
         aria-label={showcase.section_title || "Featured Visual Showcase"}
-        className="hidden md:block relative w-full overflow-hidden select-none transition-colors duration-500"
+        className={`hidden md:block relative w-full overflow-hidden select-none transition-colors duration-500 ${className || ""}`}
         style={backgroundStyle}
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
@@ -379,7 +381,7 @@ export default function VisualProductShowcase({ settings, placement, singleSlide
         )}
 
         <div
-          style={
+        style={isBenefitsBannerSlot ? { aspectRatio: "4.1 / 1", minHeight: "220px" } :
             (currentSlide.banner_size_ratio || (currentSlide as any).bannerSizeRatio) === "1080x1080"
               ? { aspectRatio: "1 / 1", minHeight: "480px" }
               : (currentSlide.banner_size_ratio || (currentSlide as any).bannerSizeRatio) === "860x270"
@@ -392,7 +394,7 @@ export default function VisualProductShowcase({ settings, placement, singleSlide
               ? { aspectRatio: "1024 / 387", minHeight: "360px" }
               : undefined
           }
-          className={`relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col ${desktopJustifyClass} items-center ${
+          className={`relative w-full ${isBenefitsBannerSlot ? "max-w-none px-5" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"} flex flex-col ${isBenefitsBannerSlot ? "justify-center" : desktopJustifyClass} items-center ${isBenefitsBannerSlot ? "aspect-[4.1/1]" : `
             (currentSlide.banner_size_ratio || (currentSlide as any).bannerSizeRatio) === "1080x1080"
               ? "aspect-square py-12 justify-center"
               : (currentSlide.banner_size_ratio || (currentSlide as any).bannerSizeRatio) === "860x270"
@@ -405,7 +407,7 @@ export default function VisualProductShowcase({ settings, placement, singleSlide
               ? "aspect-[1024/387] py-8 justify-center"
               : hasForegroundImage
               ? "min-h-[480px] sm:min-h-[560px] md:min-h-[620px] lg:min-h-[680px] xl:min-h-[720px] pt-6 sm:pt-8 md:pt-10 pb-0"
-              : "min-h-[440px] sm:min-h-[500px] md:min-h-[560px] lg:min-h-[620px]"
+              : "min-h-[440px] sm:min-h-[500px] md:min-h-[560px] lg:min-h-[620px]"}`
           } z-10`}
         >
           <AnimatePresence mode="wait">
@@ -520,7 +522,7 @@ export default function VisualProductShowcase({ settings, placement, singleSlide
                           loading="lazy"
                           decoding="async"
                           className={`w-auto h-auto max-w-[98%] sm:max-w-[96%] md:max-w-[94%] ${
-                            hasHeaderContent
+                            isBenefitsBannerSlot ? "max-h-[190px]" : hasHeaderContent
                               ? "max-h-[360px] sm:max-h-[440px] md:max-h-[520px] lg:max-h-[580px] xl:max-h-[620px]"
                               : "max-h-[420px] sm:max-h-[500px] md:max-h-[580px] lg:max-h-[640px] xl:max-h-[680px]"
                           } object-contain object-bottom block drop-shadow-[0_20px_35px_rgba(0,0,0,0.15)] transition-transform duration-500 ease-out hover:scale-[1.01]`}

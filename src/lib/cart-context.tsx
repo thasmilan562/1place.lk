@@ -196,6 +196,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addToCart = useCallback((item: CartItem) => {
+    // Zero / unpriced item guard (only verified promotional free gifts are allowed with price 0)
+    if (!item.isFreeGift && (typeof item.price !== "number" || item.price <= 0 || isNaN(item.price))) {
+      console.warn("Rejected unpriced product from being added to cart:", item);
+      return;
+    }
+
     setCart((prev) => {
       const existingIdx = prev.findIndex((i) =>
         isMatchingItem(i, item.productId, item.variantId, item.color, item.storage, item.isFreeGift)

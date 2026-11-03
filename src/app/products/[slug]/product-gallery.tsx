@@ -62,7 +62,7 @@ export default function ProductGallery({
   return (
     <div className="space-y-3 sm:space-y-4">
       {/* ── Main Media Display Container (Square 1:1 shape on mobile and desktop) ── */}
-      <div className="relative w-full aspect-square max-h-[340px] sm:max-h-[520px] rounded-[22px] sm:rounded-[28px] overflow-hidden bg-white border border-[#EAEAEA] flex items-center justify-center group shadow-xs p-2 sm:p-6">
+      <div className="relative w-full aspect-square max-h-[340px] sm:max-h-[520px] rounded-none overflow-hidden bg-white border border-[#EAEAEA] flex items-center justify-center group shadow-xs p-1 sm:p-3">
         {/* Bottom-Left Discount Badge */}
         {discount > 0 && (
           <div className="absolute bottom-0 left-0 z-10">
@@ -100,7 +100,7 @@ export default function ProductGallery({
             <img
               src={displayImages[safeActiveIdx]}
               alt={`${name} - Image ${safeActiveIdx + 1}`}
-              className="w-full h-full object-contain object-center p-1 sm:p-2 transition-transform duration-300 ease-out group-hover:scale-105 cursor-pointer select-none"
+              className="w-full h-full object-cover object-center transition-transform duration-300 ease-out group-hover:scale-[1.05] cursor-pointer select-none"
               onClick={() => setIsFullscreen(true)}
               onError={(e) => {
                 (e.target as HTMLImageElement).src = "/placeholder-phone.webp";

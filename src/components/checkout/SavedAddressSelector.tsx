@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { MapPin, Plus, Check, Trash2, Edit3, Sparkles, Building2, Home } from "lucide-react";
+import { MapPin, Plus, Check, Trash2, Edit3, CircleCheck as Sparkles, Building2, Home } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, query, getDocs, doc, deleteDoc, addDoc, updateDoc } from "firebase/firestore";
 import { User } from "firebase/auth";

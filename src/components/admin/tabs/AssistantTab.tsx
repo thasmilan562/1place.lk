@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import {
   Bot,
   MessageSquare,
-  Sparkles,
+  CircleCheck as Sparkles,
   Users,
   Search,
   CheckCircle2,

@@ -22,6 +22,7 @@ export default function ProductCard({ product, className = "", priority = false 
   const [imageError, setImageError] = useState(false);
 
   const isWishlisted = isInWishlist(product.id);
+  const isUnpriced = typeof product.price !== "number" || product.price <= 0;
   const isOutOfStock =
     product.stock_status === "out_of_stock" ||
     (typeof product.stock_count === "number" && product.stock_count <= 0);
@@ -59,7 +60,7 @@ export default function ProductCard({ product, className = "", priority = false 
     e.preventDefault();
     e.stopPropagation();
 
-    if (isOutOfStock && !isPreOrder) return;
+    if (isUnpriced || (isOutOfStock && !isPreOrder)) return;
 
     handleAuthenticatedPurchase({
       action: "add-to-cart",
@@ -97,19 +98,27 @@ export default function ProductCard({ product, className = "", priority = false 
 
   return (
     <div
-      className={`group relative bg-white border border-[#EAEAEA] rounded-2xl p-2.5 sm:p-3.5 flex flex-col justify-between h-full transition-all duration-200 hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-md w-full min-w-0 max-w-full ${className}`}
+      className={`premium-product-card group relative bg-white border border-[#EAEAEA] rounded-2xl p-2.5 sm:p-3.5 flex flex-col justify-between h-full transition-all duration-200 hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-md w-full min-w-0 max-w-full ${className}`}
     >
+      <button
+        type="button"
+        onClick={handleToggleWishlist}
+        aria-label={isWishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+        className="premium-wishlist premium-wishlist--standalone absolute top-5 right-5 z-10 rounded-full bg-white flex items-center justify-center text-neutral-500 transition-colors hover:text-[#68122F]"
+      >
+        <Heart className={`w-4 h-4 ${isWishlisted ? "fill-[#68122F] text-[#68122F]" : ""}`} />
+      </button>
       {/* ── Clickable Link Body ── */}
       <Link
         href={`/products/${getProductSlug(product)}`}
         className="block flex-1 flex flex-col focus:outline-none cursor-pointer"
       >
         {/* ── 1. Image Container (bg-[#F8F9FA] matching reference) ── */}
-        <div className="relative w-full aspect-square bg-[#F8F9FA] rounded-xl flex items-center justify-center overflow-hidden mb-2.5">
+        <div className="premium-product-image relative w-full aspect-square bg-[#F8F9FA] rounded-xl flex items-center justify-center overflow-hidden mb-2.5">
           {/* Top-Left Badge: Discount or New */}
           <div className="absolute top-2 left-2 z-10 pointer-events-none">
             {hasDiscount ? (
-              <span className="bg-[#E11D48] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-2xs inline-block">
+              <span className="premium-product-badge bg-[#E11D48] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-2xs inline-block">
                 -{discountPercent}%
               </span>
             ) : isPreOrder ? (
@@ -123,26 +132,8 @@ export default function ProductCard({ product, className = "", priority = false 
             ) : null}
           </div>
 
-          {/* Top-Right Wishlist Button */}
-          <button
-            type="button"
-            onClick={handleToggleWishlist}
-            aria-label={
-              isWishlisted
-                ? `Remove ${product.name} from wishlist`
-                : `Add ${product.name} to wishlist`
-            }
-            className="absolute top-2 right-2 z-10 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white shadow-xs border border-neutral-200/80 flex items-center justify-center text-neutral-500 hover:text-[#68122F] hover:scale-105 active:scale-95 transition-all cursor-pointer"
-          >
-            <Heart
-              className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-colors ${
-                isWishlisted ? "fill-[#68122F] text-[#68122F]" : "text-neutral-500"
-              }`}
-            />
-          </button>
-
           {/* Product Image */}
-          <div className="w-full h-full flex items-center justify-center overflow-hidden relative p-3 sm:p-4">
+          <div className="w-full h-full flex items-center justify-center overflow-hidden relative p-0">
             <Image
               src={mainImage}
               alt={product.name}
@@ -151,7 +142,7 @@ export default function ProductCard({ product, className = "", priority = false 
               priority={priority}
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               onError={() => setImageError(true)}
-              className="object-contain object-center transition-transform duration-300 ease-out group-hover:scale-105"
+              className="object-cover object-center scale-[1.04] transition-transform duration-300 ease-out group-hover:scale-[1.08]"
             />
           </div>
         </div>
@@ -160,19 +151,27 @@ export default function ProductCard({ product, className = "", priority = false 
         <div className="flex-1 flex flex-col justify-between mb-3">
           <div>
             {/* Product Name (2 lines clamped) */}
-            <h3 className="font-semibold text-xs sm:text-[13px] text-[#111111] line-clamp-2 leading-snug group-hover:text-[#68122F] transition-colors min-h-[32px] sm:min-h-[36px] mb-1">
+            <h3 className="premium-product-name font-semibold text-xs sm:text-[13px] text-[#111111] line-clamp-2 leading-snug group-hover:text-[#68122F] transition-colors min-h-[32px] sm:min-h-[36px] mb-1">
               {product.name}
             </h3>
 
             {/* Price Row: Bold LKR Selling Price + Optional Strikethrough Original Price */}
             <div className="flex items-baseline gap-1.5 sm:gap-2 flex-wrap">
-              <span className="font-black text-xs sm:text-sm text-[#111111] leading-tight">
-                {formatPrice(product.price)}
-              </span>
-              {hasDiscount && (
-                <span className="text-[10px] sm:text-[11.5px] text-neutral-400 line-through font-normal leading-tight">
-                  {formatPrice(product.old_price!)}
+              {isUnpriced ? (
+                <span className="font-semibold text-[11px] sm:text-xs text-amber-700 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-md">
+                  Price Coming Soon
                 </span>
+              ) : (
+                <>
+                  <span className="premium-product-price font-black text-xs sm:text-sm text-[#111111] leading-tight">
+                    {formatPrice(product.price)}
+                  </span>
+                  {hasDiscount && (
+                    <span className="text-[10px] sm:text-[11.5px] text-neutral-400 line-through font-normal leading-tight">
+                      {formatPrice(product.old_price!)}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -181,7 +180,14 @@ export default function ProductCard({ product, className = "", priority = false 
 
       {/* ── 3. Bottom Full-Width Add to Cart Button ── */}
       <div className="w-full">
-        {isOutOfStock && !isPreOrder ? (
+        {isUnpriced ? (
+          <Link
+            href={`/products/${getProductSlug(product)}`}
+            className="w-full h-9 sm:h-10 rounded-xl font-bold text-xs bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <span>View Details</span>
+          </Link>
+        ) : isOutOfStock && !isPreOrder ? (
           <button
             type="button"
             disabled

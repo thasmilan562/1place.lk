@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { Bell, ShoppingBag, ArrowRight, X, Sparkles } from "lucide-react";
+import { Bell, ShoppingBag, ArrowRight, X, CircleCheck as Sparkles } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
 export interface LiveOrderNotification {

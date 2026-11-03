@@ -101,10 +101,10 @@ export function normalizeOrder(docData: any, docId: string): NormalizedOrder {
   const addrObj = data.deliveryAddress || data.shippingAddress || {};
   const deliveryAddress = {
     address: addrObj.address || data.address || "No street address provided",
-    city: addrObj.city || data.city || "Colombo",
-    district: addrObj.district || data.district || "Colombo",
-    province: addrObj.province || data.province || "Western Province",
-    postalCode: addrObj.postalCode || data.postalCode || "00300",
+    city: addrObj.city || data.city || "",
+    district: addrObj.district || data.district || "",
+    province: addrObj.province || data.province || "",
+    postalCode: addrObj.postalCode || data.postalCode || "",
     landmark: addrObj.landmark || data.landmark || "",
     instructions: addrObj.instructions || data.instructions || "",
   };
@@ -128,7 +128,7 @@ export function normalizeOrder(docData: any, docId: string): NormalizedOrder {
       color: item.color || item.selectedColor || "",
       storage: item.storage || item.selectedStorage || "",
       ram: item.ram || "",
-      sku: item.sku || `SKU-${item.productId?.slice(-4) || "0000"}`,
+      sku: item.sku || "",
       warrantyTitle: item.warrantyTitle || item.warranty || "",
       warrantyPrice: item.warrantyPrice || 0,
       lineTotal,
@@ -136,14 +136,14 @@ export function normalizeOrder(docData: any, docId: string): NormalizedOrder {
   });
 
   // 5. Resolve Fees & Discounts
-  const deliveryFee = typeof data.deliveryFee === "number" ? data.deliveryFee : data.deliveryOption === "pickup" ? 0 : 450;
-  const codFee = typeof data.codFee === "number" ? data.codFee : data.paymentMethod === "cod" || data.paymentMethod === "COD" ? 250 : 0;
+  const deliveryFee = typeof data.deliveryFee === "number" ? data.deliveryFee : 0;
+  const codFee = typeof data.codFee === "number" ? data.codFee : 0;
   const cardFee = typeof data.cardFee === "number" ? data.cardFee : typeof data.payhereFee === "number" ? data.payhereFee : 0;
   const warrantyTotal = typeof data.warrantyTotal === "number" ? data.warrantyTotal : 0;
   const discountTotal = typeof data.discountTotal === "number" ? data.discountTotal : data.couponDiscount || 0;
 
   // 6. Recalculate Grand Total & Check for Zero Total Anomaly
-  let grandTotal = typeof data.grandTotal === "number" ? data.grandTotal : typeof data.totalPrice === "number" ? data.totalPrice : 0;
+  let grandTotal = typeof data.finalTotal === "number" ? data.finalTotal : typeof data.grandTotal === "number" ? data.grandTotal : typeof data.totalPrice === "number" ? data.totalPrice : 0;
   let needsReview = false;
 
   const reconstructedTotal = calculatedSubtotal + deliveryFee + codFee + cardFee + warrantyTotal - discountTotal;
@@ -165,7 +165,11 @@ export function normalizeOrder(docData: any, docId: string): NormalizedOrder {
   if (isCardOrPayHere) {
     // For Card / PayHere: strictly require server webhook verification (status_code 2)
     // to prevent incomplete/unauthorized card attempts (e.g. before 6-digit OTP is entered) from displaying as Paid
-    if (data.payhereStatusCode === "2" || (data.payhereVerified === true && rawPaymentStatus === "paid")) {
+    if (rawPaymentStatus.includes("refund")) {
+      paymentStatus = "Refunded";
+    } else if (rawPaymentStatus.includes("charge") || data.payhereStatusCode === "-3") {
+      paymentStatus = "Charged Back";
+    } else if (data.payhereStatusCode === "2" || (data.payhereVerified === true && rawPaymentStatus === "paid")) {
       paymentStatus = "Paid";
     } else if (rawPaymentStatus.includes("fail") || data.payhereStatusCode === "-2") {
       paymentStatus = "Failed";
@@ -180,7 +184,7 @@ export function normalizeOrder(docData: any, docId: string): NormalizedOrder {
     }
   } else {
     // For Cash on Delivery (COD) and manual payments:
-    if (rawPaymentStatus.includes("paid")) paymentStatus = "Paid";
+    if (["paid", "completed", "cash collected"].includes(rawPaymentStatus.trim())) paymentStatus = "Paid";
     else if (rawPaymentStatus.includes("fail")) paymentStatus = "Failed";
     else if (rawPaymentStatus.includes("refund")) paymentStatus = "Refunded";
     else if (rawPaymentStatus.includes("charge")) paymentStatus = "Charged Back";
@@ -192,13 +196,14 @@ export function normalizeOrder(docData: any, docId: string): NormalizedOrder {
   const rawOrderStatus = (data.orderStatus || data.status || "").toString().toLowerCase();
 
   if (rawOrderStatus.includes("cancel") || paymentStatus === "Cancelled") orderStatus = "Cancelled";
+  else if (rawOrderStatus.includes("return")) orderStatus = "Returned";
+  else if (rawOrderStatus.includes("out for delivery")) orderStatus = "Out for Delivery";
   else if (rawOrderStatus.includes("deliver") || rawOrderStatus.includes("complete")) orderStatus = "Delivered";
-  else if (rawOrderStatus.includes("ship") || rawOrderStatus.includes("out")) orderStatus = "Shipped";
+  else if (rawOrderStatus.includes("ship")) orderStatus = "Shipped";
   else if (rawOrderStatus.includes("pack")) orderStatus = "Packed";
   else if (rawOrderStatus.includes("process") || (isCardOrPayHere && paymentStatus === "Paid")) orderStatus = "Processing";
   else if (rawOrderStatus.includes("confirm")) orderStatus = "Confirmed";
-  else if (rawOrderStatus.includes("return")) orderStatus = "Returned";
-  else orderStatus = isCardOrPayHere && paymentStatus === "Pending" ? "Pending" : "Processing";
+  else orderStatus = "Pending";
 
   return {
     id,

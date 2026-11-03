@@ -29,7 +29,7 @@ import {
   Download,
   Filter,
   RefreshCw,
-  Sparkles,
+  CircleCheck as Sparkles,
   HardDrive,
   BarChart3,
   Settings as SettingsIcon,
@@ -56,13 +56,18 @@ import {
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, setDoc, getDoc, onSnapshot, writeBatch } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, setDoc, getDoc, onSnapshot, writeBatch, arrayUnion } from "firebase/firestore";
 import { playOrderChime } from "@/lib/audio-chime";
 import RealtimeOrderAlert, { LiveOrderNotification } from "@/components/admin/RealtimeOrderAlert";
 import GoogleSearchConsoleTraffic from "@/components/admin/GoogleSearchConsoleTraffic";
 import { Product, Category, Review, OfferBanner, BannerStatus, HeroSlide, GalleryImage, GoogleReviewsSettings, VisualShowcaseSettings, TodayDealSettings, MegaMenuSettings, Brand, GalleryAnimationSettings, WhatsAppCampaign } from "@/lib/types";
 import { categories as fallbackCategories, fallbackOfferBanners, products as fallbackProducts, DEFAULT_SHOWCASE_SETTINGS, DEFAULT_TODAY_DEAL_SETTINGS, DEFAULT_MEGA_MENU_SETTINGS, DEFAULT_BRANDS, DEFAULT_GALLERY_ANIMATION_SETTINGS } from "@/lib/data";
 import { DEFAULT_GOOGLE_REVIEWS_SETTINGS, getShowcaseSettings, getTodayDealSettings, getMegaMenuSettings, getBrands, getGalleryAnimationSettings } from "@/lib/firestore-client";
+import { ESSENTIAL_ADMIN_TABS } from "@/lib/admin-navigation";
+import FooterTab from "@/components/admin/tabs/FooterTab";
+import StoreOverview from "@/components/admin/tabs/StoreOverview";
+import StoreSettingsTab from "@/components/admin/tabs/StoreSettingsTab";
+import SimpleBrandsTab from "@/components/admin/tabs/SimpleBrandsTab";
 import { deduplicateCategories } from "@/lib/category-utils";
 import { KNOWN_BRAND_NAMES } from "@/lib/migration-audit";
 import { jsPDF } from "jspdf";
@@ -70,24 +75,17 @@ import { jsPDF } from "jspdf";
 // Admin Tabs
 import ProductModal from "@/components/admin/ProductModal";
 import HeroModal from "@/components/admin/HeroModal";
-import GalleryModal from "@/components/admin/GalleryModal";
 import OrdersTab from "@/components/admin/tabs/OrdersTab";
-import ProductsTab from "@/components/admin/tabs/ProductsTab";
+import ProductsTab from "@/components/admin/tabs/CatalogProductsTab";
 import HeroTab from "@/components/admin/tabs/HeroTab";
-import GalleryTab from "@/components/admin/tabs/GalleryTab";
-import ShowcaseTab from "@/components/admin/tabs/ShowcaseTab";
-import TodayDealTab from "@/components/admin/tabs/TodayDealTab";
+import HomeOffersEditor from "@/components/admin/HomeOffersEditor";
 
-import MobileExperienceTab from "@/components/admin/tabs/MobileExperienceTab";
-import RepairsTab from "@/components/admin/tabs/RepairsTab";
 
-import CashFlowTab from "@/components/admin/tabs/CashFlowTab";
 import CouponsTab from "@/components/admin/tabs/CouponsTab";
 import CouponModal from "@/components/admin/CouponModal";
 import CategoriesTab from "@/components/admin/tabs/CategoriesTab";
 import CategoryModal from "@/components/admin/CategoryModal";
 import FeaturedGridBannerControl from "@/components/admin/FeaturedGridBannerControl";
-import WhatsAppMarketingTab from "@/components/admin/tabs/WhatsAppMarketingTab";
 import SpinWinTab from "@/components/admin/tabs/SpinWinTab";
 import { Coupon } from "@/lib/types";
 import { useAdminTheme } from "./layout";
@@ -97,48 +95,28 @@ type Tab =
   | "overview"
   | "products"
   | "categories"
-  | "today-deal"
-  | "repairs"
-  | "cashflow"
-  | "showcase"
   | "users"
-  | "gallery"
   | "hero"
   | "coupons"
   | "inventory"
   | "payments"
-  | "analytics"
-  | "mobile"
   | "orders"
-  | "whatsapp-marketing"
-  | "spin-win";
+  | "spin-win"
+  | "footer"
+  | "brands"
+  | "settings";
 
-const VALID_ADMIN_TABS = new Set<string>([
-  "overview",
-  "products",
-  "categories",
-  "today-deal",
-  "repairs",
-  "cashflow",
-  "showcase",
-  "users",
-  "gallery",
-  "hero",
-  "coupons",
-  "inventory",
-  "payments",
-  "analytics",
-  "mobile",
-  "orders",
-  "whatsapp-marketing",
-  "spin-win",
-]);
+const VALID_ADMIN_TABS = ESSENTIAL_ADMIN_TABS;
 
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawParam = searchParams.get("tab") || "overview";
   const tabParam = (VALID_ADMIN_TABS.has(rawParam) ? rawParam : "overview") as Tab;
+
+  useEffect(() => {
+    if (!VALID_ADMIN_TABS.has(rawParam)) router.replace("/admin/dashboard");
+  }, [rawParam, router]);
 
   const [activeTab, setActiveTab] = useState<Tab>(tabParam);
   const { theme, isLight } = useAdminTheme();
@@ -797,14 +775,21 @@ function DashboardContent() {
       const orderDate = o.createdAt ? new Date(o.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
       (o.items || []).forEach((it: any) => {
         const id = it.id || it.productId || it.name;
+        const matchedProd = products.find((p) => p.id === id || p.id === it.productId || p.slug === id || p.name?.toLowerCase() === (it.name || "").toLowerCase());
+        const rawCategory = (matchedProd as any)?.category || matchedProd?.category_name || matchedProd?.categoryName || matchedProd?.category_slug || it.category || "General";
+        const categoryTitle = rawCategory
+          .split("-")
+          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ");
+
         const current = salesMap.get(id) || {
           id,
-          name: it.name || "Device",
-          category: it.category || "Mobile Phones",
+          name: it.name || matchedProd?.name || "Product",
+          category: categoryTitle,
           unitsSold: 0,
           revenue: 0,
           lastSold: orderDate,
-          image: it.image || "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=200",
+          image: it.image || matchedProd?.images?.[0] || "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=200",
         };
         current.unitsSold += Number(it.quantity || 1);
         current.revenue += Number(it.price || 0) * Number(it.quantity || 1);
@@ -812,22 +797,64 @@ function DashboardContent() {
       });
     });
 
-    const fallbackList = [
-      { id: "1", name: "iPhone 15 (128GB)", category: "Mobile Phones", unitsSold: 24, revenue: 2880000, lastSold: "15 Sep 2026", image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=200" },
-      { id: "2", name: "Samsung Galaxy S24", category: "Mobile Phones", unitsSold: 18, revenue: 1620000, lastSold: "15 Sep 2026", image: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?q=80&w=200" },
-      { id: "3", name: "AirPods Pro 2", category: "Audio", unitsSold: 15, revenue: 825000, lastSold: "14 Sep 2026", image: "https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?q=80&w=200" },
-      { id: "4", name: "Redmi Note 13", category: "Mobile Phones", unitsSold: 12, revenue: 816000, lastSold: "14 Sep 2026", image: "https://images.unsplash.com/photo-1598327105666-5b89351aff97?q=80&w=200" },
-      { id: "5", name: "Samsung 25W Charger", category: "Accessories", unitsSold: 10, revenue: 250000, lastSold: "14 Sep 2026", image: "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?q=80&w=200" },
-    ];
-
     if (salesMap.size === 0) {
-      return fallbackList;
+      return [];
     }
 
     const list = Array.from(salesMap.values());
     list.sort((a, b) => b.unitsSold - a.unitsSold);
     return list.slice(0, 5);
-  }, [orders]);
+  }, [orders, products]);
+
+  // Real Category Distribution & Total Units Sold for Donut Chart
+  const categorySalesDistribution = useMemo(() => {
+    let totalUnits = 0;
+    const catMap = new Map<string, number>();
+
+    orders.forEach((o) => {
+      (o.items || []).forEach((it: any) => {
+        const qty = Number(it.quantity || 1);
+        totalUnits += qty;
+        const id = it.id || it.productId || it.name;
+        const matchedProd = products.find((p) => p.id === id || p.id === it.productId || p.slug === id || p.name?.toLowerCase() === (it.name || "").toLowerCase());
+        const rawCategory = (matchedProd as any)?.category || matchedProd?.category_name || matchedProd?.categoryName || matchedProd?.category_slug || it.category || "General";
+        const formattedCat = rawCategory
+          .split("-")
+          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ");
+        catMap.set(formattedCat, (catMap.get(formattedCat) || 0) + qty);
+      });
+    });
+
+    if (totalUnits === 0) {
+      return { totalUnits: 0, segments: [] };
+    }
+
+    const colorPalette = ["#2563EB", "#06B6D4", "#F59E0B", "#8B5CF6", "#EC4899", "#10B981", "#64748B"];
+    const entries = Array.from(catMap.entries()).sort((a, b) => b[1] - a[1]);
+    const topEntries = entries.slice(0, 5);
+    const otherUnits = entries.slice(5).reduce((sum, e) => sum + e[1], 0);
+    if (otherUnits > 0) {
+      topEntries.push(["Others", otherUnits]);
+    }
+
+    let accumulatedPct = 0;
+    const segments = topEntries.map(([name, count], idx) => {
+      const pct = Math.max(1, Math.round((count / totalUnits) * 100));
+      const strokeDashoffset = -accumulatedPct;
+      accumulatedPct += pct;
+      return {
+        name,
+        count,
+        pct,
+        strokeDasharray: `${pct}, 100`,
+        strokeDashoffset,
+        color: colorPalette[idx % colorPalette.length],
+      };
+    });
+
+    return { totalUnits, segments };
+  }, [orders, products]);
 
   // Low Stock Alert items for dark dashboard
   const lowStockDisplayList = useMemo(() => {
@@ -835,27 +862,21 @@ function DashboardContent() {
       (p) =>
         p.stock_status === "low_stock" ||
         p.stock_status === "out_of_stock" ||
-        (p.stock_count !== undefined && p.stock_count <= 8)
+        (p.stock_count !== undefined && p.stock_count <= 5)
     );
 
     if (list.length > 0) {
       return list.slice(0, 5).map((p, idx) => ({
         id: p.id,
         name: p.name,
-        sku: p.code || `ACC-0${idx + 24}`,
-        stock: p.stock_count !== undefined ? p.stock_count : idx + 3,
-        status: p.stock_status === "out_of_stock" ? "Out of Stock" : "Low Stock",
+        sku: p.code || `SKU-${p.id.slice(0, 6)}`,
+        stock: p.stock_count !== undefined ? p.stock_count : 0,
+        status: p.stock_status === "out_of_stock" || p.stock_count === 0 ? "Out of Stock" : "Low Stock",
         image: p.images?.[0] || "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?q=80&w=200",
       }));
     }
 
-    return [
-      { id: "ls1", name: "iPhone 14 Case", sku: "ACC-001", stock: 4, status: "Low Stock", image: "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?q=80&w=200" },
-      { id: "ls2", name: "Samsung 25W Charger", sku: "ACC-024", stock: 6, status: "Low Stock", image: "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?q=80&w=200" },
-      { id: "ls3", name: "AirPods Pro 2", sku: "AUD-012", stock: 3, status: "Low Stock", image: "https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?q=80&w=200" },
-      { id: "ls4", name: "Redmi Note 13 (6GB)", sku: "MOB-089", stock: 5, status: "Low Stock", image: "https://images.unsplash.com/photo-1598327105666-5b89351aff97?q=80&w=200" },
-      { id: "ls5", name: "Samsung Galaxy S24 Case", sku: "ACC-056", stock: 7, status: "Low Stock", image: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?q=80&w=200" },
-    ];
+    return [];
   }, [products]);
 
   // Filtered Products List (Support separate Low Stock view)
@@ -1266,16 +1287,21 @@ function DashboardContent() {
 
   const handleUpdateOrderStatus = async (id: string, newStatus: string) => {
     try {
-      await updateDoc(doc(db, "orders", id), { status: newStatus, orderStatus: newStatus });
+      const previousOrder = orders.find((order) => order.id === id);
+      await updateDoc(doc(db, "orders", id), {
+        status: newStatus, orderStatus: newStatus, updatedAt: new Date().toISOString(),
+        statusHistory: arrayUnion({ action: "Order Status Updated", previousStatus: previousOrder?.orderStatus || previousOrder?.status || "Pending", newStatus, timestamp: new Date().toISOString() }),
+      });
       setOrders(orders.map((o) => (o.id === id ? { ...o, status: newStatus, orderStatus: newStatus } : o)));
 
       // Trigger automated email when status changes to completed/delivered/shipped/packing
       const targetOrder = orders.find((o) => o.id === id);
       if (targetOrder) {
         let statusType = "";
-        if (newStatus === "delivered" || newStatus === "completed") statusType = "delivered_thankyou";
-        else if (newStatus === "shipped") statusType = "on_the_way";
-        else if (newStatus === "processing" || newStatus === "packed") statusType = "packing";
+        const normalizedStatus = newStatus.toLowerCase();
+        if (normalizedStatus === "delivered" || normalizedStatus === "completed") statusType = "delivered_thankyou";
+        else if (normalizedStatus === "shipped") statusType = "on_the_way";
+        else if (normalizedStatus === "processing" || normalizedStatus === "packed") statusType = "packing";
 
         if (statusType) {
           fetch("/api/send-customer-email", {
@@ -1296,7 +1322,7 @@ function DashboardContent() {
       }
     } catch (e) {
       console.error("Error updating order status:", e);
-      alert("Failed to update order status");
+      throw e;
     }
   };
 
@@ -1395,1038 +1421,7 @@ function DashboardContent() {
       {/* ════════════════════════════════════════════════════════════════════
           TAB 1: OVERVIEW DASHBOARD
       ════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "overview" && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Header Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
-            <div>
-              <h1
-                className={`text-2xl sm:text-3xl font-bold tracking-tight ${
-                  isLight ? "text-[#111827]" : "text-[#F8FAFC]"
-                }`}
-                style={{ fontFamily: "var(--font-inter, Inter, sans-serif)", fontWeight: 700 }}
-              >
-                Dashboard Overview
-              </h1>
-              <p className={`text-xs font-normal mt-1 ${
-                isLight ? "text-[#64748B]" : "text-[#94A3B8]"
-              }`}>
-                Real-time operational metrics, sales summary, and fulfillment status
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className={`text-xs font-medium hidden sm:inline ${
-                isLight ? "text-[#64748B]" : "text-[#94A3B8]"
-              }`}>
-                {currentDateTime || "System Live"}
-              </span>
-              <div
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold ${
-                  isLight
-                    ? "bg-white border border-[#E5E7EB] text-[#111827] shadow-xs"
-                    : "bg-[#101821] border border-[#1E2A36] text-[#F8FAFC]"
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>System Online</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 4 KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* 1. Total Revenue */}
-            <div
-              className={`rounded-2xl p-5 space-y-3 transition-colors ${
-                isLight
-                  ? "bg-white border border-[#E2E8F0] shadow-xs hover:border-slate-300"
-                  : "bg-[#0E141D] hover:bg-[#121A25] border border-white/[0.08] shadow-xs"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-xs ${
-                    isLight
-                      ? "bg-[#F8FAFC] border border-[#E2E8F0] text-[#0F172A]"
-                      : "bg-[#121A25] border border-white/[0.08] text-emerald-400"
-                  }`}
-                >
-                  <BarChart3 className="w-5 h-5" />
-                </div>
-              </div>
-              <div>
-                <p className={`text-[11px] font-semibold uppercase tracking-wider ${
-                  isLight ? "text-[#667085]" : "text-[#94A3B8]"
-                }`}>
-                  Total Revenue
-                </p>
-                <h3 className={`text-2xl font-bold mt-1 tracking-tight font-mono ${
-                  isLight ? "text-[#111827]" : "text-[#F8FAFC]"
-                }`}>
-                  {formatPrice(metrics.totalRev)}
-                </h3>
-              </div>
-              <div className={`flex items-center justify-between pt-2 text-[11px] border-t ${
-                isLight ? "border-[#E5E7EB] text-[#667085]" : "border-[#1A2633] text-[#94A3B8]"
-              }`}>
-                <span className="text-[#12B76A] font-medium flex items-center gap-1">
-                  Live
-                </span>
-                <span>{metrics.recentRev > 0 ? `${formatPrice(metrics.recentRev)} (7d)` : "Real-time orders"}</span>
-                <svg className="w-16 h-5 overflow-visible" viewBox="0 0 60 20">
-                  <path d="M 0 16 Q 15 14, 25 10 T 45 8 T 60 2" fill="none" stroke="#12B76A" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-              </div>
-            </div>
-
-            {/* 2. Total Orders */}
-            <div
-              className={`rounded-2xl p-5 space-y-3 transition-colors ${
-                isLight
-                  ? "bg-white border border-[#E2E8F0] shadow-xs hover:border-slate-300"
-                  : "bg-[#0E141D] hover:bg-[#121A25] border border-white/[0.08] shadow-xs"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shadow-xs ${
-                    isLight
-                      ? "bg-[#F8FAFC] border border-[#E2E8F0] text-[#0F172A]"
-                      : "bg-[#121A25] border border-white/[0.08] text-blue-400"
-                  }`}
-                >
-                  <ShoppingBag className="w-5 h-5" />
-                </div>
-              </div>
-              <div>
-                <p className={`text-[11px] font-semibold uppercase tracking-wider ${
-                  isLight ? "text-[#667085]" : "text-[#94A3B8]"
-                }`}>
-                  Total Orders
-                </p>
-                <h3 className={`text-2xl font-bold mt-1 tracking-tight font-mono ${
-                  isLight ? "text-[#111827]" : "text-[#F8FAFC]"
-                }`}>
-                  {metrics.totalOrd}
-                </h3>
-              </div>
-              <div className={`flex items-center justify-between pt-2 text-[11px] border-t ${
-                isLight ? "border-[#E5E7EB] text-[#667085]" : "border-[#1A2633] text-[#94A3B8]"
-              }`}>
-                <span className={`font-medium flex items-center gap-1 ${
-                  isLight ? "text-[#12B76A]" : "text-blue-400"
-                }`}>
-                  {metrics.recentOrdersCount} new
-                </span>
-                <span>in last 7 days</span>
-                <svg className="w-16 h-5 overflow-visible" viewBox="0 0 60 20">
-                  <path d="M 0 14 Q 15 12, 30 8 T 45 6 T 60 3" fill="none" stroke={isLight ? "#111827" : "#3B82F6"} strokeWidth="2" strokeLinecap="round" />
-                </svg>
-              </div>
-            </div>
-
-            {/* 3. Catalog Products */}
-            <div
-              className={`rounded-2xl p-5 space-y-3 transition-colors ${
-                isLight
-                  ? "bg-white border border-[#E2E8F0] shadow-xs hover:border-slate-300"
-                  : "bg-[#0E141D] hover:bg-[#121A25] border border-white/[0.08] shadow-xs"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shadow-xs ${
-                    isLight
-                      ? "bg-[#F8FAFC] border border-[#E2E8F0] text-[#0F172A]"
-                      : "bg-[#121A25] border border-white/[0.08] text-purple-400"
-                  }`}
-                >
-                  <Package className="w-5 h-5" />
-                </div>
-              </div>
-              <div>
-                <p className={`text-[11px] font-semibold uppercase tracking-wider ${
-                  isLight ? "text-[#667085]" : "text-[#94A3B8]"
-                }`}>
-                  Catalog Products
-                </p>
-                <h3 className={`text-2xl font-bold mt-1 tracking-tight font-mono ${
-                  isLight ? "text-[#111827]" : "text-[#F8FAFC]"
-                }`}>
-                  {metrics.totalProd}
-                </h3>
-              </div>
-              <div className={`flex items-center justify-between pt-2 text-[11px] border-t ${
-                isLight ? "border-[#E5E7EB] text-[#667085]" : "border-[#1A2633] text-[#94A3B8]"
-              }`}>
-                <span className={`font-medium flex items-center gap-1 ${
-                  isLight ? "text-[#12B76A]" : "text-purple-400"
-                }`}>
-                  Active
-                </span>
-                <span>{products.filter((p) => p.stock_status !== "out_of_stock").length} in-stock items</span>
-                <svg className="w-16 h-5 overflow-visible" viewBox="0 0 60 20">
-                  <path d="M 0 15 Q 20 10, 35 12 T 50 7 T 60 4" fill="none" stroke={isLight ? "#667085" : "#A855F7"} strokeWidth="2" strokeLinecap="round" />
-                </svg>
-              </div>
-            </div>
-
-            {/* 4. Verified Customers */}
-            <div
-              className={`rounded-2xl p-5 space-y-3 transition-colors ${
-                isLight
-                  ? "bg-white border border-[#E2E8F0] shadow-xs hover:border-slate-300"
-                  : "bg-[#0E141D] hover:bg-[#121A25] border border-white/[0.08] shadow-xs"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shadow-xs ${
-                    isLight
-                      ? "bg-[#F8FAFC] border border-[#E2E8F0] text-[#0F172A]"
-                      : "bg-[#121A25] border border-white/[0.08] text-amber-400"
-                  }`}
-                >
-                  <Users className="w-5 h-5" />
-                </div>
-              </div>
-              <div>
-                <p className={`text-[11px] font-semibold uppercase tracking-wider ${
-                  isLight ? "text-[#667085]" : "text-[#94A3B8]"
-                }`}>
-                  Verified Customers
-                </p>
-                <h3 className={`text-2xl font-bold mt-1 tracking-tight font-mono ${
-                  isLight ? "text-[#111827]" : "text-[#F8FAFC]"
-                }`}>
-                  {metrics.totalCust}
-                </h3>
-              </div>
-              <div className={`flex items-center justify-between pt-2 text-[11px] border-t ${
-                isLight ? "border-[#E5E7EB] text-[#667085]" : "border-[#1A2633] text-[#94A3B8]"
-              }`}>
-                <span className={`font-medium flex items-center gap-1 ${
-                  isLight ? "text-[#12B76A]" : "text-amber-400"
-                }`}>
-                  Live
-                </span>
-                <span>Registered & guest profiles</span>
-                <svg className="w-16 h-5 overflow-visible" viewBox="0 0 60 20">
-                  <path d="M 0 17 Q 15 15, 30 11 T 45 6 T 60 2" fill="none" stroke={isLight ? "#111827" : "#F59E0B"} strokeWidth="2" strokeLinecap="round" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* ════════════════════════════════════════════════════════════════
-              SALES PERFORMANCE & SALES DISTRIBUTION (Grid: 8 cols + 4 cols)
-          ════════════════════════════════════════════════════════════════ */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-            {/* Left: Sales Performance Analytics Card (Col 8) */}
-            <div
-              className={`lg:col-span-8 rounded-2xl p-5 space-y-4 ${
-                isLight
-                  ? "bg-white border border-[#E2E8F0] shadow-xs"
-                  : "bg-[#0E141D] border border-white/[0.08] shadow-xs"
-              }`}
-            >
-              {/* Header with Title, Segmented Toggle [ Sales ] [ Web Traffic ], and Dropdowns */}
-              <div
-                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3.5 ${
-                  isLight ? "border-[#E2E8F0]" : "border-white/[0.08]"
-                }`}
-              >
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <h3
-                      className={`text-sm font-bold ${
-                        isLight ? "text-[#111827]" : "text-[#F8FAFC]"
-                      }`}
-                    >
-                      {analyticsTab === "sales" ? "Sales Performance" : "Web Traffic"}
-                    </h3>
-                    {analyticsTab === "sales" && (
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
-                          isLight
-                            ? "bg-[#F3F4F6] border-[#E5E7EB] text-[#667085]"
-                            : "bg-[#0E1A27] border-[#1E2A36] text-[#94A3B8]"
-                        }`}
-                      >
-                        LKR
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Segmented Switch: [ Sales ] [ Web Traffic ] */}
-                  <div
-                    className={`flex items-center p-0.5 border rounded-xl ${
-                      isLight
-                        ? "bg-[#F3F4F6] border-[#E5E7EB]"
-                        : "bg-[#0D1722] border-[#1E2A36]"
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setAnalyticsTab("sales")}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                        analyticsTab === "sales"
-                          ? isLight
-                            ? "bg-[#111827] text-white shadow-xs font-bold"
-                            : "bg-[#101821] text-white border border-[#1E2A36] shadow-xs"
-                          : isLight
-                            ? "text-[#667085] hover:text-[#111827]"
-                            : "text-[#94A3B8] hover:text-white"
-                      }`}
-                    >
-                      Sales
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAnalyticsTab("traffic")}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                        analyticsTab === "traffic"
-                          ? isLight
-                            ? "bg-[#111827] text-white shadow-xs font-bold"
-                            : "bg-[#101821] text-white border border-[#1E2A36] shadow-xs"
-                          : isLight
-                            ? "text-[#667085] hover:text-[#111827]"
-                            : "text-[#94A3B8] hover:text-white"
-                      }`}
-                    >
-                      Web Traffic
-                    </button>
-                  </div>
-                </div>
-
-                {/* Controls: Year, Period, Chart Type Dropdown (Shown on Sales tab) */}
-                {analyticsTab === "sales" && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Year Select */}
-                    <div className="relative">
-                      <select
-                        value={salesYear}
-                        onChange={(e) => setSalesYear(e.target.value)}
-                        className={`appearance-none pl-2.5 pr-7 py-1 rounded-xl text-xs font-semibold outline-none border cursor-pointer ${
-                          isLight
-                            ? "bg-white border-[#E5E7EB] text-[#111827] hover:border-slate-400"
-                            : "bg-[#0D1722] border-[#1E2A36] text-[#F8FAFC]"
-                        }`}
-                      >
-                        <option value="2026">2026</option>
-                        <option value="2025">2025</option>
-                      </select>
-                      <ChevronDown className={`w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${
-                        isLight ? "text-[#667085]" : "text-[#64748B]"
-                      }`} />
-                    </div>
-
-                    {/* Period Select */}
-                    <div className="relative">
-                      <select
-                        value={trafficPeriod}
-                        onChange={(e) => setTrafficPeriod(e.target.value as any)}
-                        className={`appearance-none pl-2.5 pr-7 py-1 rounded-xl text-xs font-semibold outline-none border cursor-pointer ${
-                          isLight
-                            ? "bg-white border-[#E5E7EB] text-[#111827] hover:border-slate-400"
-                            : "bg-[#0D1722] border-[#1E2A36] text-[#F8FAFC]"
-                        }`}
-                      >
-                        <option value="12 Months">Monthly</option>
-                        <option value="30 Days">30 Days</option>
-                        <option value="7 Days">7 Days</option>
-                        <option value="Today">Today</option>
-                      </select>
-                      <ChevronDown className={`w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${
-                        isLight ? "text-[#667085]" : "text-[#64748B]"
-                      }`} />
-                    </div>
-
-                    {/* Chart Type Dropdown (Chart Type: Bar ˅ -> Line, Bar, Pie) */}
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setIsChartTypeDropdownOpen(!isChartTypeDropdownOpen)}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
-                          isLight
-                            ? "bg-white border-[#E5E7EB] text-[#111827] hover:border-slate-400"
-                            : "bg-[#0D1722] border-[#1E2A36] text-[#F8FAFC] hover:border-slate-600"
-                        }`}
-                      >
-                        <span className={isLight ? "text-[#667085]" : "text-[#94A3B8]"}>Chart Type:</span>
-                        <span className="capitalize">{chartType}</span>
-                        <ChevronDown className={`w-3.5 h-3.5 ml-0.5 ${isLight ? "text-[#667085]" : "text-[#64748B]"}`} />
-                      </button>
-
-                      {isChartTypeDropdownOpen && (
-                        <div
-                          className={`absolute right-0 mt-1.5 w-36 rounded-xl p-1 shadow-2xl z-30 animate-in fade-in slide-in-from-top-1 border ${
-                            isLight
-                              ? "bg-white border-[#E5E7EB] text-[#111827]"
-                              : "bg-[#101A25] border-[#1E2A36] text-[#F8FAFC]"
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setChartType("line");
-                              setIsChartTypeDropdownOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg transition-colors cursor-pointer ${
-                              chartType === "line"
-                                ? isLight
-                                  ? "bg-[#F3F4F6] text-[#111827] font-bold"
-                                  : "bg-white/10 text-white font-bold"
-                                : isLight
-                                  ? "text-[#667085] hover:text-[#111827] hover:bg-[#F9FAFB]"
-                                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
-                            }`}
-                          >
-                            <span>Line Chart</span>
-                            {chartType === "line" && (
-                              <Check className={`w-3 h-3 ${isLight ? "text-[#111827]" : "text-white"}`} />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setChartType("bar");
-                              setIsChartTypeDropdownOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg transition-colors cursor-pointer ${
-                              chartType === "bar"
-                                ? isLight
-                                  ? "bg-[#F3F4F6] text-[#111827] font-bold"
-                                  : "bg-white/10 text-white font-bold"
-                                : isLight
-                                  ? "text-[#667085] hover:text-[#111827] hover:bg-[#F9FAFB]"
-                                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
-                            }`}
-                          >
-                            <span>Bar Chart</span>
-                            {chartType === "bar" && (
-                              <Check className={`w-3 h-3 ${isLight ? "text-[#111827]" : "text-white"}`} />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setChartType("pie");
-                              setIsChartTypeDropdownOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg transition-colors cursor-pointer ${
-                              chartType === "pie"
-                                ? isLight
-                                  ? "bg-[#F3F4F6] text-[#111827] font-bold"
-                                  : "bg-white/10 text-white font-bold"
-                                : isLight
-                                  ? "text-[#667085] hover:text-[#111827] hover:bg-[#F9FAFB]"
-                                  : "text-[#94A3B8] hover:text-white hover:bg-white/5"
-                            }`}
-                          >
-                            <span>Pie Chart</span>
-                            {chartType === "pie" && (
-                              <Check className={`w-3 h-3 ${isLight ? "text-[#111827]" : "text-white"}`} />
-                            )}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Web Traffic (Google Search Console Live Real-Time Integration) OR Sales Charts */}
-              {analyticsTab === "traffic" ? (
-                <div className={`relative pt-2 ${isLight ? "bg-white" : ""}`}>
-                  <CustomAreaChart 
-                    data={[
-                      { date: 'Jan', value: 1200 },
-                      { date: 'Feb', value: 1900 },
-                      { date: 'Mar', value: 1500 },
-                      { date: 'Apr', value: 2200 },
-                      { date: 'May', value: 2800 },
-                      { date: 'Jun', value: 2500 },
-                      { date: 'Jul', value: 3200 },
-                      { date: 'Aug', value: 3800 },
-                      { date: 'Sep', value: 4100 },
-                      { date: 'Oct', value: 3900 },
-                      { date: 'Nov', value: 4500 },
-                      { date: 'Dec', value: 5200 },
-                    ]}
-                    isLight={isLight}
-                    height={260}
-                    valueSuffix=" visitors"
-                    color={isLight ? "#2563EB" : "#3B82F6"}
-                    gradientId="webTrafficGradient"
-                  />
-                </div>
-              ) : (
-                <div className={`relative pt-2 ${isLight ? "bg-white" : ""}`}>
-                  <CustomAreaChart 
-                    data={monthlySalesData.map(m => ({ date: m.month, value: m.amount }))}
-                    isLight={isLight}
-                    valuePrefix="LKR "
-                    height={260}
-                    color={isLight ? "#111827" : "#FFFFFF"}
-                    gradientId="salesAreaGradient"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Right: Sales Distribution Donut Card (Col 4) */}
-            <div
-              className={`lg:col-span-4 rounded-2xl p-5 space-y-4 ${
-                isLight
-                  ? "bg-white border border-[#E2E8F0] shadow-xs"
-                  : "bg-[#0E141D] border border-white/[0.08] shadow-xs"
-              }`}
-            >
-              <div className={`flex items-center justify-between border-b pb-3 ${
-                isLight ? "border-[#E2E8F0]" : "border-white/[0.08]"
-              }`}>
-                <div>
-                  <h3 className={`text-sm font-bold ${
-                    isLight ? "text-[#111827]" : "text-[#F8FAFC]"
-                  }`}>
-                    Sales Distribution
-                  </h3>
-                  <p className={`text-xs mt-0.5 ${
-                    isLight ? "text-[#667085]" : "text-[#64748B]"
-                  }`}>
-                    By device & category
-                  </p>
-                </div>
-                <Link
-                  href="/admin/dashboard?tab=products"
-                  className={`text-xs font-semibold flex items-center gap-1 transition-colors ${
-                    isLight
-                      ? "text-[#667085] hover:text-[#111827]"
-                      : "text-[#94A3B8] hover:text-white"
-                  }`}
-                >
-                  <span>View Details</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-
-              {/* Donut Chart & Category Legend */}
-              <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-center justify-between gap-4 py-2">
-                {/* SVG Donut Chart with Center "958 UNITS SOLD" */}
-                <div className="relative w-36 h-36 flex items-center justify-center shrink-0">
-                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                    <path
-                      className="text-[#2563EB]"
-                      strokeDasharray="44, 100"
-                      strokeWidth="3.8"
-                      stroke="currentColor"
-                      fill="none"
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
-                    <path
-                      className="text-[#06B6D4]"
-                      strokeDasharray="24, 100"
-                      strokeDashoffset="-44"
-                      strokeWidth="3.8"
-                      stroke="currentColor"
-                      fill="none"
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
-                    <path
-                      className="text-[#F59E0B]"
-                      strokeDasharray="14, 100"
-                      strokeDashoffset="-68"
-                      strokeWidth="3.8"
-                      stroke="currentColor"
-                      fill="none"
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
-                    <path
-                      className="text-[#8B5CF6]"
-                      strokeDasharray="9, 100"
-                      strokeDashoffset="-82"
-                      strokeWidth="3.8"
-                      stroke="currentColor"
-                      fill="none"
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
-                    <path
-                      className="text-[#EC4899]"
-                      strokeDasharray="6, 100"
-                      strokeDashoffset="-91"
-                      strokeWidth="3.8"
-                      stroke="currentColor"
-                      fill="none"
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
-                    <path
-                      className={isLight ? "text-[#CBD5E1]" : "text-[#64748B]"}
-                      strokeDasharray="3, 100"
-                      strokeDashoffset="-97"
-                      strokeWidth="3.8"
-                      stroke="currentColor"
-                      fill="none"
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
-                  </svg>
-
-                  {/* Center Text: 958 UNITS SOLD */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                    <span className={`text-xl font-bold font-mono leading-none ${
-                      isLight ? "text-[#111827]" : "text-[#F8FAFC]"
-                    }`}>
-                      958
-                    </span>
-                    <span className={`text-[9px] font-semibold uppercase tracking-wider mt-1 ${
-                      isLight ? "text-[#667085]" : "text-[#64748B]"
-                    }`}>
-                      Units Sold
-                    </span>
-                  </div>
-                </div>
-
-                {/* Categories Breakdown List */}
-                <div className="space-y-2 text-xs flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB]" />
-                      <span className={`font-medium ${isLight ? "text-[#101828]" : "text-[#F8FAFC]"}`}>Mobile Phones</span>
-                    </span>
-                    <span className={`font-semibold font-mono ${isLight ? "text-[#101828]" : "text-[#F8FAFC]"}`}>
-                      44% <span className={`font-normal ${isLight ? "text-[#667085]" : "text-[#64748B]"}`}>(420)</span>
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#06B6D4]" />
-                      <span className={`font-medium ${isLight ? "text-[#101828]" : "text-[#F8FAFC]"}`}>Accessories</span>
-                    </span>
-                    <span className={`font-semibold font-mono ${isLight ? "text-[#101828]" : "text-[#F8FAFC]"}`}>
-                      24% <span className={`font-normal ${isLight ? "text-[#667085]" : "text-[#64748B]"}`}>(230)</span>
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" />
-                      <span className={`font-medium ${isLight ? "text-[#101828]" : "text-[#F8FAFC]"}`}>Audio</span>
-                    </span>
-                    <span className={`font-semibold font-mono ${isLight ? "text-[#101828]" : "text-[#F8FAFC]"}`}>
-                      14% <span className={`font-normal ${isLight ? "text-[#667085]" : "text-[#64748B]"}`}>(135)</span>
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#8B5CF6]" />
-                      <span className={`font-medium ${isLight ? "text-[#101828]" : "text-[#F8FAFC]"}`}>Tablets</span>
-                    </span>
-                    <span className={`font-semibold font-mono ${isLight ? "text-[#101828]" : "text-[#F8FAFC]"}`}>
-                      9% <span className={`font-normal ${isLight ? "text-[#667085]" : "text-[#64748B]"}`}>(86)</span>
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#EC4899]" />
-                      <span className={`font-medium ${isLight ? "text-[#101828]" : "text-[#F8FAFC]"}`}>Laptops</span>
-                    </span>
-                    <span className={`font-semibold font-mono ${isLight ? "text-[#101828]" : "text-[#F8FAFC]"}`}>
-                      6% <span className={`font-normal ${isLight ? "text-[#667085]" : "text-[#64748B]"}`}>(58)</span>
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <span className={`w-2.5 h-2.5 rounded-full ${isLight ? "bg-[#94A3B8]" : "bg-[#64748B]"}`} />
-                      <span className={`font-medium ${isLight ? "text-[#101828]" : "text-[#F8FAFC]"}`}>Others</span>
-                    </span>
-                    <span className={`font-semibold font-mono ${isLight ? "text-[#101828]" : "text-[#F8FAFC]"}`}>
-                      3% <span className={`font-normal ${isLight ? "text-[#667085]" : "text-[#64748B]"}`}>(29)</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ════════════════════════════════════════════════════════════════
-              LOWER SECTION: SOLD PRODUCTS + LOW STOCK ALERT (Replaces Recent Orders)
-          ════════════════════════════════════════════════════════════════ */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-            {/* Left: Sold Products Table (Col 7) */}
-            <div
-              className={`lg:col-span-7 rounded-2xl p-5 space-y-4 ${
-                isLight
-                  ? "bg-white border border-[#E2E8F0] shadow-xs"
-                  : "bg-[#0E141D] border border-white/[0.08] shadow-xs"
-              }`}
-            >
-              <div className={`flex items-center justify-between border-b pb-3 ${
-                isLight ? "border-[#E2E8F0]" : "border-white/[0.08]"
-              }`}>
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                      isLight
-                        ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                        : "bg-emerald-500/15 text-emerald-400"
-                    }`}
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className={`text-sm font-bold ${
-                      isLight ? "text-[#101828]" : "text-[#F8FAFC]"
-                    }`}>
-                      Sold Products
-                    </h3>
-                    <p className={`text-xs ${
-                      isLight ? "text-[#667085]" : "text-[#64748B]"
-                    }`}>
-                      Top selling products (actual sales)
-                    </p>
-                  </div>
-                </div>
-                <Link
-                  href="/admin/dashboard?tab=products"
-                  className={`text-xs font-semibold flex items-center gap-1 transition-colors ${
-                    isLight
-                      ? "text-[#667085] hover:text-[#111827]"
-                      : "text-[#94A3B8] hover:text-white"
-                  }`}
-                >
-                  <span>View All</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
-                  <thead>
-                    <tr
-                      className={`font-semibold uppercase tracking-wider text-[10px] border-b ${
-                        isLight
-                          ? "bg-[#F8FAFC] text-[#667085] border-[#EAECF0]"
-                          : "bg-[#0D1722] text-[#64748B] border-[#1E2A36]"
-                      }`}
-                    >
-                      <th className="py-2.5 px-3 rounded-l-lg">#</th>
-                      <th className="py-2.5 px-3">Product</th>
-                      <th className="py-2.5 px-3">Category</th>
-                      <th className="py-2.5 px-3 text-center">Units Sold</th>
-                      <th className="py-2.5 px-3">Revenue</th>
-                      <th className="py-2.5 px-3">Last Sold</th>
-                      <th className="py-2.5 px-3 rounded-r-lg text-right"></th>
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y ${isLight ? "divide-[#EAECF0]" : "divide-[#1A2633]"}`}>
-                    {soldProductsList.map((item, idx) => (
-                      <tr
-                        key={item.id || idx}
-                        className={`transition-colors ${
-                          isLight
-                            ? "bg-white hover:bg-[#F9FAFB]"
-                            : "hover:bg-[#162333]"
-                        }`}
-                      >
-                        <td className={`py-3 px-3 font-mono font-bold ${
-                          isLight ? "text-[#667085]" : "text-[#64748B]"
-                        }`}>
-                          #{idx + 1}
-                        </td>
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-2.5 max-w-[180px] truncate">
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              className={`w-7 h-7 rounded-md object-contain shrink-0 border ${
-                                isLight
-                                  ? "bg-[#F8FAFC] border-[#EAECF0]"
-                                  : "bg-[#0D1722] border-[#1E2A36]"
-                              }`}
-                            />
-                            <span className={`font-semibold truncate ${
-                              isLight ? "text-[#101828]" : "text-[#F8FAFC]"
-                            }`}>
-                              {item.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className={`py-3 px-3 ${isLight ? "text-[#667085]" : "text-[#94A3B8]"}`}>
-                          {item.category}
-                        </td>
-                        <td className={`py-3 px-3 text-center font-mono font-bold ${
-                          isLight ? "text-[#101828]" : "text-[#F8FAFC]"
-                        }`}>
-                          {item.unitsSold}
-                        </td>
-                        <td className={`py-3 px-3 font-mono font-semibold ${
-                          isLight ? "text-[#101828]" : "text-[#F8FAFC]"
-                        }`}>
-                          {formatPrice(item.revenue)}
-                        </td>
-                        <td className={`py-3 px-3 whitespace-nowrap ${
-                          isLight ? "text-[#667085]" : "text-[#94A3B8]"
-                        }`}>
-                          {item.lastSold}
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <button
-                            type="button"
-                            title="Options"
-                            className={`p-1 rounded-md transition-colors ${
-                              isLight
-                                ? "text-[#667085] hover:text-[#101828]"
-                                : "text-[#64748B] hover:text-white"
-                            }`}
-                          >
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Right: Low Stock Alert Table (Col 5) */}
-            <div
-              className={`lg:col-span-5 rounded-2xl p-5 space-y-4 ${
-                isLight
-                  ? "bg-white border border-[#E2E8F0] shadow-xs"
-                  : "bg-[#0E141D] border border-white/[0.08] shadow-xs"
-              }`}
-            >
-              <div className={`flex items-center justify-between border-b pb-3 ${
-                isLight ? "border-[#E2E8F0]" : "border-white/[0.08]"
-              }`}>
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                      isLight
-                        ? "bg-rose-50 text-rose-600 border border-rose-100"
-                        : "bg-red-500/15 text-red-400"
-                    }`}
-                  >
-                    <AlertTriangle className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className={`text-sm font-bold ${
-                      isLight ? "text-[#101828]" : "text-[#F8FAFC]"
-                    }`}>
-                      Low Stock Alert
-                    </h3>
-                    <p className={`text-xs ${
-                      isLight ? "text-[#667085]" : "text-[#64748B]"
-                    }`}>
-                      Products need restock
-                    </p>
-                  </div>
-                </div>
-                <Link
-                  href="/admin/dashboard?tab=inventory"
-                  className={`text-xs font-semibold flex items-center gap-1 transition-colors ${
-                    isLight
-                      ? "text-[#667085] hover:text-[#111827]"
-                      : "text-[#94A3B8] hover:text-white"
-                  }`}
-                >
-                  <span>View All</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
-                  <thead>
-                    <tr
-                      className={`font-semibold uppercase tracking-wider text-[10px] border-b ${
-                        isLight
-                          ? "bg-[#F8FAFC] text-[#667085] border-[#EAECF0]"
-                          : "bg-[#0D1722] text-[#64748B] border-[#1E2A36]"
-                      }`}
-                    >
-                      <th className="py-2.5 px-3 rounded-l-lg">Product</th>
-                      <th className="py-2.5 px-3">SKU</th>
-                      <th className="py-2.5 px-3 text-center">Stock</th>
-                      <th className="py-2.5 px-3 text-right">Status</th>
-                      <th className="py-2.5 px-3 rounded-r-lg text-right"></th>
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y ${isLight ? "divide-[#EAECF0]" : "divide-[#1A2633]"}`}>
-                    {lowStockDisplayList.map((item) => (
-                      <tr
-                        key={item.id}
-                        className={`transition-colors ${
-                          isLight
-                            ? "bg-white hover:bg-[#F9FAFB]"
-                            : "hover:bg-[#162333]"
-                        }`}
-                      >
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-2 max-w-[150px] truncate">
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              className={`w-7 h-7 rounded-md object-contain shrink-0 border ${
-                                isLight
-                                  ? "bg-[#F8FAFC] border-[#EAECF0]"
-                                  : "bg-[#0D1722] border-[#1E2A36]"
-                              }`}
-                            />
-                            <span className={`font-semibold truncate ${
-                              isLight ? "text-[#101828]" : "text-[#F8FAFC]"
-                            }`}>
-                              {item.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className={`py-3 px-3 font-mono ${
-                          isLight ? "text-[#667085]" : "text-[#94A3B8]"
-                        }`}>
-                          {item.sku}
-                        </td>
-                        <td className={`py-3 px-3 text-center font-mono font-bold ${
-                          isLight ? "text-rose-600" : "text-red-400"
-                        }`}>
-                          {item.stock}
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                              isLight
-                                ? "bg-rose-50 text-rose-600 border-rose-200"
-                                : "bg-red-500/10 text-red-400 border-red-500/20"
-                            }`}
-                          >
-                            Low Stock
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <button
-                            type="button"
-                            title="Options"
-                            className={`p-1 rounded-md transition-colors ${
-                              isLight
-                                ? "text-[#667085] hover:text-[#101828]"
-                                : "text-[#64748B] hover:text-white"
-                            }`}
-                          >
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* ════════════════════════════════════════════════════════════════
-              FLOATING TOAST NOTIFICATIONS (Bottom Right Stack)
-          ════════════════════════════════════════════════════════════════ */}
-          <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 max-w-sm pointer-events-auto">
-            {/* 1. New Order Received Toast */}
-            {!dismissedToasts.includes("order-1005") && (
-              <div
-                className={`rounded-2xl p-3.5 flex items-start gap-3 animate-in fade-in slide-in-from-bottom-3 border ${
-                  isLight
-                    ? "bg-white border-[#E5E7EB] shadow-xl text-[#111827]"
-                    : "bg-[#07111C] border-[#1E2A36] shadow-2xl text-white"
-                }`}
-              >
-                <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                    isLight
-                      ? "bg-blue-50 text-blue-600 border border-blue-100"
-                      : "bg-blue-500/15 text-blue-400"
-                  }`}
-                >
-                  <ShoppingBag className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className={`text-xs font-bold ${
-                      isLight ? "text-[#111827]" : "text-[#F8FAFC]"
-                    }`}>
-                      New Order Received!
-                    </h4>
-                    <button
-                      type="button"
-                      onClick={() => setDismissedToasts((prev) => [...prev, "order-1005"])}
-                      className={`cursor-pointer ${
-                        isLight ? "text-[#667085] hover:text-[#111827]" : "text-[#64748B] hover:text-white"
-                      }`}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <p className={`text-[11px] mt-0.5 truncate ${
-                    isLight ? "text-[#667085]" : "text-[#94A3B8]"
-                  }`}>
-                    #1005 · Samsung Galaxy A54
-                  </p>
-                  <span className={`text-[10px] block mt-1 ${
-                    isLight ? "text-[#98A2B3]" : "text-[#64748B]"
-                  }`}>
-                    2 minutes ago
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* 2. Low Stock Alert Toast */}
-            {!dismissedToasts.includes("stock-iphone14") && (
-              <div
-                className={`rounded-2xl p-3.5 flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 border ${
-                  isLight
-                    ? "bg-white border-[#E5E7EB] shadow-xl text-[#111827]"
-                    : "bg-[#07111C] border-[#1E2A36] shadow-2xl text-white"
-                }`}
-              >
-                <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                    isLight
-                      ? "bg-rose-50 text-rose-600 border border-rose-100"
-                      : "bg-red-500/15 text-red-400"
-                  }`}
-                >
-                  <AlertTriangle className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className={`text-xs font-bold ${
-                      isLight ? "text-[#111827]" : "text-[#F8FAFC]"
-                    }`}>
-                      Low Stock Alert
-                    </h4>
-                    <button
-                      type="button"
-                      onClick={() => setDismissedToasts((prev) => [...prev, "stock-iphone14"])}
-                      className={`cursor-pointer ${
-                        isLight ? "text-[#667085] hover:text-[#111827]" : "text-[#64748B] hover:text-white"
-                      }`}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <p className={`text-[11px] mt-0.5 truncate ${
-                    isLight ? "text-[#667085]" : "text-[#94A3B8]"
-                  }`}>
-                    iPhone 14 Case only 4 left!
-                  </p>
-                  <span className={`text-[10px] block mt-1 ${
-                    isLight ? "text-[#98A2B3]" : "text-[#64748B]"
-                  }`}>
-                    5 minutes ago
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {activeTab === "overview" && <StoreOverview orders={orders} products={products} customerCount={customers.length} loading={loading} />}
 
       {/* ════════════════════════════════════════════════════════════════════
           TAB 2: PRODUCTS TAB
@@ -2524,6 +1519,7 @@ function DashboardContent() {
           TAB 5B: HOMEPAGE HERO SLIDER TAB
       ════════════════════════════════════════════════════════════════════ */}
       {activeTab === "hero" && (
+        <div><HomeOffersEditor />
         <HeroTab
           slides={heroSlides}
           onAdd={() => {
@@ -2537,49 +1533,23 @@ function DashboardContent() {
           onDelete={handleDeleteHeroSlide}
           onToggleStatus={handleToggleHeroSlideStatus}
         />
+        </div>
       )}
 
       {/* ════════════════════════════════════════════════════════════════════
           TAB 5C: STORE GALLERY TAB
       ════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "gallery" && (
-        <GalleryTab
-          images={galleryImages}
-          initialAnimationSettings={galleryAnimationSettings}
-          onAdd={() => {
-            setEditingGalleryImage(null);
-            setIsGalleryModalOpen(true);
-          }}
-          onEdit={(image: GalleryImage) => {
-            setEditingGalleryImage(image);
-            setIsGalleryModalOpen(true);
-          }}
-          onDelete={handleDeleteGalleryImage}
-          onRefresh={refreshData}
-        />
-      )}
+
 
       {/* ════════════════════════════════════════════════════════════════════
           TAB 5D: VISUAL PRODUCT SHOWCASE BANNERS
       ════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "showcase" && (
-        <ShowcaseTab
-          products={products}
-          categories={categories}
-          initialSettings={showcaseSettings}
-          onRefresh={refreshData}
-        />
-      )}
+
 
       {/* ════════════════════════════════════════════════════════════════════
           TAB 5E: TODAY'S DEAL PROMOTIONAL BANNER
       ════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "today-deal" && (
-        <TodayDealTab
-          initialSettings={todayDealSettings}
-          onRefresh={refreshData}
-        />
-      )}
+
 
       {/* ════════════════════════════════════════════════════════════════════
           TAB 6: CUSTOMERS TAB (CRM Style Directory)
@@ -2776,13 +1746,7 @@ function DashboardContent() {
       {/* ════════════════════════════════════════════════════════════════════
           WHATSAPP MARKETING TAB
       ════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "whatsapp-marketing" && (
-        <WhatsAppMarketingTab
-          campaigns={whatsappCampaigns}
-          products={products}
-          customers={customers}
-        />
-      )}
+
 
       {/* ════════════════════════════════════════════════════════════════════
           SPIN & WIN PROMOTION TAB
@@ -2866,63 +1830,26 @@ function DashboardContent() {
       {/* ════════════════════════════════════════════════════════════════════
           TAB 11: ANALYTICS TAB
       ════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "analytics" && (
-        <div className="space-y-6 animate-in fade-in duration-150">
-          <div className="pb-2 border-b border-white/5">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-              Analytics & Performance Reports
-            </h1>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">
-              Real-time revenue, conversion rates and payment method breakdown
-            </p>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className={`rounded-2xl border p-5 shadow-xs space-y-4 ${
-              isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
-            }`}>
-              <h3 className={`font-semibold text-sm ${isLight ? "text-slate-900" : "text-white"}`}>Monthly Sales Breakdown</h3>
-              <div className={`h-44 rounded-xl flex items-center justify-center text-xs border ${
-                isLight ? "bg-slate-50 border-slate-200 text-slate-500" : "bg-white/5 border-white/10 text-slate-400"
-              }`}>
-                Line chart visualizing LKR revenue growth across 31 days
-              </div>
-            </div>
-
-            <div className={`rounded-2xl border p-5 shadow-xs space-y-4 ${
-              isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
-            }`}>
-              <h3 className={`font-semibold text-sm ${isLight ? "text-slate-900" : "text-white"}`}>Payment Method Distribution</h3>
-              <div className={`h-44 rounded-xl flex items-center justify-center text-xs border ${
-                isLight ? "bg-slate-50 border-slate-200 text-slate-500" : "bg-white/5 border-white/10 text-slate-400"
-              }`}>
-                PayHere Online (55%) • COD (35%) • WhatsApp Checkout (10%)
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ════════════════════════════════════════════════════════════════════
           TAB: MOBILE EXPERIENCE
       ════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "mobile" && (
-        <MobileExperienceTab />
-      )}
+
 
       {/* ════════════════════════════════════════════════════════════════════
           TAB: MOBILE REPAIRS
       ════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "repairs" && (
-        <RepairsTab />
-      )}
+
 
       {/* ════════════════════════════════════════════════════════════════════
           TAB: CASH FLOW
       ════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "cashflow" && (
-        <CashFlowTab />
-      )}
+
+
+      {activeTab === "footer" && <FooterTab />}
+      {activeTab === "settings" && <StoreSettingsTab />}
+      {activeTab === "brands" && <SimpleBrandsTab />}
 
       {/* Global Product Modal */}
       <ProductModal
@@ -2949,16 +1876,7 @@ function DashboardContent() {
         slide={editingHeroSlide}
       />
 
-      {/* Gallery Modal */}
-      <GalleryModal
-        isOpen={isGalleryModalOpen}
-        onClose={() => setIsGalleryModalOpen(false)}
-        onSave={() => {
-          setIsGalleryModalOpen(false);
-          refreshData();
-        }}
-        initialData={editingGalleryImage}
-      />
+
 
       {/* Coupon Modal */}
       <CouponModal

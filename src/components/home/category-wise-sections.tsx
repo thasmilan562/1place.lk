@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronRight, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronRight, CircleCheck as Sparkles } from "lucide-react";
 import ProductCard from "@/components/products/ProductCard";
 import { Product, Category } from "@/lib/types";
 import { normalizeCategorySlug, uniqueById } from "@/lib/utils";
@@ -101,7 +101,8 @@ export default function CategoryWiseSections({
 
   // Group products into category sections
   const activeSections = useMemo(() => {
-    if (validProducts.length === 0) return [];
+    // When catalog has 3 or fewer items, avoid repeating the same products across redundant homepage sections
+    if (validProducts.length <= 3) return [];
 
     const sections: {
       key: string;

@@ -43,6 +43,7 @@ function LoginFormContent() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
@@ -223,167 +224,39 @@ function LoginFormContent() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#EAEAEA] sm:bg-[#ECECEC] flex flex-col justify-between items-center selection:bg-[#64152F] selection:text-white font-sans px-3 py-4 sm:px-6 sm:py-8">
+    <div className="account-page premium-login min-h-screen w-full bg-[#EAEAEA] sm:bg-[#ECECEC] flex flex-col justify-between items-center selection:bg-[#64152F] selection:text-white font-sans px-3 py-4 sm:px-6 sm:py-8">
       {/* ── Top Bar with Back Link ── */}
-      <div className="w-full max-w-5xl flex items-center justify-between py-2 px-2 shrink-0">
+      <div className="account-topbar w-full flex items-center justify-between py-2 px-2 shrink-0">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-neutral-600 hover:text-black transition-colors group"
         >
           <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-          <span>Back to 1place.lk</span>
+          <span>Back to store</span>
         </Link>
         <div className="flex items-center gap-1.5 text-xs text-neutral-500 font-bold uppercase tracking-wider">
           <ShieldCheck className="w-4 h-4 text-[#64152F]" />
-          <span>100% Genuine Care &amp; Warranty</span>
+          <span>ONEPLACE Account</span>
         </div>
       </div>
 
       {/* ── Main Dual-Tone Authentication Card ── */}
-      <div className="w-full max-w-5xl bg-white rounded-[28px] sm:rounded-[36px] border border-neutral-200/90 shadow-[0_20px_60px_rgba(0,0,0,0.12)] overflow-hidden my-auto grid grid-cols-1 lg:grid-cols-12">
-        {/* ══════════════════════════════════════════════════════
-            DESKTOP LUXURY BURGUNDY BRAND LEFT PANEL (>= 1024px)
-           ══════════════════════════════════════════════════════ */}
-        <div className="hidden lg:flex lg:col-span-5 bg-gradient-to-br from-[#120207] via-[#2A0510] to-[#500A1F] text-white p-9 lg:p-11 flex-col justify-between relative overflow-hidden">
-          {/* Subtle glowing ambient wave curves */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="absolute -top-24 -left-24 w-80 h-80 bg-[#8B1D41]/30 rounded-full blur-[90px]" />
-            <div className="absolute -bottom-24 -right-24 w-80 h-80 bg-[#64152F]/40 rounded-full blur-[90px]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(161,27,69,0.3),transparent_65%)]" />
-            <svg
-              className="absolute inset-0 w-full h-full opacity-20 pointer-events-none"
-              preserveAspectRatio="none"
-              viewBox="0 0 400 600"
-            >
-              <path d="M0,220 C140,290 260,160 400,340 L400,600 L0,600 Z" fill="url(#brandGrad)" />
-              <defs>
-                <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#A11B45" stopOpacity="0.5" />
-                  <stop offset="100%" stopColor="#350713" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-
-          {/* Top: Official Stacked ONEPLACE Logo */}
-          <div className="relative z-10">
-            <Link href="/" className="inline-block group">
-              <img
-                src="/logo-original.png"
-                alt="ONEPLACE.LK"
-                className="h-20 w-auto object-contain drop-shadow-md transition-transform group-hover:scale-105"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/logo.png";
-                }}
-              />
-            </Link>
-          </div>
-
-          {/* Middle: Headline & Three Key Trust Highlights */}
-          <div className="relative z-10 my-auto py-8">
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white leading-tight">
-              Welcome <br />
-              <span className="text-[#B91C47] drop-shadow-sm">Back</span>
-            </h1>
-            <p className="mt-3 text-xs sm:text-sm text-neutral-300 font-medium leading-relaxed max-w-xs">
-              Sign in to continue your shopping experience at 1place.lk.
-            </p>
-
-            {/* Three Value Proposition Items */}
-            <div className="mt-8 space-y-4">
-              {/* Item 1: Free Delivery */}
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-full bg-white/[0.08] border border-white/10 flex items-center justify-center shrink-0 text-white shadow-xs">
-                  <Truck className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs sm:text-sm font-bold text-white">Free Delivery</h4>
-                  <p className="text-[11px] text-neutral-400">for orders over LKR 5,000</p>
-                </div>
-              </div>
-
-              {/* Item 2: 100% Authentic Products */}
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-full bg-white/[0.08] border border-white/10 flex items-center justify-center shrink-0 text-white shadow-xs">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs sm:text-sm font-bold text-white">100% Authentic Products</h4>
-                  <p className="text-[11px] text-neutral-400">Genuine warranty &amp; verified suppliers</p>
-                </div>
-              </div>
-
-              {/* Item 3: Easy Returns */}
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-full bg-white/[0.08] border border-white/10 flex items-center justify-center shrink-0 text-white shadow-xs">
-                  <RotateCcw className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs sm:text-sm font-bold text-white">Easy Returns</h4>
-                  <p className="text-[11px] text-neutral-400">Hassle free shopping experience</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom: Luxury Market Watermark */}
-          <div className="relative z-10 pt-4 border-t border-white/10">
-            <div className="w-8 h-1 bg-[#8B1D41] rounded-full mb-3" />
-            <p className="text-[9.5px] font-bold text-neutral-300 tracking-[0.25em] uppercase">
-              PREMIUM SRI LANKA MARKETPLACE
-            </p>
-            <p className="text-[8.5px] font-semibold text-neutral-500 tracking-[0.18em] uppercase mt-0.5">
-              EVERYTHING YOU NEED, IN ONE PLACE.
-            </p>
-          </div>
-        </div>
-
-        {/* ══════════════════════════════════════════════════════
-            RIGHT SIGN IN / SIGN UP FORM PANEL (7 Columns)
-           ══════════════════════════════════════════════════════ */}
-        <div className="lg:col-span-7 bg-white p-6 sm:p-10 lg:p-12 flex flex-col justify-center">
+      <div className="account-page-card">
+        <div className="account-surface">
           <div className="w-full max-w-[440px] mx-auto">
-            {/* Mobile Header: Logo + Switch */}
-            <div className="flex lg:hidden items-center justify-between pb-4 mb-4 border-b border-neutral-100">
-              <Link href="/" className="inline-flex items-center">
-                <img
-                  src="/logo.png"
-                  alt="ONEPLACE"
-                  className="h-7 w-auto object-contain"
-                />
-              </Link>
-              <button
-                type="button"
-                onClick={() => handleTab(tab === "signin" ? "signup" : "signin")}
-                className="text-xs font-bold text-[#64152F] hover:text-[#450C1F]"
-              >
-                {tab === "signin" ? "Sign Up" : "Sign In"}
-              </button>
-            </div>
-
-            {/* Desktop Top Right: Sign In / Sign Up switcher link */}
-            <div className="hidden lg:flex items-center justify-end mb-6">
-              <p className="text-xs text-neutral-600 font-medium">
-                {tab === "signin" ? "Don't have an account? " : "Already have an account? "}
-                <button
-                  type="button"
-                  onClick={() => handleTab(tab === "signin" ? "signup" : "signin")}
-                  className="font-bold text-[#64152F] hover:text-[#450C1F] hover:underline transition-colors cursor-pointer"
-                >
-                  {tab === "signin" ? "Sign Up" : "Sign In"}
-                </button>
-              </p>
+            <div className="account-brand">
+              <Link href="/" aria-label="ONEPLACE homepage"><img src="/logo.png" alt="ONEPLACE" /></Link>
             </div>
 
             {/* Heading and Subtitle */}
-            <div className="mb-6">
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 tracking-tight">
-                {tab === "signin" ? "Sign In" : "Create Account"}
-              </h2>
+            <div className="account-heading">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 tracking-tight">
+                {tab === "signin" ? "Sign in to ONEPLACE." : "Your account. Your place."}
+              </h1>
               <p className="text-xs sm:text-sm text-neutral-500 font-medium mt-1">
                 {tab === "signin"
-                  ? "Welcome back! Please sign in to your account."
-                  : "Join 1place.lk for exclusive offers, fast checkout, and order tracking."}
+                  ? "Your favourites, orders and everyday discoveries. All together."
+                  : "Create an account for a simpler shopping experience."}
               </p>
             </div>
 
@@ -454,6 +327,7 @@ function LoginFormContent() {
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
+                  role="alert"
                   className="mb-4 p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold flex items-start gap-2"
                 >
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
@@ -465,6 +339,7 @@ function LoginFormContent() {
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
+                  role="status"
                   className="mb-4 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold flex items-start gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
@@ -478,13 +353,15 @@ function LoginFormContent() {
               {/* Full Name (Sign Up mode) */}
               {tab === "signup" && (
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-neutral-800">
+                  <label htmlFor="customer-name" className="block text-xs font-bold text-neutral-800">
                     Full Name
                   </label>
                   <div className="relative">
                     <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                     <input
                       type="text"
+                      id="customer-name"
+                      autoComplete="name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Enter your full name"
@@ -497,13 +374,15 @@ function LoginFormContent() {
 
               {/* Email Address */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-neutral-800">
+                <label htmlFor="customer-email" className="block text-xs font-bold text-neutral-800">
                   Email Address
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                   <input
                     type="email"
+                    id="customer-email"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email address"
@@ -515,13 +394,15 @@ function LoginFormContent() {
 
               {/* Password */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-neutral-800">
+                <label htmlFor="customer-password" className="block text-xs font-bold text-neutral-800">
                   Password
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                   <input
                     type={showPassword ? "text" : "password"}
+                    id="customer-password"
+                    autoComplete={tab === "signup" ? "new-password" : "current-password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
@@ -542,19 +423,24 @@ function LoginFormContent() {
               {/* Confirm Password (Sign Up mode) */}
               {tab === "signup" && (
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-neutral-800">
+                  <label htmlFor="customer-confirm" className="block text-xs font-bold text-neutral-800">
                     Confirm Password
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                     <input
-                      type={showPassword ? "text" : "password"}
+                      type={showConfirmPassword ? "text" : "password"}
+                      id="customer-confirm"
+                      autoComplete="new-password"
                       value={confirm}
                       onChange={(e) => setConfirm(e.target.value)}
                       placeholder="Confirm your password"
                       required
-                      className="w-full h-11 pl-10 pr-4 bg-white border border-neutral-200 focus:border-[#64152F] rounded-xl text-sm font-medium text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-[#64152F]/10 transition-all"
+                      className="w-full h-11 pl-10 pr-11 bg-white border border-neutral-200 focus:border-[#64152F] rounded-xl text-sm font-medium text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-[#64152F]/10 transition-all"
                     />
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 flex items-center justify-center">
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
                   </div>
                 </div>
               )}
@@ -605,7 +491,7 @@ function LoginFormContent() {
               </div>
 
               {/* Mobile Bottom Switcher */}
-              <p className="text-center text-xs text-neutral-500 pt-3 lg:hidden">
+              <p className="account-switch text-center text-xs text-neutral-500 pt-3">
                 {tab === "signin" ? "Don't have an account? " : "Already have an account? "}
                 <button
                   type="button"

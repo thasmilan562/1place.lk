@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { OfferBanner, BannerStatus, BannerPlacement, Product } from "@/lib/types";
-import { Sparkles, Plus, Search, Edit, Trash2, Copy, Eye, Tag, Calendar, Monitor, Smartphone, Layers, CheckCircle2, PauseCircle, Clock, Archive } from "lucide-react";
+import { CircleCheck as Sparkles, Plus, Search, Edit, Trash2, Copy, Eye, Tag, Calendar, Monitor, Smartphone, Layers, CheckCircle2, PauseCircle, Clock, Archive } from "lucide-react";
 import FeaturedGridBannerControl from "@/components/admin/FeaturedGridBannerControl";
 import CampaignPopupControl from "@/components/admin/CampaignPopupControl";
 import NewArrivalsControl from "@/components/admin/NewArrivalsControl";

@@ -85,7 +85,7 @@ export default function CartClient() {
   };
 
   return (
-    <div className="bg-white min-h-screen pt-[88px] sm:pt-[96px] pb-24 text-black">
+    <div className="bg-white min-h-screen pb-24 text-black">
       {/* ── Breadcrumbs ── */}
       <div className="border-b border-[#EAEAEA] bg-white">
         <div className="max-w-7xl mx-auto px-4 lg:px-6 py-3.5">

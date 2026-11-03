@@ -20,7 +20,7 @@ import {
   Banknote,
   CreditCard,
   MessageCircle,
-  Sparkles,
+  CircleCheck as Sparkles,
   Calendar,
   Store,
 } from "lucide-react";
@@ -561,6 +561,7 @@ export default function ProductDetailClient({
   // Dynamic Pricing, Stock, SKU & Out-of-Stock Computation
   const warrantyPrice = selectedWarranty ? selectedWarranty.additional_price : 0;
   const currentVariantPrice = (selectedVariant ? selectedVariant.price : product.price) + warrantyPrice;
+  const isPriced = typeof currentVariantPrice === "number" && currentVariantPrice > 0;
   const currentVariantOldPrice = selectedVariant?.old_price ?? product.old_price;
 
   const currentSku = selectedVariant?.sku || product.code || product.slug;
@@ -619,7 +620,7 @@ export default function ProductDetailClient({
   const currentActiveImage = allMasterImages[selectedGalleryIndex] || product.images?.[0] || "";
 
   const handleAddToCart = () => {
-    if (isVariantOutOfStock || !selectedVariant || currentStock <= 0) return;
+    if (!isPriced || isVariantOutOfStock || !selectedVariant || currentStock <= 0) return;
 
     const finalColor = selectedVariant?.color || (hasUserChosenColor ? selectedColor : (colorVariants[0]?.name || ""));
     const finalQty = Math.min(currentStock, Math.max(1, quantity));
@@ -651,7 +652,7 @@ export default function ProductDetailClient({
   };
 
   const handleBuyNow = () => {
-    if (isVariantOutOfStock || !selectedVariant || currentStock <= 0) return;
+    if (!isPriced || isVariantOutOfStock || !selectedVariant || currentStock <= 0) return;
 
     const finalColor = selectedVariant?.color || (hasUserChosenColor ? selectedColor : (colorVariants[0]?.name || ""));
     const finalQty = Math.min(currentStock, Math.max(1, quantity));
@@ -735,7 +736,7 @@ export default function ProductDetailClient({
   };
 
   return (
-    <div className="bg-white min-h-screen text-black pb-32 sm:pb-36 w-full max-w-full overflow-x-hidden">
+    <div className="premium-product-detail bg-white min-h-screen text-black pb-32 sm:pb-36 w-full max-w-full overflow-x-hidden">
       {/* ── 1. Top Breadcrumbs with Functional Back Button ── */}
       <div className="border-b border-[#EAEAEA] bg-white">
         <div className="max-w-7xl mx-auto px-4 lg:px-6 py-2.5 sm:py-3.5">
@@ -857,7 +858,7 @@ export default function ProductDetailClient({
         <div className="grid lg:grid-cols-12 gap-8 lg:gap-14 items-start w-full min-w-0 max-w-full">
           
           {/* Left Column: Image Gallery (Shows ALL uploaded photos & syncs with color selection) */}
-          <div className="lg:col-span-6 w-full min-w-0 max-w-full">
+          <div className="premium-product-gallery lg:col-span-6 w-full min-w-0 max-w-full">
             <ProductGallery
               images={allMasterImages}
               name={product.name}
@@ -926,7 +927,7 @@ export default function ProductDetailClient({
                       ? isPreOrderAvailable
                         ? "Out of Stock — Available for Pre-Booking"
                         : "Out of Stock"
-                      : "In Stock & Ready to Ship"}
+                      : (!isPriced ? "In Catalog · Pricing Pending Confirmation" : "In Stock & Ready to Ship")}
                   </span>
                 </div>
               </div>
@@ -934,7 +935,7 @@ export default function ProductDetailClient({
               {/* Price Display (Fully responsive flex-wrap) */}
               <div className="flex items-baseline flex-wrap gap-2.5 sm:gap-3 mb-4 sm:mb-6 w-full min-w-0 max-w-full">
                 <span className="text-2xl sm:text-3xl md:text-4xl font-black text-black tracking-tight shrink-0">
-                  {formatPrice(currentVariantPrice)}
+                  {isPriced ? formatPrice(currentVariantPrice) : "Price Coming Soon"}
                 </span>
                 {currentVariantOldPrice && currentVariantOldPrice > currentVariantPrice && (
                   <span className="text-base sm:text-lg text-gray-400 line-through font-medium shrink-0">
@@ -1232,7 +1233,7 @@ export default function ProductDetailClient({
                 {/* 1. Add to Bag */}
                 <button
                   type="button"
-                  disabled={isVariantOutOfStock}
+                  disabled={!isPriced || isVariantOutOfStock}
                   onClick={handleAddToCart}
                   className={`flex-1 py-3.5 sm:py-4 px-4 sm:px-6 rounded-full font-bold text-xs sm:text-sm border-2 flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
                     isVariantOutOfStock
@@ -1256,7 +1257,7 @@ export default function ProductDetailClient({
                   ) : (
                     <>
                       <ShoppingBag className="w-4 h-4" />
-                      <span>Add to Bag</span>
+                      <span>{!isPriced ? "Price Coming Soon" : "Add to Bag"}</span>
                     </>
                   )}
                 </button>
@@ -1274,7 +1275,7 @@ export default function ProductDetailClient({
                 ) : (
                   <button
                     type="button"
-                    disabled={isVariantOutOfStock || buyingNow}
+                    disabled={!isPriced || isVariantOutOfStock || buyingNow}
                     onClick={handleBuyNow}
                     className={`flex-1 py-3.5 sm:py-4 px-4 sm:px-6 rounded-full font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
                       isVariantOutOfStock
@@ -1477,7 +1478,7 @@ export default function ProductDetailClient({
         <CompatibleAccessories currentProduct={product} allProducts={allProducts} />
 
         {/* ── 5. Same Brand Recommendations ("More from Brand") ── */}
-        <SameBrandProducts currentProduct={product} allProducts={allProducts} />
+        {allProducts.length > 8 && <SameBrandProducts currentProduct={product} allProducts={allProducts} />}
       </div>
 
       {/* ── 6. Mobile Sticky Bottom Purchase Bar (Screens < 1024px) ── */}
@@ -1503,7 +1504,7 @@ export default function ProductDetailClient({
             <>
               <button
                 type="button"
-                disabled={isVariantOutOfStock}
+                disabled={!isPriced || isVariantOutOfStock}
                 onClick={handleAddToCart}
                 className={`min-h-[44px] px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shrink-0 ${
                   isVariantOutOfStock
@@ -1519,7 +1520,7 @@ export default function ProductDetailClient({
 
               <button
                 type="button"
-                disabled={isVariantOutOfStock || buyingNow}
+                disabled={!isPriced || isVariantOutOfStock || buyingNow}
                 onClick={handleBuyNow}
                 className="min-h-[44px] px-4 sm:px-5 py-2 rounded-full bg-[#111111] text-white font-bold text-xs flex items-center gap-1.5 shadow-md disabled:opacity-50 active:scale-95 transition-all cursor-pointer hover:bg-neutral-800 shrink-0"
               >

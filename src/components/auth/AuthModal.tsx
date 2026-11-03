@@ -22,18 +22,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import { auth } from "@/lib/firebase";
 import { getAuthSettings } from "@/lib/firestore-client";
 import { sendPasswordResetEmail } from "firebase/auth";
+import { useDialogFocus } from "@/lib/use-dialog-focus";
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: "signin" | "signup";
 }
 
-export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, initialTab = "signin" }: AuthModalProps) {
+  const dialogRef = useDialogFocus(isOpen, onClose);
   const router = useRouter();
   const { addToCart } = useCart();
   const { signIn, signUp, signInWithGoogle, signInWithApple } = useAuth();
 
   const [tab, setTab] = useState<"signin" | "signup">("signin");
+  useEffect(() => { if (isOpen) setTab(initialTab); }, [isOpen, initialTab]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -63,15 +67,21 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [success, setSuccess] = useState("");
   const [logoError, setLogoError] = useState(false);
 
-  // Prevent background body scrolling when modal is open
+  // Prevent background body scrolling when modal is open and coordinate overlays
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      document.body.dataset.authModalOpen = "true";
+      window.dispatchEvent(new CustomEvent("auth-modal-opened"));
     } else {
       document.body.style.overflow = "";
+      delete document.body.dataset.authModalOpen;
+      window.dispatchEvent(new CustomEvent("auth-modal-closed"));
     }
     return () => {
       document.body.style.overflow = "";
+      delete document.body.dataset.authModalOpen;
+      window.dispatchEvent(new CustomEvent("auth-modal-closed"));
     };
   }, [isOpen]);
 
@@ -229,17 +239,24 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           {/* Modal Card */}
           <motion.div
             key="auth-modal-card"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={tab === "signin" ? "Sign in to ONEPLACE" : "Create a ONEPLACE account"}
+            tabIndex={-1}
+            data-premium-auth
+            data-account-surface
             initial={{ opacity: 0, y: 30, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 30, scale: 0.98 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full bg-white rounded-[28px] sm:rounded-[32px] px-6 sm:px-8 py-7 shadow-[0_24px_64px_rgba(0,0,0,0.22)] border border-neutral-200 z-10 text-neutral-900 overflow-y-auto max-h-[92vh] sm:max-h-[calc(100vh-40px)] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="account-surface account-modal relative w-full bg-white rounded-[28px] sm:rounded-[32px] px-6 sm:px-8 py-7 shadow-[0_24px_64px_rgba(0,0,0,0.22)] border border-neutral-200 z-10 text-neutral-900 overflow-y-auto max-h-[92vh] sm:max-h-[calc(100vh-40px)] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
             style={{
               width: "min(520px, 100vw)",
             }}
           >
             {/* Header: Logo + Close Button */}
-            <div className="flex items-center justify-between mb-5">
+            <div className="account-modal-brand flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
                 {!logoError ? (
                   <img
@@ -266,10 +283,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             </div>
 
             {/* Segmented Control Tabs */}
-            <div className="grid grid-cols-2 p-1 bg-neutral-100 rounded-xl mb-5 h-11 items-center border border-neutral-200/60">
+            <div className="account-tabs grid grid-cols-2 p-1 bg-neutral-100 rounded-xl mb-5 h-11 items-center border border-neutral-200/60">
               <button
                 type="button"
                 onClick={() => handleTab("signin")}
+                aria-pressed={tab === "signin"}
                 className={`h-9 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center cursor-pointer ${
                   tab === "signin"
                     ? "bg-white text-[#64152F] shadow-xs font-black"
@@ -281,6 +299,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <button
                 type="button"
                 onClick={() => handleTab("signup")}
+                aria-pressed={tab === "signup"}
                 className={`h-9 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center cursor-pointer ${
                   tab === "signup"
                     ? "bg-white text-[#64152F] shadow-xs font-black"
@@ -292,14 +311,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             </div>
 
             {/* Heading & Subtitle */}
-            <div className="mb-5">
+            <div className="account-heading">
               <h2 className="text-2xl font-black text-neutral-900 tracking-tight">
-                {tab === "signin" ? "Sign In" : "Create Account"}
+                {tab === "signin" ? "Welcome to your place." : "Your account. Your place."}
               </h2>
               <p className="text-xs text-neutral-500 font-medium mt-1">
                 {tab === "signin"
-                  ? "Welcome back! Please sign in to your account."
-                  : "Join 1place.lk for exclusive offers, order tracking, and warranty."}
+                  ? "Sign in to save your favourites and pick up where you left off."
+                  : "Create an account for a simpler shopping experience."}
               </p>
             </div>
 
@@ -394,13 +413,15 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               {/* Full Name (Sign Up Only) */}
               {tab === "signup" && (
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-neutral-800">
+                  <label htmlFor="modal-name" className="block text-xs font-bold text-neutral-800">
                     Full Name
                   </label>
                   <div className="relative">
                     <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                     <input
                       type="text"
+                      id="modal-name"
+                      autoComplete="name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Alex Silva"
@@ -413,13 +434,15 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
               {/* Email Address */}
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-neutral-800">
+                <label htmlFor="modal-email" className="block text-xs font-bold text-neutral-800">
                   Email Address
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                   <input
                     type="email"
+                    id="modal-email"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email address"
@@ -431,13 +454,15 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
               {/* Password */}
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-neutral-800">
+                <label htmlFor="modal-password" className="block text-xs font-bold text-neutral-800">
                   Password
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                   <input
                     type={showPassword ? "text" : "password"}
+                    id="modal-password"
+                    autoComplete={tab === "signup" ? "new-password" : "current-password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
@@ -458,13 +483,15 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               {/* Confirm Password (Sign Up Only) */}
               {tab === "signup" && (
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-neutral-800">
+                  <label htmlFor="modal-confirm" className="block text-xs font-bold text-neutral-800">
                     Confirm Password
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                     <input
                       type={showConfirmPassword ? "text" : "password"}
+                      id="modal-confirm"
+                      autoComplete="new-password"
                       value={confirm}
                       onChange={(e) => setConfirm(e.target.value)}
                       placeholder="Confirm your password"

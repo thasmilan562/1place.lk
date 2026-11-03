@@ -15,7 +15,7 @@ import {
   AlertCircle,
   Globe,
   RotateCcw,
-  Sparkles,
+  CircleCheck as Sparkles,
   ExternalLink,
   MessageSquare,
   Building2,

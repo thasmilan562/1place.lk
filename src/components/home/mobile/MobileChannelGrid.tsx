@@ -13,7 +13,7 @@ import {
   Laptop,
   Shield,
   ShoppingBag,
-  Sparkles,
+  CircleCheck as Sparkles,
   Tag,
   Flame,
 } from "lucide-react";

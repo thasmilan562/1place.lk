@@ -1,332 +1,49 @@
 "use client";
-
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Search,
-  LayoutDashboard,
-  Package,
-  FolderOpen,
-  FolderTree,
-  Tag,
-  LayoutGrid,
-  Sparkles,
-  Flame,
-  ShoppingBag,
-  Wrench,
-  DollarSign,
-  ShieldCheck,
-  Users,
-  Images,
-  ImageIcon,
-  Globe,
-  HardDrive,
-  CreditCard,
-  Star,
-  BarChart3,
-  Bot,
-  Smartphone,
-  Settings,
-  Clock,
-  Plus,
-  ArrowRight,
-  X,
-  Command,
-} from "lucide-react";
-import { useAdminTheme } from "@/app/admin/dashboard/layout";
+import { ArrowUpRight, Plus, Search, X } from "lucide-react";
+import { ADMIN_NAVIGATION, adminTabHref } from "@/lib/admin-navigation";
+import { useDialogFocus } from "@/lib/use-dialog-focus";
 
-interface CommandPaletteProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onOpenAddProduct?: () => void;
-}
-
-interface CommandItem {
-  id: string;
-  title: string;
-  category: string;
-  icon: any;
-  href?: string;
-  action?: () => void;
-  shortcut?: string;
-}
-
-export default function CommandPalette({ isOpen, onClose, onOpenAddProduct }: CommandPaletteProps) {
+export default function CommandPalette({ isOpen, onClose, onOpenAddProduct }: { isOpen: boolean; onClose: () => void; onOpenAddProduct?: () => void }) {
   const router = useRouter();
-  const { isLight } = useAdminTheme();
   const [query, setQuery] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const commands: CommandItem[] = useMemo(() => [
-    // Quick Actions
-    {
-      id: "act-add-product",
-      title: "Add New Product",
-      category: "Quick Actions",
-      icon: Plus,
-      action: () => {
-        onClose();
-        if (onOpenAddProduct) {
-          onOpenAddProduct();
-        } else {
-          window.dispatchEvent(new CustomEvent("open-add-product-modal"));
-        }
-      },
-      shortcut: "P",
-    },
-    {
-      id: "act-today-deal",
-      title: "Configure Today's Deal",
-      category: "Quick Actions",
-      icon: Flame,
-      href: "/admin/dashboard?tab=today-deal",
-    },
-    {
-      id: "act-update-stock",
-      title: "Audit Inventory & Stock",
-      category: "Quick Actions",
-      icon: HardDrive,
-      href: "/admin/dashboard?tab=inventory",
-    },
-    {
-      id: "act-book-repair",
-      title: "Book Device Repair Ticket",
-      category: "Quick Actions",
-      icon: Wrench,
-      href: "/admin/dashboard?tab=repairs",
-    },
-    {
-      id: "act-add-cashflow",
-      title: "Log Cash Flow Transaction",
-      category: "Quick Actions",
-      icon: DollarSign,
-      href: "/admin/dashboard?tab=cashflow",
-    },
-
-    // Navigation Pages
-    { id: "nav-overview", title: "Overview Dashboard", category: "Navigation", icon: LayoutDashboard, href: "/admin/dashboard?tab=overview" },
-    { id: "nav-products", title: "Product Catalog", category: "Navigation", icon: Package, href: "/admin/dashboard?tab=products" },
-    { id: "nav-orders", title: "Orders Management", category: "Navigation", icon: ShoppingBag, href: "/admin/dashboard?tab=orders" },
-    { id: "nav-collections", title: "Featured Collections", category: "Navigation", icon: LayoutGrid, href: "/admin/dashboard?tab=collections" },
-    { id: "nav-showcase", title: "Visual Showcase", category: "Navigation", icon: Sparkles, href: "/admin/dashboard?tab=showcase" },
-    { id: "nav-today-deal", title: "Today's Deal Flash Sale", category: "Navigation", icon: Flame, href: "/admin/dashboard?tab=today-deal" },
-    { id: "nav-coupons", title: "Promo Codes & Coupons", category: "Navigation", icon: Tag, href: "/admin/dashboard?tab=coupons" },
-    { id: "nav-payments", title: "Payments & Gateway Settings", category: "Navigation", icon: CreditCard, href: "/admin/dashboard?tab=payments" },
-    { id: "nav-analytics", title: "Analytics & Reports", category: "Navigation", icon: BarChart3, href: "/admin/dashboard?tab=analytics" },
-    { id: "nav-inventory", title: "Warehouse Inventory Levels", category: "Navigation", icon: HardDrive, href: "/admin/dashboard?tab=inventory" },
-    { id: "nav-repairs", title: "Mobile Device Repairs", category: "Navigation", icon: Wrench, href: "/admin/dashboard?tab=repairs" },
-    { id: "nav-cashflow", title: "Cash Flow & Daily Accounts", category: "Navigation", icon: DollarSign, href: "/admin/dashboard?tab=cashflow" },
-    { id: "nav-users", title: "Customers Directory", category: "Navigation", icon: Users, href: "/admin/dashboard?tab=users" },
-    { id: "nav-gallery", title: "Store Gallery Wall", category: "Navigation", icon: Images, href: "/admin/dashboard?tab=gallery" },
-    { id: "nav-hero", title: "Homepage Hero Slider", category: "Navigation", icon: Sparkles, href: "/admin/dashboard?tab=hero" },
-    { id: "nav-mobile", title: "Mobile Experience Settings", category: "Navigation", icon: Smartphone, href: "/admin/dashboard?tab=mobile" },
-  ], [onClose, onOpenAddProduct]);
-
-  const filteredCommands = useMemo(() => {
-    if (!query.trim()) return commands;
-    const q = query.toLowerCase();
-    return commands.filter(
-      (c) => c.title.toLowerCase().includes(q) || c.category.toLowerCase().includes(q)
-    );
-  }, [commands, query]);
-
+  const dialogRef = useDialogFocus(isOpen, onClose);
+  const commands = useMemo(() => [
+    { id: "add-product", label: "Add product", group: "Quick action", icon: Plus, href: "" },
+    ...ADMIN_NAVIGATION.map((item) => ({ ...item, href: adminTabHref(item.id) })),
+  ], []);
+  const results = commands.filter((item) => `${item.label} ${item.group}`.toLowerCase().includes(query.trim().toLowerCase()));
   useEffect(() => {
-    if (isOpen) {
-      setQuery("");
-      setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
+    if (!isOpen) return;
+    setQuery(""); setSelected(0);
+    const frame = requestAnimationFrame(() => inputRef.current?.focus());
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { cancelAnimationFrame(frame); document.body.style.overflow = previous; };
   }, [isOpen]);
-
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
-
-  const executeCommand = (item: CommandItem) => {
+  useEffect(() => { setSelected(0); }, [query]);
+  useEffect(() => { if (isOpen) document.getElementById(`admin-command-${selected}`)?.scrollIntoView({ block: "nearest" }); }, [selected, isOpen]);
+  const execute = (item: (typeof commands)[number]) => {
     onClose();
-    if (item.action) {
-      item.action();
-    } else if (item.href) {
-      router.push(item.href);
-    }
+    if (item.id === "add-product") {
+      if (onOpenAddProduct) onOpenAddProduct();
+      else window.dispatchEvent(new CustomEvent("open-add-product-modal"));
+    } else router.push(item.href);
   };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      onClose();
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % Math.max(1, filteredCommands.length));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + filteredCommands.length) % Math.max(1, filteredCommands.length));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (filteredCommands[selectedIndex]) {
-        executeCommand(filteredCommands[selectedIndex]);
-      }
-    }
-  };
-
   if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 sm:pt-28 p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div
-        className={`w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 font-sans border ${
-          isLight
-            ? "bg-white border-[#E5E7EB] text-[#111827]"
-            : "bg-[#181A66] border-[#2A2D73]"
-        }`}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKeyDown}
-      >
-        {/* Search Input Bar */}
-        <div className={`relative flex items-center px-4 py-3.5 border-b ${
-          isLight
-            ? "border-[#E5E7EB] bg-white text-[#111827]"
-            : "border-[#2A2D73] bg-[#121358]/50"
-        }`}>
-          <Search className={`w-5 h-5 shrink-0 mr-3 ${
-            isLight ? "text-[#667085]" : "text-[#A8ABCC]"
-          }`} />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type a command or jump to page..."
-            className={`w-full bg-transparent text-sm outline-none font-medium ${
-              isLight
-                ? "text-[#111827] placeholder-[#98A2B3]"
-                : "text-white placeholder-[#A8ABCC]/60"
-            }`}
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              className={`p-1 rounded-md mr-1 ${
-                isLight ? "text-[#667085] hover:text-[#111827]" : "text-[#A8ABCC] hover:text-white"
-              }`}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-            isLight
-              ? "bg-[#F3F4F6] text-[#667085] border-[#E5E7EB]"
-              : "bg-[#1E2175] text-[#A8ABCC] border-[#2A2D73]"
-          }`}>
-            ESC
-          </span>
-        </div>
-
-        {/* Results List */}
-        <div className="max-h-80 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-          {filteredCommands.length === 0 ? (
-            <div className={`py-8 text-center text-xs font-medium ${
-              isLight ? "text-[#667085]" : "text-[#A8ABCC]"
-            }`}>
-              No matching pages or actions found for "{query}".
-            </div>
-          ) : (
-            filteredCommands.map((item, index) => {
-              const isSelected = index === selectedIndex;
-              const Icon = item.icon;
-
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => executeCommand(item)}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs transition-colors cursor-pointer ${
-                    isSelected
-                      ? isLight
-                        ? "bg-[#111827] text-white font-semibold shadow-xs"
-                        : "bg-[#6C63FF] text-white font-semibold shadow-md shadow-[#6C63FF]/20"
-                      : isLight
-                        ? "text-[#374151] hover:bg-[#F3F4F6] hover:text-[#111827]"
-                        : "text-[#A8ABCC] hover:bg-[#1E2175] hover:text-white"
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                        isSelected
-                          ? "bg-white/20 text-white"
-                          : isLight
-                            ? "bg-[#F3F4F6] text-[#374151]"
-                            : "bg-[#1E2175] text-[#A8ABCC]"
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <span className="truncate">{item.title}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0 ml-2">
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider font-bold ${
-                        isSelected
-                          ? "bg-white/20 text-white"
-                          : isLight
-                            ? "bg-[#F3F4F6] text-[#667085] border border-[#E5E7EB]"
-                            : "bg-[#1E2175] text-[#A8ABCC] border-[#2A2D73]"
-                      }`}
-                    >
-                      {item.category}
-                    </span>
-                    <ArrowRight className={`w-3.5 h-3.5 ${
-                      isSelected
-                        ? "text-white"
-                        : isLight
-                          ? "text-[#667085]"
-                          : "text-[#A8ABCC]/70"
-                    }`} />
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-
-        {/* Footer Shortcut Helper */}
-        <div className={`px-4 py-2.5 border-t flex items-center justify-between text-[11px] ${
-          isLight
-            ? "bg-[#F9FAFB] border-[#E5E7EB] text-[#667085]"
-            : "bg-[#0D1048] border-[#2A2D73] text-[#A8ABCC]"
-        }`}>
-          <div className="flex items-center gap-3">
-            <span>
-              <kbd className={`px-1.5 py-0.5 rounded font-mono text-[10px] border ${
-                isLight
-                  ? "bg-white border-[#E5E7EB] text-[#111827]"
-                  : "bg-[#181A66] border-[#2A2D73] text-white"
-              }`}>↑</kbd>{" "}
-              <kbd className={`px-1.5 py-0.5 rounded font-mono text-[10px] border ${
-                isLight
-                  ? "bg-white border-[#E5E7EB] text-[#111827]"
-                  : "bg-[#181A66] border-[#2A2D73] text-white"
-              }`}>↓</kbd> to navigate
-            </span>
-            <span>
-              <kbd className={`px-1.5 py-0.5 rounded font-mono text-[10px] border ${
-                isLight
-                  ? "bg-white border-[#E5E7EB] text-[#111827]"
-                  : "bg-[#181A66] border-[#2A2D73] text-white"
-              }`}>↵</kbd> to select
-            </span>
-          </div>
-          <span className={`flex items-center gap-1 font-medium ${
-            isLight ? "text-[#111827]" : "text-white/80"
-          }`}>
-            <Command className={`w-3 h-3 ${isLight ? "text-[#111827]" : "text-[#6C63FF]"}`} /> Quick Switcher
-          </span>
-        </div>
-      </div>
+  return <div className="admin-command-overlay">
+    <div className="admin-command-backdrop" aria-hidden="true" onClick={onClose} />
+    <div className="admin-command" ref={dialogRef} role="dialog" aria-modal="true" aria-label="Search admin" tabIndex={-1} data-lenis-prevent>
+      <div className="admin-command__input"><Search size={19} /><input ref={inputRef} type="search" aria-label="Search pages and actions" role="combobox" aria-expanded="true" aria-controls="admin-command-results" aria-activedescendant={results[selected] ? `admin-command-${selected}` : undefined} placeholder="Search your workspace…" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => {
+        if (event.key === "ArrowDown") { event.preventDefault(); setSelected((value) => (value + 1) % Math.max(1, results.length)); }
+        if (event.key === "ArrowUp") { event.preventDefault(); setSelected((value) => (value - 1 + Math.max(1, results.length)) % Math.max(1, results.length)); }
+        if (event.key === "Enter" && results[selected]) { event.preventDefault(); execute(results[selected]); }
+      }} /><button type="button" aria-label="Close admin search" onClick={onClose}><X size={20} /></button></div>
+      <div id="admin-command-results" role="listbox" aria-label="Pages and actions" className="admin-command__results">{results.length ? results.map((item,index) => <button type="button" id={`admin-command-${index}`} role="option" aria-selected={selected === index} key={item.id} onMouseEnter={() => setSelected(index)} onClick={() => execute(item)}><item.icon size={17} /><span>{item.label}</span><small>{item.group}</small><ArrowUpRight size={14} /></button>) : <p role="status">No results. Try “orders”, “products” or “settings”.</p>}</div>
+      <div className="admin-command__footer"><span>↑ ↓ Navigate · Enter to open</span><button type="button" onClick={onClose}>Esc · Close</button></div>
     </div>
-  );
+  </div>;
 }

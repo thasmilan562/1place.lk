@@ -19,7 +19,7 @@ import {
   ExternalLink,
   RotateCcw,
   AlertTriangle,
-  Sparkles,
+  CircleCheck as Sparkles,
   Sliders,
   Maximize2,
 } from "lucide-react";

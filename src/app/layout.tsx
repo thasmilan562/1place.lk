@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Outfit, Manrope } from "next/font/google";
 import "./globals.css";
+import "./premium-storefront.css";
+import "./account.css";
+import "./admin-workspace.css";
 
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
@@ -15,7 +18,6 @@ import CampaignPopup from "@/components/ui/CampaignPopup";
 import SpinWinModal from "@/components/promotions/SpinWinModal";
 import SmoothScrollProvider from "@/components/providers/SmoothScrollProvider";
 import DisableNumberScroll from "@/components/providers/DisableNumberScroll";
-import AppLoadingScreen from "@/components/ui/AppLoadingScreen";
 import BrowseHistoryTracker from "@/components/navigation/BrowseHistoryTracker";
 import Script from "next/script";
 import { BUSINESS_INFO } from "@/lib/business-info";
@@ -215,7 +217,6 @@ export default function RootLayout({
           <CartProvider>
             <WishlistProvider>
               <ToastProvider>
-                <AppLoadingScreen />
                 <SmoothScrollProvider>
                   {/* Screen reader live region for accessibility */}
                   <div id="cart-live-announce" className="sr-only" aria-live="polite" aria-atomic="true" />

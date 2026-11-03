@@ -263,6 +263,72 @@ export const CATEGORY_ALIASES: Record<string, string> = {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
+// 3.5 CANONICAL CATEGORY RESOLVER & ALIAS MAP
+// ══════════════════════════════════════════════════════════════════════════════
+export interface CanonicalCategoryInfo {
+  canonicalSlug: string;
+  canonicalName: string;
+  canonicalId: string;
+}
+
+export const CANONICAL_CATEGORY_MAP: Record<string, CanonicalCategoryInfo> = {
+  // Toys & Games aliases (collapses duplicate toy/toys/toys-kids)
+  "toy": { canonicalSlug: "toys-kids", canonicalName: "Toys & Games", canonicalId: "toys-kids" },
+  "toys": { canonicalSlug: "toys-kids", canonicalName: "Toys & Games", canonicalId: "toys-kids" },
+  "toys-kids": { canonicalSlug: "toys-kids", canonicalName: "Toys & Games", canonicalId: "toys-kids" },
+  "toys-games": { canonicalSlug: "toys-kids", canonicalName: "Toys & Games", canonicalId: "toys-kids" },
+  "toys-and-games": { canonicalSlug: "toys-kids", canonicalName: "Toys & Games", canonicalId: "toys-kids" },
+  "cat-toy": { canonicalSlug: "toys-kids", canonicalName: "Toys & Games", canonicalId: "toys-kids" },
+  "cat-toys": { canonicalSlug: "toys-kids", canonicalName: "Toys & Games", canonicalId: "toys-kids" },
+
+  // Beauty & Skincare aliases (unifies beauty-skincare vs beauty-and-skincare)
+  "beauty": { canonicalSlug: "beauty-skincare", canonicalName: "Beauty & Skincare", canonicalId: "beauty-skincare" },
+  "skincare": { canonicalSlug: "beauty-skincare", canonicalName: "Beauty & Skincare", canonicalId: "beauty-skincare" },
+  "beauty-skincare": { canonicalSlug: "beauty-skincare", canonicalName: "Beauty & Skincare", canonicalId: "beauty-skincare" },
+  "beauty-and-skincare": { canonicalSlug: "beauty-skincare", canonicalName: "Beauty & Skincare", canonicalId: "beauty-skincare" },
+  "cat-beauty-skincare": { canonicalSlug: "beauty-skincare", canonicalName: "Beauty & Skincare", canonicalId: "beauty-skincare" },
+
+  // Keyboards & Mouse aliases (NEVER laptops!)
+  "keyboard": { canonicalSlug: "keyboards-and-mouse", canonicalName: "Keyboards & Mouse", canonicalId: "keyboards-and-mouse" },
+  "keyboards": { canonicalSlug: "keyboards-and-mouse", canonicalName: "Keyboards & Mouse", canonicalId: "keyboards-and-mouse" },
+  "mouse": { canonicalSlug: "keyboards-and-mouse", canonicalName: "Keyboards & Mouse", canonicalId: "keyboards-and-mouse" },
+  "cat-keyboard": { canonicalSlug: "keyboards-and-mouse", canonicalName: "Keyboards & Mouse", canonicalId: "keyboards-and-mouse" },
+  "cat-mouse": { canonicalSlug: "keyboards-and-mouse", canonicalName: "Keyboards & Mouse", canonicalId: "keyboards-and-mouse" },
+  "keyboards-and-mouse": { canonicalSlug: "keyboards-and-mouse", canonicalName: "Keyboards & Mouse", canonicalId: "keyboards-and-mouse" },
+
+  // Batteries & Power Banks (NEVER general mobile-accessories!)
+  "battery": { canonicalSlug: "power-banks", canonicalName: "Power Banks", canonicalId: "power-banks" },
+  "batteries": { canonicalSlug: "power-banks", canonicalName: "Power Banks", canonicalId: "power-banks" },
+  "power-bank": { canonicalSlug: "power-banks", canonicalName: "Power Banks", canonicalId: "power-banks" },
+  "power-banks": { canonicalSlug: "power-banks", canonicalName: "Power Banks", canonicalId: "power-banks" },
+  "powerbank": { canonicalSlug: "power-banks", canonicalName: "Power Banks", canonicalId: "power-banks" },
+  "powerbanks": { canonicalSlug: "power-banks", canonicalName: "Power Banks", canonicalId: "power-banks" },
+  "cat-battery": { canonicalSlug: "power-banks", canonicalName: "Power Banks", canonicalId: "power-banks" },
+  "cat-powerbanks": { canonicalSlug: "power-banks", canonicalName: "Power Banks", canonicalId: "power-banks" },
+
+  // Computers & Laptops
+  "laptop": { canonicalSlug: "laptops", canonicalName: "Laptops & MacBooks", canonicalId: "laptops-computer" },
+  "laptops": { canonicalSlug: "laptops", canonicalName: "Laptops & MacBooks", canonicalId: "laptops-computer" },
+  "laptops-computer": { canonicalSlug: "laptops", canonicalName: "Laptops & MacBooks", canonicalId: "laptops-computer" },
+  "cat-laptops": { canonicalSlug: "laptops", canonicalName: "Laptops & MacBooks", canonicalId: "laptops-computer" },
+
+  // Mobiles & Tablets
+  "mobiles-tablets": { canonicalSlug: "mobiles-tablets", canonicalName: "Mobiles & Tablets", canonicalId: "mobiles-tablets" },
+  "smartphones": { canonicalSlug: "smartphones", canonicalName: "Smartphones", canonicalId: "cat-smartphones" },
+  "cat-smartphones": { canonicalSlug: "smartphones", canonicalName: "Smartphones", canonicalId: "cat-smartphones" },
+  "tablets": { canonicalSlug: "tablets", canonicalName: "Tablets & iPads", canonicalId: "cat-tablets" },
+  "cat-tablets": { canonicalSlug: "tablets", canonicalName: "Tablets & iPads", canonicalId: "cat-tablets" },
+};
+
+export function resolveCanonicalCategory(input?: string | null): CanonicalCategoryInfo | null {
+  if (!input) return null;
+  const raw = input.toLowerCase().trim();
+  const stripped = raw.replace(/^cat-/, "");
+  return CANONICAL_CATEGORY_MAP[raw] || CANONICAL_CATEGORY_MAP[stripped] || null;
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
 // 4. CLEANING & IDENTIFICATION HELPERS
 // ══════════════════════════════════════════════════════════════════════════════
 

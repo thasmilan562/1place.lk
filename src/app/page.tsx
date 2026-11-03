@@ -1,14 +1,11 @@
-import HeroSection from "@/components/home/hero-section";
+import HeroSection from "@/components/home/premium-hero";
 import CircularCategories from "@/components/home/circular-categories";
-import FeaturedProducts from "@/components/home/featured-products";
-import StoreBenefitsBar from "@/components/home/store-benefits-bar";
-import AnnouncementTicker from "@/components/home/announcement-ticker";
+import HomeOfferBanners from "@/components/home/HomeOfferBanners";
 import NewArrivalsSection from "@/components/home/new-arrivals-section";
 import GallerySection from "@/components/home/gallery-section";
 import CampaignPlacement from "@/components/ui/CampaignPlacement";
 import HomeScrollReset from "@/components/home/HomeScrollReset";
 import ShopAllProductsSection from "@/components/home/shop-all-products-section";
-import CategoryWiseSections from "@/components/home/category-wise-sections";
 
 import VisualProductShowcase from "@/components/home/visual-product-showcase";
 import {
@@ -93,12 +90,10 @@ export default async function HomePage() {
       <VisualProductShowcase settings={showcaseSettings} placement="below_hero" />
 
       {/* 2. Circular Category Navigation Strip */}
-      <CircularCategories categories={categories} />
+      <CircularCategories categories={categories} products={products} />
+      <HomeOfferBanners products={products} fallbackEndsAt={todayDealSettings?.endsAt || ""} />
 
-      {/* 3. Featured Products (Matching UI References: 4 cards desktop / 2 cards mobile) */}
-      <FeaturedProducts initialProducts={products} />
-
-      {/* Visual Showcase: Below Shop by Category */}
+      {/* Visual Showcase: Below Categories */}
       <VisualProductShowcase settings={showcaseSettings} placement="below_category" />
 
       {/* 3. Complete Shop All Products Catalogue (Visual Showcase Banners interleaved at specified Product Lines) */}
@@ -109,11 +104,8 @@ export default async function HomePage() {
         showcaseSettings={showcaseSettings}
       />
 
-      {/* 4. Category-Wise Sections (Auto-hides empty categories, 6-col responsive) */}
-      <CategoryWiseSections initialProducts={products} categories={categories} />
-
       {/* 5. New Arrivals Collection (If Enabled) */}
-      {newArrivalsSettings?.enabled === true && (
+      {newArrivalsSettings?.enabled === true && products.length > 8 && (
         <>
           <NewArrivalsSection initialProducts={products} initialSettings={newArrivalsSettings} />
           <VisualProductShowcase settings={showcaseSettings} placement="below_new_arrivals" />
@@ -137,14 +129,13 @@ export default async function HomePage() {
       {/* Campaign Placement */}
       <CampaignPlacement placement="homepage_after_categories" />
 
-      {/* 6. Customer Trust & Shopping Benefits Bar */}
-      <StoreBenefitsBar />
+      {/* Compact, admin-managed banner replacing the shopping benefits strip */}
+      <VisualProductShowcase settings={showcaseSettings} placement="benefits_banner_slot" className="home-benefits-ad-slot" />
 
       {/* Visual Showcase: Above Location / Footer */}
       <VisualProductShowcase settings={showcaseSettings} placement="above_location" />
 
       {/* 7. Scrolling Announcement Bar (Sits directly above Footer) */}
-      <AnnouncementTicker />
     </>
   );
 }

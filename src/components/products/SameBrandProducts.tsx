@@ -33,7 +33,7 @@ export default function SameBrandProducts({
             More Products from {brandName}
           </h2>
           <p className="text-xs text-gray-500 mt-1 font-medium">
-            Explore authentic {brandName} smartphones, devices and official Sri Lankan warranty accessories.
+            Discover more from the {brandName} collection.
           </p>
         </div>
 

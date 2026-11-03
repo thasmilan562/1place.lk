@@ -14,7 +14,7 @@ import {
   Copy,
   ArrowUp,
   ArrowDown,
-  Sparkles,
+  CircleCheck as Sparkles,
   RotateCcw,
   AlertTriangle,
   Layers,
