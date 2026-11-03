@@ -1882,8 +1882,8 @@ export default function ProductModal({
                 </details>
 
                 {/* Old / Regular Price */}
-                <div data-product-extra>
-                  <label className="block font-bold text-gray-700 mb-1">Compare-at price (LKR) · optional</label>
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Old price (LKR) · optional</label>
                   <input
                     type="number"
                     min={0}
@@ -1899,7 +1899,7 @@ export default function ProductModal({
                       setHasUnsavedChanges(true);
                     }}
                     placeholder="e.g. 185000"
-                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-500 line-through outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-700 outline-none focus:border-blue-500"
                   />
                 </div>
 
