@@ -14,6 +14,7 @@ import {
   AlertCircle,
   ArrowRight,
   ShieldCheck,
+  Smartphone,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useCart } from "@/lib/cart-context";
@@ -21,7 +22,7 @@ import { getPendingPurchaseIntent, executePendingPurchaseIntent } from "@/lib/au
 import { motion, AnimatePresence } from "framer-motion";
 import { auth } from "@/lib/firebase";
 import { getAuthSettings } from "@/lib/firestore-client";
-import { sendPasswordResetEmail } from "firebase/auth";
+import { sendPasswordResetEmail, type ConfirmationResult } from "firebase/auth";
 import { useDialogFocus } from "@/lib/use-dialog-focus";
 
 interface AuthModalProps {
@@ -34,7 +35,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "signin" }: Au
   const dialogRef = useDialogFocus(isOpen, onClose);
   const router = useRouter();
   const { addToCart } = useCart();
-  const { signIn, signUp, signInWithGoogle, signInWithApple } = useAuth();
+  const { signIn, signUp, signInWithGoogle, signInWithApple, sendPhoneSignInCode, signInWithPhonePassword, signUpWithPhone, resetPhonePassword } = useAuth();
 
   const [tab, setTab] = useState<"signin" | "signup">("signin");
   useEffect(() => { if (isOpen) setTab(initialTab); }, [isOpen, initialTab]);
@@ -47,6 +48,10 @@ export default function AuthModal({ isOpen, onClose, initialTab = "signin" }: Au
   const [rememberMe, setRememberMe] = useState(true);
   const [googleAuthEnabled, setGoogleAuthEnabled] = useState<boolean>(true);
   const [appleAuthEnabled, setAppleAuthEnabled] = useState<boolean>(true);
+  const [otp, setOtp] = useState("");
+  const [phoneConfirmation, setPhoneConfirmation] = useState<ConfirmationResult | null>(null);
+  const [phoneRecovery, setPhoneRecovery] = useState(false);
+  const signInMethod: "email" | "phone" = email.trim().includes("@") ? "email" : "phone";
 
   // Load cached Auth Settings
   useEffect(() => {
@@ -90,6 +95,9 @@ export default function AuthModal({ isOpen, onClose, initialTab = "signin" }: Au
     setEmail("");
     setPassword("");
     setConfirm("");
+    setOtp("");
+    setPhoneConfirmation(null);
+    setPhoneRecovery(false);
     setError("");
     setSuccess("");
     setShowPassword(false);
@@ -120,33 +128,90 @@ export default function AuthModal({ isOpen, onClose, initialTab = "signin" }: Au
       if (password !== confirm) return setError("Passwords do not match.");
       if (password.length < 6) return setError("Password must be at least 6 characters.");
     }
+    const normalizedPhone = normalizeSriLankanPhone(email);
+    if (signInMethod === "phone" && !normalizedPhone) return setError("Enter a valid Sri Lankan mobile number, such as 077 123 4567.");
+    if (tab === "signup" && signInMethod === "phone" && !phoneConfirmation) return setError("Verify your mobile number before creating your account.");
+    if (phoneRecovery && (!phoneConfirmation || !/^\d{6}$/.test(otp.trim()))) return setError("Enter the 6-digit code sent to your mobile number.");
+    if (phoneRecovery && password.length < 6) return setError("New password must be at least 6 characters.");
 
     setLoading(true);
     try {
       if (tab === "signin") {
-        await signIn(email, password);
+        if (signInMethod === "phone") {
+          if (phoneRecovery) {
+            await resetPhonePassword(normalizedPhone, phoneConfirmation!, otp.trim(), password);
+          } else {
+            await signInWithPhonePassword(normalizedPhone, password);
+          }
+        } else {
+          await signIn(email, password);
+        }
         setSuccess("Signed in successfully. Welcome back!");
         setTimeout(() => handlePostAuth(), 400);
       } else {
-        await signUp(name, email, password, "male");
+        if (signInMethod === "phone") {
+          await signUpWithPhone(name, normalizedPhone, password, phoneConfirmation!, otp.trim());
+        } else {
+          await signUp(name, email, password);
+        }
         setSuccess("Account created successfully!");
         setTimeout(() => handlePostAuth(), 400);
       }
     } catch (err: any) {
       const code = err?.code || "";
-      if (
+      if (code === "auth/invalid-verification-code") {
+        setError("That verification code is incorrect. Check the SMS and try again.");
+      } else if (code === "auth/code-expired") {
+        setError("That code has expired. Request a new verification code.");
+        setPhoneConfirmation(null);
+      } else if (code === "auth/too-many-requests") {
+        setError("Too many attempts. Wait a little and try again.");
+      } else if (code === "auth/operation-not-allowed") {
+        setError("Mobile sign-in is not enabled in Firebase yet.");
+      } else if (
         code === "auth/user-not-found" ||
         code === "auth/wrong-password" ||
         code === "auth/invalid-credential"
       ) {
-        setError("Invalid email or password. Please try again.");
-      } else if (code === "auth/email-already-in-use") {
-        setError("This email is already registered. Please sign in.");
+        setError(signInMethod === "phone" ? "Invalid mobile number or password. Please try again." : "Invalid email or password. Please try again.");
+      } else if (code === "auth/email-already-in-use" || code === "auth/provider-already-linked") {
+        setError(signInMethod === "phone" ? "This mobile number already has an account. Sign in or use Forgot Password." : "This email is already registered. Please sign in.");
       } else if (code === "auth/invalid-email") {
         setError("Please enter a valid email address.");
       } else {
         setError(err?.message || "Authentication failed. Please try again.");
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const normalizeSriLankanPhone = (value: string) => {
+    const compact = value.replace(/[\s()-]/g, "");
+    if (/^0\d{9}$/.test(compact)) return `+94${compact.slice(1)}`;
+    if (/^94\d{9}$/.test(compact)) return `+${compact}`;
+    if (/^\+94\d{9}$/.test(compact)) return compact;
+    return "";
+  };
+
+  const handleSendPhoneCode = async () => {
+    setError("");
+    setSuccess("");
+    const normalizedPhone = normalizeSriLankanPhone(email);
+    if (!normalizedPhone) {
+      setError("Enter a valid Sri Lankan mobile number, such as 077 123 4567.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const confirmation = await sendPhoneSignInCode(normalizedPhone, "modal-phone-sign-in-recaptcha");
+      setPhoneConfirmation(confirmation);
+      setEmail(normalizedPhone);
+      setSuccess(`Verification code sent to ${normalizedPhone}.`);
+    } catch (err: any) {
+      if (err?.code === "auth/operation-not-allowed") setError("Mobile sign-in is not enabled in Firebase yet.");
+      else if (err?.code === "auth/invalid-phone-number") setError("Enter a valid mobile number with country code.");
+      else setError(err?.message || "Could not send the verification code. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -199,6 +264,30 @@ export default function AuthModal({ isOpen, onClose, initialTab = "signin" }: Au
   };
 
   const handleForgotPassword = async () => {
+    if (signInMethod === "phone") {
+      const normalizedPhone = normalizeSriLankanPhone(email);
+      if (!normalizedPhone) {
+        setError("Enter your mobile number first to reset your password.");
+        return;
+      }
+      setError("");
+      setSuccess("");
+      setResetLoading(true);
+      try {
+        const confirmation = await sendPhoneSignInCode(normalizedPhone, "modal-phone-sign-in-recaptcha");
+        setEmail(normalizedPhone);
+        setPhoneConfirmation(confirmation);
+        setPhoneRecovery(true);
+        setPassword("");
+        setOtp("");
+        setSuccess("Verification code sent. Enter the code and choose a new password.");
+      } catch (err: any) {
+        setError(err?.message || "Could not send a verification code. Please try again.");
+      } finally {
+        setResetLoading(false);
+      }
+      return;
+    }
     if (!email.trim()) {
       setError("Please enter your email address first, then click Forgot.");
       return;
@@ -432,37 +521,53 @@ export default function AuthModal({ isOpen, onClose, initialTab = "signin" }: Au
                 </div>
               )}
 
-              {/* Email Address */}
+              {/* Email or mobile number */}
               <div className="space-y-1">
-                <label htmlFor="modal-email" className="block text-xs font-bold text-neutral-800">
-                  Email Address
-                </label>
+                <label htmlFor="modal-identifier" className="block text-xs font-bold text-neutral-800">Email or Mobile Number</label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                  <input
-                    type="email"
-                    id="modal-email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email address"
-                    required
-                    className="w-full h-11 pl-10 pr-4 bg-white border border-neutral-200 focus:border-[#64152F] rounded-xl text-sm font-medium text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-[#64152F]/10 transition-all"
-                  />
+                  {signInMethod === "email" ? <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" /> : <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />}
+                  <input type="text" id="modal-identifier" autoComplete={signInMethod === "email" ? "username" : "tel"} inputMode={signInMethod === "email" ? "email" : "tel"} value={email} onChange={(e) => { setEmail(e.target.value); setPhoneConfirmation(null); setOtp(""); setPhoneRecovery(false); }} placeholder="name@example.com or 077 123 4567" required className="w-full h-11 pl-10 pr-4 bg-white border border-neutral-200 focus:border-[#64152F] rounded-xl text-sm font-medium text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-[#64152F]/10 transition-all" />
                 </div>
               </div>
+
+              {signInMethod === "phone" && <div id="modal-phone-sign-in-recaptcha" />}
+              {signInMethod === "phone" && (tab === "signup" || phoneRecovery) && (
+                <div className="space-y-3">
+                  {phoneConfirmation && (tab === "signup" || phoneRecovery) && (
+                    <>
+                      <div className="space-y-1">
+                        <label htmlFor="modal-phone-otp" className="block text-xs font-bold text-neutral-800">Verification Code</label>
+                        <input
+                          type="text"
+                          id="modal-phone-otp"
+                          autoComplete="one-time-code"
+                          inputMode="numeric"
+                          maxLength={6}
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                          placeholder="Enter 6-digit code"
+                          required
+                          className="w-full h-11 px-4 bg-white border border-neutral-200 focus:border-[#64152F] rounded-xl text-sm font-medium tracking-[0.2em] text-neutral-900 placeholder:text-neutral-400 placeholder:tracking-normal outline-none focus:ring-2 focus:ring-[#64152F]/10 transition-all"
+                        />
+                      </div>
+                      {tab === "signup" && <button type="button" onClick={() => { setPhoneConfirmation(null); setOtp(""); setSuccess(""); }} className="text-xs font-semibold text-[#64152F] hover:underline">Change number / resend code</button>}
+                    </>
+                  )}
+                  {!phoneConfirmation && <button type="button" onClick={phoneRecovery ? handleForgotPassword : handleSendPhoneCode} disabled={loading || resetLoading} className="w-full h-10 rounded-xl border border-neutral-200 bg-white text-neutral-800 text-xs font-bold hover:border-neutral-400 disabled:opacity-60">{loading || resetLoading ? "Sending code…" : phoneRecovery ? "Resend verification code" : "Verify mobile number"}</button>}
+                </div>
+              )}
 
               {/* Password */}
               <div className="space-y-1">
                 <label htmlFor="modal-password" className="block text-xs font-bold text-neutral-800">
-                  Password
+                  {phoneRecovery ? "New Password" : "Password"}
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                   <input
                     type={showPassword ? "text" : "password"}
                     id="modal-password"
-                    autoComplete={tab === "signup" ? "new-password" : "current-password"}
+                    autoComplete={tab === "signup" || phoneRecovery ? "new-password" : "current-password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
@@ -511,7 +616,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "signin" }: Au
               )}
 
               {/* Options: Remember me & Forgot Password */}
-              <div className="flex items-center justify-between pt-1">
+              {(tab === "signin" || (tab === "signup" && signInMethod === "email")) && <div className="flex items-center justify-between pt-1">
                 <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-neutral-700 font-semibold">
                   <input
                     type="checkbox"
@@ -522,7 +627,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "signin" }: Au
                   <span>Remember me</span>
                 </label>
 
-                {tab === "signin" && (
+                {tab === "signin" && !phoneRecovery && (
                   <button
                     type="button"
                     onClick={handleForgotPassword}
@@ -532,13 +637,13 @@ export default function AuthModal({ isOpen, onClose, initialTab = "signin" }: Au
                     {resetLoading ? "Sending..." : "Forgot Password?"}
                   </button>
                 )}
-              </div>
+              </div>}
 
               {/* Primary Action Button */}
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || (tab === "signup" && signInMethod === "phone" && !phoneConfirmation) || (phoneRecovery && !phoneConfirmation)}
                   className="w-full h-12 rounded-xl bg-[#64152F] hover:bg-[#4E0F23] text-white font-bold text-sm shadow-md shadow-[#64152F]/20 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {loading ? (
@@ -548,7 +653,7 @@ export default function AuthModal({ isOpen, onClose, initialTab = "signin" }: Au
                     </>
                   ) : (
                     <>
-                      <span>{tab === "signin" ? "Sign In" : "Create Account"}</span>
+                      <span>{phoneRecovery ? "Reset Password" : tab === "signin" ? "Sign In" : "Create Account"}</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

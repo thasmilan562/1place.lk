@@ -8,10 +8,16 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile,
+  EmailAuthProvider,
+  linkWithCredential,
+  updatePassword,
   sendPasswordResetEmail,
   GoogleAuthProvider,
   OAuthProvider,
   signInWithPopup,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  type ConfirmationResult,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, onSnapshot, getDoc } from "firebase/firestore";
@@ -23,6 +29,11 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  sendPhoneSignInCode: (phoneNumber: string, containerId: string) => Promise<ConfirmationResult>;
+  confirmPhoneSignInCode: (confirmation: ConfirmationResult, code: string) => Promise<void>;
+  signInWithPhonePassword: (phoneNumber: string, password: string) => Promise<void>;
+  signUpWithPhone: (name: string, phoneNumber: string, password: string, confirmation: ConfirmationResult, code: string) => Promise<void>;
+  resetPhonePassword: (phoneNumber: string, confirmation: ConfirmationResult, code: string, newPassword: string) => Promise<void>;
   signUp: (name: string, email: string, password: string, phone?: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
@@ -39,6 +50,12 @@ const STORAGE_KEYS = {
   USER_LOGGED_IN: "oneplace_logged_in",
   SAVED_PHONE: "oneplace_user_phone",
 };
+
+let phoneRecaptchaVerifier: RecaptchaVerifier | null = null;
+
+function getPhoneLoginAlias(phoneNumber: string) {
+  return `${phoneNumber.replace(/\D/g, "")}@mobile.1place.lk`;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -111,6 +128,86 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email.trim(), password);
+    sessionStorage.setItem(STORAGE_KEYS.USER_LOGGED_IN, "true");
+  }, []);
+
+  const sendPhoneSignInCode = useCallback(async (phoneNumber: string, containerId: string) => {
+    phoneRecaptchaVerifier?.clear();
+    const verifier = new RecaptchaVerifier(auth, containerId, { size: "invisible" });
+    phoneRecaptchaVerifier = verifier;
+    try {
+      return await signInWithPhoneNumber(auth, phoneNumber, verifier);
+    } catch (error) {
+      verifier.clear();
+      phoneRecaptchaVerifier = null;
+      throw error;
+    }
+  }, []);
+
+  const confirmPhoneSignInCode = useCallback(async (confirmation: ConfirmationResult, code: string) => {
+    const credential = await confirmation.confirm(code.trim());
+    phoneRecaptchaVerifier?.clear();
+    phoneRecaptchaVerifier = null;
+    const phone = credential.user.phoneNumber || "";
+    sessionStorage.setItem(STORAGE_KEYS.USER_LOGGED_IN, "true");
+
+    try {
+      await setDoc(doc(db, "users", credential.user.uid), {
+        uid: credential.user.uid,
+        displayName: credential.user.displayName || "Valued Customer",
+        email: credential.user.email || "",
+        phone,
+        role: "customer",
+        lastLoginAt: new Date().toISOString(),
+      }, { merge: true });
+    } catch (dbErr) {
+      console.warn("Could not sync phone user profile:", dbErr);
+    }
+  }, []);
+
+  const signInWithPhonePassword = useCallback(async (phoneNumber: string, password: string) => {
+    const alias = getPhoneLoginAlias(phoneNumber);
+    await signInWithEmailAndPassword(auth, alias, password);
+    sessionStorage.setItem(STORAGE_KEYS.USER_LOGGED_IN, "true");
+  }, []);
+
+  const signUpWithPhone = useCallback(async (name: string, phoneNumber: string, password: string, confirmation: ConfirmationResult, code: string) => {
+    const phoneCredential = await confirmation.confirm(code.trim());
+    phoneRecaptchaVerifier?.clear();
+    phoneRecaptchaVerifier = null;
+    const alias = getPhoneLoginAlias(phoneNumber);
+    const linked = await linkWithCredential(phoneCredential.user, EmailAuthProvider.credential(alias, password));
+    await updateProfile(linked.user, { displayName: name.trim() });
+    sessionStorage.setItem(STORAGE_KEYS.USER_LOGGED_IN, "true");
+    localStorage.setItem(STORAGE_KEYS.SAVED_PHONE, phoneNumber);
+    await setDoc(doc(db, "users", linked.user.uid), {
+      uid: linked.user.uid,
+      displayName: name.trim(),
+      email: "",
+      phone: phoneNumber,
+      phoneLoginAlias: alias,
+      role: "customer",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  }, []);
+
+  const resetPhonePassword = useCallback(async (phoneNumber: string, confirmation: ConfirmationResult, code: string, newPassword: string) => {
+    const verified = await confirmation.confirm(code.trim());
+    phoneRecaptchaVerifier?.clear();
+    phoneRecaptchaVerifier = null;
+    const verifiedPhone = verified.user.phoneNumber || "";
+    if (verifiedPhone !== phoneNumber) {
+      await firebaseSignOut(auth);
+      throw new Error("The verified number does not match. Please request a new code.");
+    }
+    const hasPasswordProvider = verified.user.providerData.some((provider) => provider.providerId === "password");
+    if (hasPasswordProvider) {
+      await updatePassword(verified.user, newPassword);
+    } else {
+      const alias = getPhoneLoginAlias(phoneNumber);
+      await linkWithCredential(verified.user, EmailAuthProvider.credential(alias, newPassword));
+    }
     sessionStorage.setItem(STORAGE_KEYS.USER_LOGGED_IN, "true");
   }, []);
 
@@ -244,6 +341,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin,
         loading,
         signIn,
+        sendPhoneSignInCode,
+        confirmPhoneSignInCode,
+        signInWithPhonePassword,
+        signUpWithPhone,
+        resetPhonePassword,
         signUp,
         signInWithGoogle,
         signInWithApple,
@@ -265,6 +367,11 @@ const fallbackAuthContext: AuthContextType = {
   isAdmin: false,
   loading: false,
   signIn: async () => {},
+  sendPhoneSignInCode: async () => { throw new Error("Phone sign-in is unavailable."); },
+  confirmPhoneSignInCode: async () => { throw new Error("Phone sign-in is unavailable."); },
+  signInWithPhonePassword: async () => { throw new Error("Phone sign-in is unavailable."); },
+  signUpWithPhone: async () => { throw new Error("Phone sign-up is unavailable."); },
+  resetPhonePassword: async () => { throw new Error("Phone password reset is unavailable."); },
   signUp: async () => {},
   signInWithGoogle: async () => {},
   signInWithApple: async () => {},

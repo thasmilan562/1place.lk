@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import {
   ArrowUp,
 } from "lucide-react";
-import { getFooterSettings } from "@/lib/firestore-client";
 import { DEFAULT_FOOTER_SETTINGS } from "@/lib/data";
 import { FooterSettings } from "@/lib/types";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -58,11 +57,6 @@ function MinimalFooter() {
     { label: "Categories", href: "/#categories-strip" },
     { label: "New arrivals", href: "/products?sort=newest" },
   ];
-  const helpLinks = [
-    { label: "Contact us", href: "/contact" },
-    { label: "Track an order", href: "/orders" },
-    { label: "Returns & warranty", href: "/return-policy" },
-  ];
   const policies = settings.policy_links || DEFAULT_FOOTER_SETTINGS.policy_links;
   const socials = [
     { name: "Instagram", href: settings.instagram_url, enabled: settings.instagram_enabled, Icon: InstagramIcon },
@@ -83,7 +77,6 @@ function MinimalFooter() {
             </div>
           </div>
           <nav aria-label="Explore the store"><h2>Explore</h2>{shopLinks.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}</nav>
-          <nav aria-label="Customer help"><h2>Here to help</h2>{helpLinks.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}</nav>
         </div>
         <div className="store-footer__bottom">
           <p>{settings.copyright_text || `© ${new Date().getFullYear()} 1place.lk. All rights reserved.`}</p>

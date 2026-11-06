@@ -1,5 +1,4 @@
-import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { getAdminDb } from "@/lib/firebase-admin";
 import { Product } from "@/lib/types";
 
 export interface OrderItemStockRef {
@@ -17,15 +16,16 @@ export interface OrderItemStockRef {
  */
 export async function deductProductStock(items: OrderItemStockRef[]): Promise<void> {
   if (!items || !Array.isArray(items) || items.length === 0) return;
+  const db = getAdminDb();
 
   for (const item of items) {
     if (!item.productId || !item.quantity || item.quantity <= 0) continue;
 
     try {
-      const prodRef = doc(db, "products", item.productId);
-      const snap = await getDoc(prodRef);
+      const prodRef = db.collection("products").doc(item.productId);
+      const snap = await prodRef.get();
 
-      if (!snap.exists()) {
+      if (!snap.exists) {
         console.warn(`[Stock Deduction] Product doc ${item.productId} not found in Firestore. Skipping.`);
         continue;
       }
@@ -73,7 +73,7 @@ export async function deductProductStock(items: OrderItemStockRef[]): Promise<vo
         updatePayload.variant_combos = updatedVariantCombos;
       }
 
-      await setDoc(prodRef, updatePayload, { merge: true });
+      await prodRef.set(updatePayload, { merge: true });
       console.log(`[Stock Deduction] Successfully deducted ${item.quantity} units for product ${item.productId}. New stock: ${newQty}`);
     } catch (err) {
       console.error(`[Stock Deduction] Error deducting stock for product ${item.productId}:`, err);

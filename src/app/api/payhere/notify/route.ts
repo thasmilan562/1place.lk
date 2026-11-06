@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { getAdminDb } from "@/lib/firebase-admin";
 import { deductProductStock } from "@/lib/stock-deduction";
 import { updateLocalOrder } from "@/lib/orders-store";
+
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
@@ -24,14 +25,20 @@ export async function POST(req: Request) {
     // Read merchant secret strictly on the server
     const merchantSecret = (process.env.PAYHERE_MERCHANT_SECRET || "").trim();
 
-    if (!merchantSecret) {
+    const configuredMerchantId = (process.env.PAYHERE_MERCHANT_ID || "").trim();
+    if (!merchantSecret || !configuredMerchantId) {
       console.error("[PayHere Webhook] Server error: PAYHERE_MERCHANT_SECRET is not configured.");
-      return NextResponse.json({ error: "Gateway secret missing on server." }, { status: 500 });
+      return NextResponse.json({ error: "PayHere merchant credentials are not configured." }, { status: 500 });
     }
 
-    if (!order_id || !payment_id || !payhere_amount || !status_code || !md5sig) {
+    if (!order_id || !payment_id || !payhere_amount || !status_code || !/^[A-F0-9]{32}$/.test(md5sig)) {
       console.warn("[PayHere Webhook] Missing required parameters from PayHere.");
       return NextResponse.json({ error: "Missing required notification parameters." }, { status: 400 });
+    }
+
+    if (merchant_id !== configuredMerchantId) {
+      console.error(`[PayHere Webhook] Merchant ID mismatch for Order ${order_id}.`);
+      return NextResponse.json({ error: "Invalid merchant." }, { status: 400 });
     }
 
     // Official PayHere Webhook MD5 Signature Verification:
@@ -43,25 +50,30 @@ export async function POST(req: Request) {
       .digest("hex")
       .toUpperCase();
 
-    if (localMd5sig !== md5sig) {
+    const expectedSignature = Buffer.from(localMd5sig, "hex");
+    const receivedSignature = Buffer.from(md5sig, "hex");
+    if (expectedSignature.length !== receivedSignature.length || !crypto.timingSafeEqual(expectedSignature, receivedSignature)) {
       console.error(`[PayHere Webhook] Security Alert: Invalid MD5 signature mismatch for Order ${order_id}!`);
       return NextResponse.json({ error: "Invalid signature verification failed." }, { status: 400 });
     }
 
     // Locate the order in Firestore
-    const orderRef = doc(db, "orders", order_id);
-    const orderSnap = await getDoc(orderRef);
+    const orderRef = getAdminDb().collection("orders").doc(order_id);
+    const orderSnap = await orderRef.get();
 
-    if (!orderSnap.exists()) {
+    if (!orderSnap.exists) {
       console.warn(`[PayHere Webhook] Order document not found in Firestore: ${order_id}`);
-      return NextResponse.json({ status: "order_not_found" }, { status: 200 });
+      return NextResponse.json({ error: "Order not found; retry notification." }, { status: 503 });
     }
 
     const orderData = orderSnap.data();
+    if (!orderData) {
+      return NextResponse.json({ error: "Order data unavailable; retry notification." }, { status: 503 });
+    }
     const nowIso = new Date().toISOString();
 
     // Prevent duplicate webhook processing (Idempotency check)
-    if (orderData.paymentStatus === "paid" && orderData.payherePaymentId === payment_id) {
+    if (String(orderData.paymentStatus || "").toLowerCase() === "paid" && orderData.payherePaymentId === payment_id) {
       console.log(`[PayHere Webhook] Duplicate notification ignored for already PAID order: ${order_id}`);
       return NextResponse.json({ status: "already_processed" }, { status: 200 });
     }
@@ -111,7 +123,7 @@ export async function POST(req: Request) {
       console.error(
         `[PayHere Webhook] Security Alert: Amount mismatch for Order ${order_id}! Expected cents: ${expectedCents} (LKR ${rawExpectedAmount.toFixed(2)}), Received cents: ${receivedCents} (LKR ${rawReceivedAmount.toFixed(2)})`
       );
-      await updateDoc(orderRef, {
+      await orderRef.update({
         paymentStatus: "amount_mismatch",
         payhereStatusCode: status_code,
         payhereStatusMessage: `Amount mismatch: expected ${rawExpectedAmount.toFixed(2)}, received ${rawReceivedAmount.toFixed(2)}`,
@@ -149,7 +161,17 @@ export async function POST(req: Request) {
           updatedAt: nowIso,
         };
 
-        await updateDoc(orderRef, updateFields);
+        const applied = await orderRef.firestore.runTransaction(async (transaction) => {
+          const latestSnap = await transaction.get(orderRef);
+          if (!latestSnap.exists) return false;
+          const latest = latestSnap.data()!;
+          if (String(latest.paymentStatus || "").toLowerCase() === "paid") return false;
+          transaction.update(orderRef, updateFields);
+          return true;
+        });
+        if (!applied) {
+          return NextResponse.json({ status: "already_processed" }, { status: 200 });
+        }
         updateLocalOrder(order_id, updateFields);
 
         // Deduct stock for ordered items upon successful webhook verification
@@ -174,7 +196,7 @@ export async function POST(req: Request) {
           payhereVerified: false,
           updatedAt: nowIso,
         };
-        await updateDoc(orderRef, updateFields);
+        await orderRef.update(updateFields);
         updateLocalOrder(order_id, updateFields);
         console.log(`[PayHere Webhook] PENDING: Order ${order_id} marked as pending.`);
         break;
@@ -190,7 +212,7 @@ export async function POST(req: Request) {
           payhereVerified: false,
           updatedAt: nowIso,
         };
-        await updateDoc(orderRef, updateFields);
+        await orderRef.update(updateFields);
         updateLocalOrder(order_id, updateFields);
         console.log(`[PayHere Webhook] CANCELLED: Order ${order_id} marked as cancelled.`);
         break;
@@ -206,7 +228,7 @@ export async function POST(req: Request) {
           payhereVerified: false,
           updatedAt: nowIso,
         };
-        await updateDoc(orderRef, updateFields);
+        await orderRef.update(updateFields);
         updateLocalOrder(order_id, updateFields);
         console.warn(`[PayHere Webhook] FAILED: Order ${order_id} payment failed.`);
         break;
@@ -222,7 +244,7 @@ export async function POST(req: Request) {
           payhereVerified: false,
           updatedAt: nowIso,
         };
-        await updateDoc(orderRef, updateFields);
+        await orderRef.update(updateFields);
         updateLocalOrder(order_id, updateFields);
         console.warn(`[PayHere Webhook] CHARGED BACK: Order ${order_id}`);
         break;
@@ -235,7 +257,7 @@ export async function POST(req: Request) {
           payhereStatusMessage: status_message || `Status: ${status_code}`,
           updatedAt: nowIso,
         };
-        await updateDoc(orderRef, updateFields);
+        await orderRef.update(updateFields);
         updateLocalOrder(order_id, updateFields);
         break;
       }

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { getAdminDb } from "@/lib/firebase-admin";
+
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { orderId, amount, currency = "LKR" } = body;
+    const { orderId, currency = "LKR" } = body;
 
     // Strict validation
     if (!orderId || typeof orderId !== "string" || orderId.trim() === "") {
@@ -15,21 +16,20 @@ export async function POST(req: Request) {
 
     const cleanOrderId = orderId.trim();
 
-    // Verify order against Firestore database to prevent client manipulation of amount
-    let verifiedAmount = Number(amount);
-    try {
-      const orderSnap = await getDoc(doc(db, "orders", cleanOrderId));
-      if (orderSnap.exists()) {
-        const orderData = orderSnap.data();
-        const storedTotal = orderData.finalTotal ?? orderData.totalPrice;
-        const dbTotal = Number(storedTotal);
-        if (!isNaN(dbTotal) && Number.isFinite(dbTotal) && dbTotal > 0) {
-          verifiedAmount = dbTotal;
-        }
-      }
-    } catch (dbErr) {
-      console.warn("[PayHere Hash] Order verification note:", dbErr);
+    // Only sign an existing, unpaid PayHere order using the server-stored total.
+    const orderSnap = await getAdminDb().collection("orders").doc(cleanOrderId).get();
+    if (!orderSnap.exists) {
+      return NextResponse.json({ error: "The order was not found." }, { status: 404 });
     }
+    const orderData = orderSnap.data()!;
+    if (!String(orderData.paymentMethod || "").toLowerCase().includes("payhere")) {
+      return NextResponse.json({ error: "This order is not configured for PayHere." }, { status: 400 });
+    }
+    if (String(orderData.paymentStatus || "").toLowerCase() === "paid" || orderData.payhereVerified === true) {
+      return NextResponse.json({ error: "This order has already been paid." }, { status: 409 });
+    }
+    const storedTotal = orderData.finalTotal ?? orderData.totalPrice;
+    const verifiedAmount = Number(storedTotal);
 
     if (isNaN(verifiedAmount) || !Number.isFinite(verifiedAmount) || verifiedAmount <= 0) {
       return NextResponse.json({ error: "A valid positive amount is required." }, { status: 400 });
@@ -41,8 +41,11 @@ export async function POST(req: Request) {
     }
 
     // Read credentials securely strictly from server-side environment variables
-    const merchantId = (process.env.PAYHERE_MERCHANT_ID || "1211149").trim();
-    const merchantSecret = (process.env.PAYHERE_MERCHANT_SECRET || "4T_SANDBOX_SECRET_KEY_PLACEHOLDER").trim();
+    const merchantId = (process.env.PAYHERE_MERCHANT_ID || "").trim();
+    const merchantSecret = (process.env.PAYHERE_MERCHANT_SECRET || "").trim();
+    if (!merchantId || !merchantSecret || /placeholder|replace|your_/i.test(merchantSecret)) {
+      return NextResponse.json({ error: "PayHere merchant credentials are not configured." }, { status: 503 });
+    }
 
     // PayHere requires amount formatted to strictly 2 decimal places (e.g. "1000.00")
     const amountInCents = Math.round(verifiedAmount * 100);
@@ -58,12 +61,16 @@ export async function POST(req: Request) {
       .toUpperCase();
 
     // Determine site base URL strictly from server environment
-    const siteBaseUrl = (
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      "https://www.1place.lk"
-    ).replace(/\/$/, "");
+    const configuredSiteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "").trim();
+    if (!configuredSiteUrl) {
+      return NextResponse.json({ error: "NEXT_PUBLIC_SITE_URL is required for PayHere redirects." }, { status: 503 });
+    }
+    const siteBaseUrl = new URL(configuredSiteUrl).origin;
 
     const mode = (process.env.PAYHERE_MODE || "sandbox").trim().toLowerCase();
+    if (mode !== "sandbox" && mode !== "live") {
+      return NextResponse.json({ error: "PAYHERE_MODE must be set to sandbox or live." }, { status: 503 });
+    }
 
     return NextResponse.json({
       hash,
@@ -72,7 +79,7 @@ export async function POST(req: Request) {
       currency: cleanCurrency,
       orderId: cleanOrderId,
       mode,
-      sandbox: mode !== "live",
+      sandbox: mode === "sandbox",
       returnUrl: `${siteBaseUrl}/payment/success`,
       cancelUrl: `${siteBaseUrl}/payment/cancel`,
       notifyUrl: `${siteBaseUrl}/api/payhere/notify`,
