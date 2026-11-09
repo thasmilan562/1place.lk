@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const DEFAULT_SECRET = "oneplace_secure_admin_session_secret_2026";
-
 async function isValidAdminSession(token?: string | null): Promise<boolean> {
   if (!token || !token.includes(".")) return false;
   try {
@@ -17,7 +15,8 @@ async function isValidAdminSession(token?: string | null): Promise<boolean> {
       return false;
     }
 
-    const secret = process.env.ADMIN_SESSION_SECRET || process.env.AUTH_SECRET || DEFAULT_SECRET;
+    const secret = process.env.ADMIN_SESSION_SECRET || process.env.AUTH_SECRET;
+    if (!secret) return false;
     const enc = new TextEncoder();
     const key = await crypto.subtle.importKey(
       "raw",

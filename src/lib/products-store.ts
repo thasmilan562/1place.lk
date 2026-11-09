@@ -18,7 +18,7 @@ export function getLocalProducts(): Product[] {
   }
 }
 
-export function saveLocalProduct(product: Product): Product {
+export function saveLocalProduct(product: Product): Product | null {
   try {
     const list = getLocalProducts();
     const existingIndex = list.findIndex(
@@ -40,14 +40,20 @@ export function saveLocalProduct(product: Product): Product {
     return updatedRecord;
   } catch (e) {
     console.error("Error saving local product:", e);
-    return product;
+    return null;
   }
 }
 
 export function deleteLocalProduct(id: string): boolean {
   try {
     const list = getLocalProducts();
-    const filtered = list.filter((p) => p.id !== id && p.slug !== id);
+    const clean = (id || "").trim().toLowerCase();
+    const filtered = list.filter((p) => {
+      const pId = (p.id || "").trim().toLowerCase();
+      const pSlug = (p.slug || "").trim().toLowerCase();
+      const pName = (p.name || "").trim().toLowerCase();
+      return pId !== clean && pSlug !== clean && pName !== clean;
+    });
     fs.writeFileSync(PRODUCTS_FILE_PATH, JSON.stringify(filtered, null, 2), "utf8");
     return true;
   } catch (e) {

@@ -72,7 +72,7 @@ export default function TodayDealSection({
         .then((fresh) => {
           if (fresh) setLiveSettings(fresh);
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [isLivePreview, settings]);
 
@@ -189,15 +189,15 @@ export default function TodayDealSection({
     deal.desktopFocalPosition === "left"
       ? "object-left"
       : deal.desktopFocalPosition === "right"
-      ? "object-right"
-      : "object-center";
+        ? "object-right"
+        : "object-center";
 
   const mobileFocalClass =
     deal.mobileFocalPosition === "left"
       ? "object-left"
       : deal.mobileFocalPosition === "right"
-      ? "object-right"
-      : "object-center";
+        ? "object-right"
+        : "object-center";
 
   const activeFocalClass =
     isLivePreview && previewDevice === "mobile" ? mobileFocalClass : desktopFocalClass;
@@ -228,17 +228,17 @@ export default function TodayDealSection({
     deal.cardPadding === "compact"
       ? "p-3 sm:p-6"
       : deal.cardPadding === "normal"
-      ? "p-5 sm:p-10"
-      : deal.cardPadding === "spacious"
-      ? "p-6 sm:p-14"
-      : "p-0"; // default edge to edge fill
+        ? "p-5 sm:p-10"
+        : deal.cardPadding === "spacious"
+          ? "p-6 sm:p-14"
+          : "p-0"; // default edge to edge fill
 
   const imageFitClass =
     deal.imageFit === "contain"
       ? "w-full h-full object-contain"
       : deal.imageFit === "fill"
-      ? "w-full h-full object-fill"
-      : "w-full h-full object-cover"; // default cover for 100% full frame fill
+        ? "w-full h-full object-fill"
+        : "w-full h-full object-cover"; // default cover for 100% full frame fill
 
   // Layout & Alignment
   const isBoxOnRight = deal.boxPosition === "right";
@@ -246,8 +246,8 @@ export default function TodayDealSection({
     deal.contentAlignment === "center"
       ? "text-center items-center"
       : deal.contentAlignment === "right"
-      ? "text-right items-end"
-      : "text-left items-start";
+        ? "text-right items-end"
+        : "text-left items-start";
 
   const content = (
     <section
@@ -278,16 +278,15 @@ export default function TodayDealSection({
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-stretch">
-          
+
           {/* ── Left Card: 100% Sharp 90-Degree Square Corners (0px Radius) ── */}
           <div
             style={{
               backgroundColor: cardBgColor,
               borderRadius: 0,
             }}
-            className={`border border-neutral-200/90 shadow-sm p-6 sm:p-10 lg:p-12 flex flex-col justify-between transition-all duration-300 rounded-none w-full min-h-[480px] sm:min-h-[520px] md:min-h-[560px] lg:min-h-[580px] h-full ${
-              isBoxOnRight ? "md:order-2" : "md:order-1"
-            }`}
+            className={`border border-neutral-200/90 shadow-sm p-6 sm:p-10 lg:p-12 flex flex-col justify-between transition-all duration-300 rounded-none w-full min-h-[480px] sm:min-h-[520px] md:min-h-[560px] lg:min-h-[580px] h-full ${isBoxOnRight ? "md:order-2" : "md:order-1"
+              }`}
           >
             <div className={`flex flex-col ${contentAlignClass}`}>
               {/* 1. Sharp Square Indicator + TODAY'S DEAL Eyebrow */}
@@ -425,9 +424,8 @@ export default function TodayDealSection({
               backgroundColor: deal.bannerBgColor || cardBgColor,
               borderRadius: 0,
             }}
-            className={`border border-neutral-200/90 shadow-sm ${cardPaddingClass} flex items-center justify-center relative overflow-hidden group transition-all duration-300 w-full rounded-none min-h-[480px] sm:min-h-[520px] md:min-h-[560px] lg:min-h-[580px] h-full ${
-              isBoxOnRight ? "md:order-1" : "md:order-2"
-            }`}
+            className={`border border-neutral-200/90 shadow-sm ${cardPaddingClass} flex items-center justify-center relative overflow-hidden group transition-all duration-300 w-full rounded-none min-h-[480px] sm:min-h-[520px] md:min-h-[560px] lg:min-h-[580px] h-full ${isBoxOnRight ? "md:order-1" : "md:order-2"
+              }`}
           >
             <Link
               href={activeCtaUrl}

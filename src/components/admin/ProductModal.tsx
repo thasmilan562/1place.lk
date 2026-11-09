@@ -46,6 +46,7 @@ interface ProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: () => void;
+  onDelete?: (id: string) => void;
   categories: Category[];
   initialData?: Product | null;
 }
@@ -148,6 +149,7 @@ export default function ProductModal({
   isOpen,
   onClose,
   onSave,
+  onDelete,
   categories,
   initialData,
 }: ProductModalProps) {
@@ -1172,6 +1174,22 @@ export default function ProductModal({
 
         {/* Top Header Actions */}
         <div className="flex items-center gap-2.5">
+          {Boolean(initialData && initialData.id && onDelete) && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`Are you sure you want to permanently delete "${name || initialData?.name || "this product"}"? This cannot be undone.`)) {
+                  onDelete?.(initialData!.id);
+                }
+              }}
+              disabled={isSubmitting}
+              className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl transition-all border border-red-200 flex items-center gap-1.5 cursor-pointer"
+              title="Delete Product"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete product</span>
+            </button>
+          )}
           <button
             onClick={() => handleSaveProduct("draft")}
             disabled={isSubmitting}

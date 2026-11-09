@@ -248,10 +248,10 @@ export default function ShopAllProductsSection({
                   segment.products.length === 1
                     ? "premium-product-grid premium-product-grid--one"
                     : segment.products.length === 2
-                    ? "premium-product-grid premium-product-grid--two"
-                    : segment.products.length <= 4
-                    ? "premium-product-grid"
-                    : "premium-product-grid"
+                      ? "premium-product-grid premium-product-grid--two"
+                      : segment.products.length <= 4
+                        ? "premium-product-grid"
+                        : "premium-product-grid"
                 }
               >
                 {segment.products.map((product) => (

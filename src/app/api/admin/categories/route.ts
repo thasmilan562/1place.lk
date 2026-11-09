@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { verifyAdminRequest } from "@/lib/admin-auth-server";
+
+export const dynamic = "force-dynamic";
+
+function unauthorized() {
+  return NextResponse.json({ success: false, error: "Unauthorized access to administrator API." }, { status: 401 });
+}
 
 function sanitize(obj: any): any {
   if (obj === undefined) return null;
@@ -17,7 +24,9 @@ function sanitize(obj: any): any {
 }
 
 // GET /api/admin/categories
-export async function GET() {
+export async function GET(req: Request) {
+  if (!verifyAdminRequest(req)) return unauthorized();
+
   try {
     const db = getAdminDb();
     const snap = await db.collection("categories").get();
@@ -31,6 +40,8 @@ export async function GET() {
 
 // POST / PUT /api/admin/categories (Create or update category)
 export async function POST(req: Request) {
+  if (!verifyAdminRequest(req)) return unauthorized();
+
   try {
     const body = await req.json();
     if (!body || !body.name || !body.name.trim()) {
@@ -61,6 +72,8 @@ export async function POST(req: Request) {
 
 // DELETE /api/admin/categories
 export async function DELETE(req: Request) {
+  if (!verifyAdminRequest(req)) return unauthorized();
+
   try {
     const { searchParams } = new URL(req.url);
     let id = searchParams.get("id");

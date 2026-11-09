@@ -1,7 +1,18 @@
 import { NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { getLocalProducts, saveLocalProduct, deleteLocalProduct } from "@/lib/products-store";
+import { verifyAdminRequest } from "@/lib/admin-auth-server";
 import { Product } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+
+function unauthorized() {
+  return NextResponse.json({ success: false, error: "Unauthorized access to administrator API." }, { status: 401 });
+}
+
+function persistenceUnavailable() {
+  return NextResponse.json({ success: false, error: "Product storage is unavailable. No changes were saved." }, { status: 503 });
+}
 
 function sanitize(obj: any): any {
   if (obj === undefined) return null;
@@ -20,38 +31,29 @@ function sanitize(obj: any): any {
 
 // GET /api/admin/products
 export async function GET(req: Request) {
+  if (!verifyAdminRequest(req)) return unauthorized();
+
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
-
-    const localList = getLocalProducts();
-    let firestoreList: Product[] = [];
+    let products: Product[];
 
     try {
       const db = getAdminDb();
       if (id) {
         const docSnap = await db.collection("products").doc(id).get();
-        if (docSnap.exists) {
-          firestoreList = [{ ...(docSnap.data() as Product), id: docSnap.id }];
-        }
+        products = docSnap.exists ? [{ ...(docSnap.data() as Product), id: docSnap.id }] : [];
       } else {
         const snap = await db.collection("products").get();
-        firestoreList = snap.docs.map((d) => ({ ...(d.data() as Product), id: d.id }));
+        products = snap.docs.map((d) => ({ ...(d.data() as Product), id: d.id }));
       }
     } catch (dbErr) {
       console.warn("[Admin API Products] Firestore read warning:", dbErr);
+      if (process.env.NODE_ENV === "production") return persistenceUnavailable();
+      const localList = getLocalProducts();
+      products = id ? localList.filter((p) => p.id === id) : localList;
     }
 
-    // Merge Firestore and local items (Firestore takes precedence, local fills any gaps)
-    const map = new Map<string, Product>();
-    localList.forEach((p) => {
-      if (p.id) map.set(p.id, p);
-    });
-    firestoreList.forEach((p) => {
-      if (p.id) map.set(p.id, p);
-    });
-
-    const products = Array.from(map.values());
     if (id) {
       const found = products.find((p) => p.id === id);
       if (!found) {
@@ -69,9 +71,11 @@ export async function GET(req: Request) {
 
 // POST /api/admin/products (Create new product)
 export async function POST(req: Request) {
+  if (!verifyAdminRequest(req)) return unauthorized();
+
   try {
     const body = await req.json();
-    if (!body || !body.name || !body.name.trim()) {
+    if (!body || typeof body.name !== "string" || !body.name.trim()) {
       return NextResponse.json({ success: false, error: "Product name is required" }, { status: 400 });
     }
 
@@ -87,13 +91,21 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    // 1. Save to Firestore via Admin SDK
+    // Firestore is authoritative in production. JSON is only a local dev fallback.
+    let db: ReturnType<typeof getAdminDb>;
     try {
-      const db = getAdminDb();
+      db = getAdminDb();
       await db.collection("products").doc(productId).set(sanitize(finalProduct), { merge: true });
+    } catch (fsErr) {
+      console.warn("[Admin API Products] Firestore write failed:", fsErr);
+      if (process.env.NODE_ENV === "production") return persistenceUnavailable();
+      if (!saveLocalProduct(finalProduct)) return persistenceUnavailable();
+      return NextResponse.json({ success: true, id: productId, product: finalProduct, storage: "local-dev" });
+    }
 
-      // Save custom category if provided
-      if (body.isCustomCategory && body.customCategoryName?.trim()) {
+    // Optional custom catalog metadata must not turn a successfully saved product into a false failure.
+    try {
+      if (body.isCustomCategory && typeof body.customCategoryName === "string" && body.customCategoryName.trim()) {
         const catSlug = body.customCategoryName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         await db.collection("categories").doc(`cat-${catSlug}`).set({
           id: `cat-${catSlug}`,
@@ -108,9 +120,7 @@ export async function POST(req: Request) {
           group: "product_categories",
         }, { merge: true });
       }
-
-      // Save custom brand if provided
-      if (body.isCustomBrand && body.customBrandName?.trim()) {
+      if (body.isCustomBrand && typeof body.customBrandName === "string" && body.customBrandName.trim()) {
         const bSlug = body.customBrandName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         await db.collection("brands").doc(`brand-${bSlug}`).set({
           id: `brand-${bSlug}`,
@@ -122,12 +132,9 @@ export async function POST(req: Request) {
           show_on_homepage: true,
         }, { merge: true });
       }
-    } catch (fsErr) {
-      console.warn("[Admin API Products] Firestore write warning (saved locally):", fsErr);
+    } catch (metadataErr) {
+      console.warn("[Admin API Products] Product saved, but optional category/brand metadata failed:", metadataErr);
     }
-
-    // 2. Save to local fallback store for 100% data persistence guarantee
-    saveLocalProduct(finalProduct);
 
     return NextResponse.json({ success: true, id: productId, product: finalProduct });
   } catch (err: any) {
@@ -138,6 +145,8 @@ export async function POST(req: Request) {
 
 // PUT /api/admin/products (Update existing product)
 export async function PUT(req: Request) {
+  if (!verifyAdminRequest(req)) return unauthorized();
+
   try {
     const body = await req.json();
     if (!body || !body.id) {
@@ -152,16 +161,16 @@ export async function PUT(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    // 1. Update in Firestore via Admin SDK
+    // Firestore is authoritative in production. JSON is only a local dev fallback.
     try {
       const db = getAdminDb();
       await db.collection("products").doc(productId).set(sanitize(finalProduct), { merge: true });
     } catch (fsErr) {
-      console.warn("[Admin API Products] Firestore update warning (updated locally):", fsErr);
+      console.warn("[Admin API Products] Firestore update failed:", fsErr);
+      if (process.env.NODE_ENV === "production") return persistenceUnavailable();
+      if (!saveLocalProduct(finalProduct)) return persistenceUnavailable();
+      return NextResponse.json({ success: true, id: productId, product: finalProduct, storage: "local-dev" });
     }
-
-    // 2. Update local store
-    saveLocalProduct(finalProduct);
 
     return NextResponse.json({ success: true, id: productId, product: finalProduct });
   } catch (err: any) {
@@ -172,6 +181,8 @@ export async function PUT(req: Request) {
 
 // PATCH /api/admin/products (Quick stock or status update)
 export async function PATCH(req: Request) {
+  if (!verifyAdminRequest(req)) return unauthorized();
+
   try {
     const body = await req.json();
     if (!body || !body.id) {
@@ -186,13 +197,10 @@ export async function PATCH(req: Request) {
       await db.collection("products").doc(productId).set(cleaned, { merge: true });
     } catch (fsErr) {
       console.warn("[Admin API Products] Firestore patch warning:", fsErr);
-    }
-
-    // Update in local store
-    const localList = getLocalProducts();
-    const existing = localList.find((p) => p.id === productId);
-    if (existing) {
-      saveLocalProduct({ ...existing, ...cleaned });
+      if (process.env.NODE_ENV === "production") return persistenceUnavailable();
+      const existing = getLocalProducts().find((p) => p.id === productId);
+      if (!existing) return NextResponse.json({ success: false, error: "Product not found" }, { status: 404 });
+      if (!saveLocalProduct({ ...existing, ...cleaned })) return persistenceUnavailable();
     }
 
     return NextResponse.json({ success: true, id: productId });
@@ -204,6 +212,8 @@ export async function PATCH(req: Request) {
 
 // DELETE /api/admin/products
 export async function DELETE(req: Request) {
+  if (!verifyAdminRequest(req)) return unauthorized();
+
   try {
     const { searchParams } = new URL(req.url);
     let id = searchParams.get("id");
@@ -211,28 +221,41 @@ export async function DELETE(req: Request) {
     if (!id) {
       try {
         const body = await req.json();
-        id = body?.id;
+        id = body?.id || body?.slug;
       } catch {
         // query param only
       }
     }
 
-    if (!id) {
+    if (!id || !id.trim()) {
       return NextResponse.json({ success: false, error: "Product id is required for deletion" }, { status: 400 });
     }
+
+    const cleanId = id.trim();
 
     // 1. Delete from Firestore via Admin SDK
     try {
       const db = getAdminDb();
-      await db.collection("products").doc(id).delete();
+      await db.collection("products").doc(cleanId).delete();
+
+      // In case doc ID is different from slug or id property
+      const slugQuery = await db.collection("products").where("slug", "==", cleanId).get();
+      for (const d of slugQuery.docs) {
+        await d.ref.delete();
+      }
+      const idQuery = await db.collection("products").where("id", "==", cleanId).get();
+      for (const d of idQuery.docs) {
+        await d.ref.delete();
+      }
     } catch (fsErr) {
       console.warn("[Admin API Products] Firestore delete warning:", fsErr);
+      if (process.env.NODE_ENV === "production") return persistenceUnavailable();
     }
 
-    // 2. Delete from local store
-    deleteLocalProduct(id);
+    // 2. ALWAYS delete from local store as well to guarantee persistence
+    deleteLocalProduct(cleanId);
 
-    return NextResponse.json({ success: true, id });
+    return NextResponse.json({ success: true, id: cleanId });
   } catch (err: any) {
     console.error("[Admin API Products] DELETE error:", err);
     return NextResponse.json({ success: false, error: err.message || "Failed to delete product" }, { status: 500 });

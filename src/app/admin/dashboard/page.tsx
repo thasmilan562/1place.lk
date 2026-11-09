@@ -61,7 +61,7 @@ import { playOrderChime } from "@/lib/audio-chime";
 import RealtimeOrderAlert, { LiveOrderNotification } from "@/components/admin/RealtimeOrderAlert";
 import GoogleSearchConsoleTraffic from "@/components/admin/GoogleSearchConsoleTraffic";
 import { Product, Category, Review, OfferBanner, BannerStatus, HeroSlide, GalleryImage, GoogleReviewsSettings, VisualShowcaseSettings, TodayDealSettings, MegaMenuSettings, Brand, GalleryAnimationSettings, WhatsAppCampaign } from "@/lib/types";
-import { categories as fallbackCategories, fallbackOfferBanners, products as fallbackProducts, DEFAULT_SHOWCASE_SETTINGS, DEFAULT_TODAY_DEAL_SETTINGS, DEFAULT_MEGA_MENU_SETTINGS, DEFAULT_BRANDS, DEFAULT_GALLERY_ANIMATION_SETTINGS } from "@/lib/data";
+import { categories as fallbackCategories, fallbackOfferBanners, DEFAULT_SHOWCASE_SETTINGS, DEFAULT_TODAY_DEAL_SETTINGS, DEFAULT_MEGA_MENU_SETTINGS, DEFAULT_BRANDS, DEFAULT_GALLERY_ANIMATION_SETTINGS } from "@/lib/data";
 import { DEFAULT_GOOGLE_REVIEWS_SETTINGS, getShowcaseSettings, getTodayDealSettings, getMegaMenuSettings, getBrands, getGalleryAnimationSettings } from "@/lib/firestore-client";
 import { ESSENTIAL_ADMIN_TABS } from "@/lib/admin-navigation";
 import FooterTab from "@/components/admin/tabs/FooterTab";
@@ -247,25 +247,16 @@ function DashboardContent() {
       setLoading(true);
       // Products
       try {
-        const prodRes = await fetch("/api/admin/products");
-        if (prodRes.ok) {
-          const prodData = await prodRes.json();
-          if (prodData.products && prodData.products.length > 0) {
-            setProducts(prodData.products);
-          } else {
-            const prodSnap = await getDocs(collection(db, "products"));
-            const prodList = prodSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
-            setProducts(prodList.length > 0 ? prodList : fallbackProducts);
-          }
-        } else {
-          const prodSnap = await getDocs(collection(db, "products"));
-          const prodList = prodSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
-          setProducts(prodList.length > 0 ? prodList : fallbackProducts);
+        const prodRes = await fetch("/api/admin/products", { cache: "no-store" });
+        if (!prodRes.ok) throw new Error(`Product API returned ${prodRes.status}`);
+        const prodData = await prodRes.json();
+        if (!prodData.success || !Array.isArray(prodData.products)) {
+          throw new Error("Product API returned an invalid catalog response");
         }
-      } catch {
-        const prodSnap = await getDocs(collection(db, "products"));
-        const prodList = prodSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
-        setProducts(prodList.length > 0 ? prodList : fallbackProducts);
+        // An empty catalog is real data; never repopulate it from bundled samples.
+        setProducts(prodData.products);
+      } catch (productErr) {
+        console.warn("Could not refresh the admin product catalog:", productErr);
       }
 
       // Categories
@@ -539,9 +530,7 @@ function DashboardContent() {
       collection(db, "products"),
       (snapshot) => {
         const prodList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
-        if (prodList.length > 0) {
-          setProducts(prodList);
-        }
+        setProducts(prodList);
       },
       (err) => console.warn("Realtime products listener error:", err)
     );
@@ -797,8 +786,7 @@ function DashboardContent() {
 
   // Top Selling Products ranking (01 to 05)
   const topSellingProducts = useMemo(() => {
-    const sourceList = products.length > 0 ? products : fallbackProducts;
-    return sourceList.slice(0, 5).map((p, idx) => ({
+    return products.slice(0, 5).map((p, idx) => ({
       rank: `0${idx + 1}`,
       id: p.id,
       name: p.name,
@@ -995,16 +983,22 @@ function DashboardContent() {
   };
 
   const handleDeleteProduct = async (id: string) => {
+    if (!id || !id.trim()) return;
+    const cleanId = id.trim();
     if (!confirm("Are you sure you want to delete this product?")) return;
     try {
-      const res = await fetch(`/api/admin/products?id=${encodeURIComponent(id)}`, {
+      // Keep the row visible until the persistent delete succeeds.
+      const res = await fetch(`/api/admin/products?id=${encodeURIComponent(cleanId)}`, {
         method: "DELETE",
       });
       if (!res.ok) {
-        throw new Error("Failed to delete product via server API");
+        const result = await res.json().catch(() => null);
+        throw new Error(result?.error || "Failed to delete product");
       }
-      setProducts(products.filter((p) => p.id !== id));
+
+      setProducts((prev) => prev.filter((p) => p.id !== cleanId && p.slug !== cleanId && (p as any)._id !== cleanId));
     } catch (e: any) {
+      console.error("Error deleting product:", e);
       alert(e.message || "Error deleting product");
     }
   };
@@ -1925,6 +1919,11 @@ function DashboardContent() {
           setIsProductModalOpen(false);
           setEditingProduct(null);
           refreshData();
+        }}
+        onDelete={async (id) => {
+          setIsProductModalOpen(false);
+          setEditingProduct(null);
+          await handleDeleteProduct(id);
         }}
         categories={categories}
         initialData={editingProduct}
