@@ -11,8 +11,6 @@ import {
   NormalizedOrder,
   OrderAuditEntry,
 } from "@/lib/order-utils";
-import { db } from "@/lib/firebase";
-import { doc, updateDoc, deleteDoc, arrayUnion, writeBatch, collection, getDocs } from "firebase/firestore";
 import { useAdminTheme } from "@/app/admin/dashboard/layout";
 import {
   Search,
@@ -67,6 +65,26 @@ interface OrdersTabProps {
   onDeleteOrder?: (id: string) => Promise<boolean | void> | void;
   onBulkDeleteOrders?: (ids: string[]) => Promise<{ deletedCount: number; failedCount: number }>;
   onRefresh?: () => void;
+}
+
+async function persistAdminOrderChanges(id: string | string[], updates: Record<string, unknown>) {
+  const response = await fetch("/api/admin/orders", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...(Array.isArray(id) ? { ids: id } : { id }), updates }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.success) throw new Error(result.error || "Order changes could not be saved.");
+}
+
+async function persistAdminOrderBatch(changes: Array<{ id: string; updates: Record<string, unknown> }>) {
+  const response = await fetch("/api/admin/orders", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ changes }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.success) throw new Error(result.error || "Order changes could not be saved.");
 }
 
 export default function OrdersTab({
@@ -411,9 +429,9 @@ export default function OrdersTab({
       if (onUpdateStatus) {
         await onUpdateStatus(orderId, newOrderStatus);
       } else {
-        await updateDoc(doc(db, "orders", orderId), {
+        await persistAdminOrderChanges(orderId, {
           orderStatus: newOrderStatus, status: newOrderStatus,
-          updatedAt: new Date().toISOString(), statusHistory: arrayUnion(auditEntry),
+          updatedAt: new Date().toISOString(), statusHistory: [auditEntry],
         });
         onRefresh?.();
       }
@@ -449,10 +467,10 @@ export default function OrdersTab({
         timestamp: new Date().toISOString(),
       };
 
-      await updateDoc(doc(db, "orders", orderId), {
+      await persistAdminOrderChanges(orderId, {
         paymentStatus: newPaymentStatus,
         updatedAt: new Date().toISOString(),
-        statusHistory: arrayUnion(auditEntry),
+        statusHistory: [auditEntry],
       });
 
       if (onRefresh) onRefresh();
@@ -471,7 +489,7 @@ export default function OrdersTab({
     if (!selectedOrder) return;
     try {
       setSavingDetails(true);
-      await updateDoc(doc(db, "orders", selectedOrder.id), {
+      await persistAdminOrderChanges(selectedOrder.id, {
         trackingNumber: editingTracking,
         internalNotes: editingNotes,
         updatedAt: new Date().toISOString(),
@@ -497,13 +515,13 @@ export default function OrdersTab({
         note: cancelReason,
       };
 
-      await updateDoc(doc(db, "orders", selectedOrder.id), {
+      await persistAdminOrderChanges(selectedOrder.id, {
         orderStatus: "Cancelled",
         status: "Cancelled",
         ...(selectedOrder.paymentStatus === "Paid" || selectedOrder.paymentStatus === "Refunded" ? {} : { paymentStatus: "Cancelled" }),
         cancellationReason: cancelReason,
         updatedAt: new Date().toISOString(),
-        statusHistory: arrayUnion(auditEntry),
+        statusHistory: [auditEntry],
       });
 
       setCancelModalOpen(false);
@@ -525,19 +543,13 @@ export default function OrdersTab({
       if (onDeleteOrder) {
         await onDeleteOrder(targetId);
       } else {
-        const ORDER_SUBCOLLECTIONS = ["items", "payments", "statusHistory", "notes", "tracking", "history", "audit"];
-        for (const subName of ORDER_SUBCOLLECTIONS) {
-          try {
-            const subSnap = await getDocs(collection(db, "orders", targetId, subName));
-            for (const subDoc of subSnap.docs) {
-              await deleteDoc(subDoc.ref);
-            }
-          } catch {}
-        }
-        await deleteDoc(doc(db, "orders", targetId));
-        try {
-          await fetch(`/api/orders?id=${encodeURIComponent(targetId)}`, { method: "DELETE" });
-        } catch {}
+        const response = await fetch("/api/admin/orders", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: targetId }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.success) throw new Error(result.error || "Order deletion failed");
       }
 
       setDeleteModalOrder(null);
@@ -586,15 +598,14 @@ export default function OrdersTab({
         let deleted = 0;
         for (let i = 0; i < selectedRowIds.length; i += CHUNK_SIZE) {
           const chunk = selectedRowIds.slice(i, i + CHUNK_SIZE);
-          const batch = writeBatch(db);
-          for (const id of chunk) {
-            batch.delete(doc(db, "orders", id));
-          }
-          await batch.commit();
-          try {
-            await fetch(`/api/orders?ids=${encodeURIComponent(chunk.join(","))}`, { method: "DELETE" });
-          } catch {}
-          deleted += chunk.length;
+          const response = await fetch("/api/admin/orders", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: chunk }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.success) throw new Error(result.error || "Order bulk deletion failed");
+          deleted += Number(result.deletedCount) || chunk.length;
           setBulkDeleteProgress({ current: deleted, total });
         }
         showToast(`${deleted} orders permanently deleted.`, "success");
@@ -639,14 +650,12 @@ export default function OrdersTab({
     }
     setSavingBulkStatus(true);
     try {
-      const batch = writeBatch(db);
-      selectedOrders.forEach((order) => batch.update(doc(db, "orders", order.id), {
-        orderStatus: bulkOrderStatus, status: bulkOrderStatus,
-        ...(bulkPaymentStatus === "unchanged" ? {} : { paymentStatus: bulkPaymentStatus }),
-        updatedAt: new Date().toISOString(),
-        statusHistory: arrayUnion({ action: "Bulk Status Updated", previousStatus: order.orderStatus, newStatus: bulkOrderStatus, timestamp: new Date().toISOString() }),
-      }));
-      await batch.commit();
+      await persistAdminOrderBatch(selectedOrders.map((order) => ({ id: order.id, updates: {
+          orderStatus: bulkOrderStatus, status: bulkOrderStatus,
+          ...(bulkPaymentStatus === "unchanged" ? {} : { paymentStatus: bulkPaymentStatus }),
+          updatedAt: new Date().toISOString(),
+          statusHistory: [{ action: "Bulk Status Updated", previousStatus: order.orderStatus, newStatus: bulkOrderStatus, timestamp: new Date().toISOString() }],
+        } })));
       setBulkStatusModalOpen(false); setSelectedRowIds([]);
       showToast(`${selectedOrders.length} orders updated.`); onRefresh?.();
     } catch { showToast("Couldn't update selected orders. No partial batch was saved.", "error"); }

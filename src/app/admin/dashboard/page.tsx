@@ -56,8 +56,7 @@ import {
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, setDoc, getDoc, onSnapshot, writeBatch, arrayUnion } from "firebase/firestore";
-import { playOrderChime } from "@/lib/audio-chime";
+import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, setDoc, getDoc, onSnapshot, writeBatch } from "firebase/firestore";
 import RealtimeOrderAlert, { LiveOrderNotification } from "@/components/admin/RealtimeOrderAlert";
 import GoogleSearchConsoleTraffic from "@/components/admin/GoogleSearchConsoleTraffic";
 import { Product, Category, Review, OfferBanner, BannerStatus, HeroSlide, GalleryImage, GoogleReviewsSettings, VisualShowcaseSettings, TodayDealSettings, MegaMenuSettings, Brand, GalleryAnimationSettings, WhatsAppCampaign } from "@/lib/types";
@@ -279,10 +278,12 @@ function DashboardContent() {
 
       // Orders
       try {
-        const ordSnap = await getDocs(collection(db, "orders"));
-        const ordList: any[] = ordSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        ordList.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        setOrders(ordList);
+        const ordRes = await fetch("/api/admin/orders", { cache: "no-store" });
+        const ordData = await ordRes.json().catch(() => ({}));
+        if (!ordRes.ok || !ordData.success || !Array.isArray(ordData.orders)) {
+          throw new Error(ordData.error || `Orders API returned ${ordRes.status}`);
+        }
+        setOrders(ordData.orders);
       } catch (ordErr) {
         console.warn("Error fetching orders:", ordErr);
       }
@@ -511,41 +512,13 @@ function DashboardContent() {
   useEffect(() => {
     refreshData();
 
-    let isInitialOrders = true;
-
-    // 1. Live Orders Listener (with real-time new order chime & popup)
-    const unsubOrders = onSnapshot(
-      collection(db, "orders"),
-      (snapshot) => {
-        const ordList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        ordList.sort(
-          (a: any, b: any) =>
-            new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-        );
-        setOrders(ordList);
-
-        if (!isInitialOrders) {
-          snapshot.docChanges().forEach((change) => {
-            if (change.type === "added") {
-              const newOrd: any = change.doc.data();
-              playOrderChime();
-              setNewOrderAlert({
-                id: change.doc.id,
-                customerName:
-                  newOrd.customerName ||
-                  newOrd.codName ||
-                  newOrd.cardName ||
-                  newOrd.primaryPhone ||
-                  "Customer",
-                total: Number(newOrd.finalTotal || newOrd.totalPrice || newOrd.subtotal || 0),
-              });
-            }
-          });
-        }
-        isInitialOrders = false;
-      },
-      (err) => console.warn("Realtime orders listener error:", err)
-    );
+    // Orders are fetched through the authenticated server API because admin
+    // browser sessions are not Firebase Auth identities.
+    const handleAdminOrdersUpdate = (event: Event) => {
+      const ordList = (event as CustomEvent<any[]>).detail;
+      if (Array.isArray(ordList)) setOrders(ordList);
+    };
+    window.addEventListener("admin-orders-updated", handleAdminOrdersUpdate);
 
     // 2. Live Products Listener
     const unsubProducts = onSnapshot(
@@ -647,7 +620,7 @@ function DashboardContent() {
     );
 
     return () => {
-      unsubOrders();
+      window.removeEventListener("admin-orders-updated", handleAdminOrdersUpdate);
       unsubProducts();
       unsubUsers();
       unsubCategories();
@@ -1414,10 +1387,21 @@ function DashboardContent() {
   const handleUpdateOrderStatus = async (id: string, newStatus: string) => {
     try {
       const previousOrder = orders.find((order) => order.id === id);
-      await updateDoc(doc(db, "orders", id), {
-        status: newStatus, orderStatus: newStatus, updatedAt: new Date().toISOString(),
-        statusHistory: arrayUnion({ action: "Order Status Updated", previousStatus: previousOrder?.orderStatus || previousOrder?.status || "Pending", newStatus, timestamp: new Date().toISOString() }),
+      const response = await fetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          updates: {
+            status: newStatus,
+            orderStatus: newStatus,
+            updatedAt: new Date().toISOString(),
+            statusHistory: [{ action: "Order Status Updated", previousStatus: previousOrder?.orderStatus || previousOrder?.status || "Pending", newStatus, timestamp: new Date().toISOString() }],
+          },
+        }),
       });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) throw new Error(result.error || "Order status update failed");
       setOrders(orders.map((o) => (o.id === id ? { ...o, status: newStatus, orderStatus: newStatus } : o)));
 
       // Trigger automated email when status changes to completed/delivered/shipped/packing
@@ -1454,30 +1438,13 @@ function DashboardContent() {
 
   const handleDeleteOrder = async (id: string) => {
     try {
-      // 1. Clean any order subcollections if they exist
-      const ORDER_SUBCOLLECTIONS = ["items", "payments", "statusHistory", "notes", "tracking", "history", "audit"];
-      for (const subName of ORDER_SUBCOLLECTIONS) {
-        try {
-          const subSnap = await getDocs(collection(db, "orders", id, subName));
-          for (const subDoc of subSnap.docs) {
-            await deleteDoc(subDoc.ref);
-          }
-        } catch {
-          // Ignored if non-existent
-        }
-      }
-
-      // 2. Delete parent order document from Firestore
-      await deleteDoc(doc(db, "orders", id));
-
-      // 3. Purge from local API store as well
-      try {
-        await fetch(`/api/orders?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-      } catch (apiErr) {
-        console.warn("API delete notice:", apiErr);
-      }
-
-      // 4. Update state optimistically
+      const response = await fetch("/api/admin/orders", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) throw new Error(result.error || "Order deletion failed");
       setOrders((prev) => prev.filter((o) => o.id !== id));
       return true;
     } catch (e: any) {
@@ -1488,52 +1455,24 @@ function DashboardContent() {
 
   const handleBulkDeleteOrders = async (ids: string[]) => {
     if (!ids || ids.length === 0) return { deletedCount: 0, failedCount: 0 };
-    const ORDER_SUBCOLLECTIONS = ["items", "payments", "statusHistory", "notes", "tracking", "history", "audit"];
     let deletedCount = 0;
     let failedCount = 0;
 
-    // Process in batches of 50 to respect Firestore write limits
     const CHUNK_SIZE = 50;
     for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
       const chunk = ids.slice(i, i + CHUNK_SIZE);
-      const batch = writeBatch(db);
-
-      for (const id of chunk) {
-        // Clean subcollection docs if any
-        for (const subName of ORDER_SUBCOLLECTIONS) {
-          try {
-            const subSnap = await getDocs(collection(db, "orders", id, subName));
-            for (const subDoc of subSnap.docs) {
-              batch.delete(subDoc.ref);
-            }
-          } catch {
-            // Ignored
-          }
-        }
-        batch.delete(doc(db, "orders", id));
-      }
-
       try {
-        await batch.commit();
-        deletedCount += chunk.length;
-      } catch (batchErr) {
-        console.error("Batch delete error, falling back to sequential delete:", batchErr);
-        for (const id of chunk) {
-          try {
-            await deleteDoc(doc(db, "orders", id));
-            deletedCount++;
-          } catch (singleErr) {
-            console.error(`Error deleting order ${id}:`, singleErr);
-            failedCount++;
-          }
-        }
-      }
-
-      // Call API for local store cleanup
-      try {
-        await fetch(`/api/orders?ids=${encodeURIComponent(chunk.join(","))}`, { method: "DELETE" });
-      } catch (apiErr) {
-        console.warn("API bulk delete notice:", apiErr);
+        const response = await fetch("/api/admin/orders", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: chunk }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.success) throw new Error(result.error || "Order bulk deletion failed");
+        deletedCount += Number(result.deletedCount) || chunk.length;
+      } catch (error) {
+        console.error("Order bulk delete failed:", error);
+        failedCount += chunk.length;
       }
     }
 

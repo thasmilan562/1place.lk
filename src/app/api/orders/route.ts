@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLocalOrders, saveLocalOrder, updateLocalOrderStatus, deleteLocalOrder, OrderRecord } from "@/lib/orders-store";
+import { verifyAdminRequest } from "@/lib/admin-auth-server";
+import { getAdminDb } from "@/lib/firebase-admin";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, doc, getDoc, query, where, limit, setDoc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { deductProductStock } from "@/lib/stock-deduction";
@@ -438,6 +440,10 @@ export async function PATCH(req: Request) {
 
 // DELETE /api/orders - delete order(s)
 export async function DELETE(req: Request) {
+  if (!verifyAdminRequest(req)) {
+    return NextResponse.json({ success: false, error: "Unauthorized access to order deletion API." }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const queryId = searchParams.get("id");
@@ -454,13 +460,14 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ success: false, error: "Missing order id(s)" }, { status: 400 });
     }
 
-    for (const id of idsToDelete) {
-      deleteLocalOrder(id);
-      try {
-        await deleteDoc(doc(db, "orders", id));
-      } catch (err) {
-        console.warn(`Firestore delete error for ${id}:`, err);
-      }
+    const db = getAdminDb();
+    for (let offset = 0; offset < idsToDelete.length; offset += 450) {
+      const batch = db.batch();
+      idsToDelete.slice(offset, offset + 450).forEach((id) => batch.delete(db.collection("orders").doc(id)));
+      await batch.commit();
+    }
+    if (process.env.NODE_ENV !== "production") {
+      for (const id of idsToDelete) deleteLocalOrder(id);
     }
 
     return NextResponse.json({ success: true, deletedCount: idsToDelete.length });

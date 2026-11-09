@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Bell, ExternalLink, LogOut, Menu, Moon, Plus, Search, Sun, X } from "lucide-react";
-import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { Category } from "@/lib/types";
 import { getCategories } from "@/lib/firestore-client";
 import { ADMIN_NAVIGATION, adminTabHref } from "@/lib/admin-navigation";
@@ -29,7 +27,7 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
   const [categories, setCategories] = useState<Category[]>([]);
   const [pending, setPending] = useState(0);
   const [orderAlert, setOrderAlert] = useState("");
-  const [notificationError, setNotificationError] = useState(false);
+  const [notificationError, setNotificationError] = useState("");
   const mobileRef = useDialogFocus(mobileOpen, () => setMobileOpen(false));
 
   useEffect(() => {
@@ -58,17 +56,46 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
     if (!authed) return;
     getCategories().then(setCategories).catch(() => {});
     let initialized = false;
+    let stopped = false;
+    let loadingOrders = false;
     const known = new Set<string>();
-    return onSnapshot(collection(db, "orders"), { includeMetadataChanges: true }, (snapshot) => {
-      setNotificationError(false);
-      setPending(snapshot.docs.filter((item) => ["pending", "pending cod", "processing", "payment pending"].includes(String(item.data().status || item.data().orderStatus || "").toLowerCase())).length);
-      const added = snapshot.docChanges().filter(change => change.type === "added" && !known.has(change.doc.id));
-      snapshot.docs.forEach(item => known.add(item.id));
-      if (initialized && !snapshot.metadata.fromCache && added.length) {
-        setOrderAlert(`${added.length === 1 ? "A new order has" : `${added.length} new orders have`} arrived. Review it in Orders.`);
+    const refreshOrders = async () => {
+      if (stopped || loadingOrders) return;
+      loadingOrders = true;
+      try {
+        const response = await fetch("/api/admin/orders", { cache: "no-store" });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.success || !Array.isArray(result.orders)) {
+          throw new Error(result.error || `Orders API returned ${response.status}`);
+        }
+
+        if (stopped) return;
+        const orders = result.orders as Array<Record<string, any>>;
+        setNotificationError("");
+        setPending(orders.filter((order) => ["pending", "pending cod", "processing", "payment pending"].includes(String(order.status || order.orderStatus || "").toLowerCase())).length);
+        const added = orders.filter((order) => order.id && !known.has(order.id));
+        orders.forEach((order) => { if (order.id) known.add(order.id); });
+        if (initialized && added.length) {
+          setOrderAlert(`${added.length === 1 ? "A new order has" : `${added.length} new orders have`} arrived. Review it in Orders.`);
+        }
+        initialized = true;
+        window.dispatchEvent(new CustomEvent("admin-orders-updated", { detail: orders }));
+      } catch (error) {
+        if (!stopped) {
+          console.error("Admin order refresh failed:", error);
+          setNotificationError(error instanceof Error ? error.message : "Unable to reach the admin orders API.");
+        }
+      } finally {
+        loadingOrders = false;
       }
-      if (!snapshot.metadata.fromCache) initialized = true;
-    }, () => { setNotificationError(true); });
+
+    };
+    void refreshOrders();
+    const intervalId = window.setInterval(() => { void refreshOrders(); }, 10000);
+    return () => {
+      stopped = true;
+      window.clearInterval(intervalId);
+    };
   }, [authed]);
 
   useEffect(() => {
@@ -117,7 +144,7 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
         <header data-admin-header className="admin-toolbar"><div className="admin-toolbar__title"><button type="button" className="admin-mobile-only" aria-label="Open navigation" onClick={() => setMobileOpen(true)}><Menu size={20} /></button><span>{current.label}</span></div>
           <div className="admin-toolbar__actions"><button type="button" className="admin-search-button" onClick={() => setSearchOpen(true)} aria-label="Search admin"><Search size={16} /><span>Find anything</span><kbd>⌘ K</kbd></button><button type="button" aria-label={theme === "light" ? "Use dark appearance" : "Use light appearance"} onClick={toggleTheme}>{theme === "light" ? <Moon size={17} /> : <Sun size={17} />}</button><Link href={adminTabHref("orders")} aria-label={`${pending} pending orders`}><Bell size={17} />{pending > 0 && <small>{pending}</small>}</Link><button type="button" className="admin-primary" onClick={() => setProductOpen(true)}><Plus size={16} /><span>Add product</span></button></div>
         </header>
-        <main className="admin-main">{notificationError && <p className="admin-feedback" role="status">Live order updates disconnected. Check your connection and refresh.</p>}{orderAlert && <div className="admin-order-alert" role="status" aria-live="polite"><Bell size={20}/><div><strong>New order</strong><p>{orderAlert}</p><Link href={adminTabHref("orders")} onClick={() => setOrderAlert("")}>View orders</Link></div><button type="button" aria-label="Dismiss new order notification" onClick={() => setOrderAlert("")}><X size={18}/></button></div>}<div className="admin-main__content">{children}</div><footer data-admin-footer>ONEPLACE · Store workspace</footer></main>
+        <main className="admin-main">{notificationError && <p className="admin-feedback" role="status">Live order updates disconnected: {notificationError}</p>}{orderAlert && <div className="admin-order-alert" role="status" aria-live="polite"><Bell size={20}/><div><strong>New order</strong><p>{orderAlert}</p><Link href={adminTabHref("orders")} onClick={() => setOrderAlert("")}>View orders</Link></div><button type="button" aria-label="Dismiss new order notification" onClick={() => setOrderAlert("")}><X size={18}/></button></div>}<div className="admin-main__content">{children}</div><footer data-admin-footer>ONEPLACE · Store workspace</footer></main>
       </div>
       <CommandPalette isOpen={searchOpen} onClose={() => setSearchOpen(false)} onOpenAddProduct={() => setProductOpen(true)} />
       <ProductModal isOpen={productOpen} onClose={() => setProductOpen(false)} categories={categories} onSave={() => { setProductOpen(false); window.location.reload(); }} />

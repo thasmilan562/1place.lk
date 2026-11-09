@@ -20,7 +20,7 @@ function unauthorized() {
 }
 
 function persistenceUnavailable() {
-  return NextResponse.json({ success: false, error: "Product storage is unavailable. No changes were saved." }, { status: 503 });
+  return NextResponse.json({ success: false, error: "Firebase Admin database connection is unavailable. Configure FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON in production; no changes were saved." }, { status: 503 });
 }
 
 function sanitize(obj: any): any {

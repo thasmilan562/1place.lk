@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase-admin";
-import { getLocalProducts } from "@/lib/products-store";
-import { Product } from "@/lib/types";
+import { getProducts } from "@/lib/firestore-client";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -15,21 +13,10 @@ const NO_CACHE_HEADERS = {
 // GET /api/products
 export async function GET() {
   try {
-    try {
-      const db = getAdminDb();
-      const snap = await db.collection("products").get();
-      const products = snap.docs.map((d) => ({ ...(d.data() as Product), id: d.id }));
-      return NextResponse.json({ success: true, products }, { headers: NO_CACHE_HEADERS });
-    } catch (e) {
-      console.warn("[Public API Products] Firestore read warning:", e);
-      // A local JSON copy is only a development fallback. In production it can
-      // contain deleted/stale products and must never override the database.
-      if (process.env.NODE_ENV === "production") {
-        return NextResponse.json({ success: false, error: "Product catalog is temporarily unavailable." }, { status: 503, headers: NO_CACHE_HEADERS });
-      }
-
-      return NextResponse.json({ success: true, products: getLocalProducts() }, { headers: NO_CACHE_HEADERS });
-    }
+    // Catalog reads are public in Firestore rules; they should not depend on a
+    // server service account. Privileged admin writes remain server-only.
+    const products = await getProducts();
+    return NextResponse.json({ success: true, products }, { headers: NO_CACHE_HEADERS });
   } catch (err: any) {
     console.error("[Public API Products] GET error:", err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500, headers: NO_CACHE_HEADERS });
