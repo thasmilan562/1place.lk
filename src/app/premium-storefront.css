@@ -423,3 +423,13 @@ main:has(.premium-login) { padding-top: 0 !important; padding-bottom: 0; }
   .home-offers__button svg { width: 12px; height: 12px; flex-shrink: 0; }
 }
 
+@media (max-width: 767px) {
+  .home-offers,
+  #todays-deal-section,
+  [aria-label="Today's deal"],
+  [aria-label="Today's Deal Promotional Showcase"] {
+    display: none !important;
+  }
+}
+
+

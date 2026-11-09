@@ -253,7 +253,7 @@ export default function TodayDealSection({
     <section
       id="todays-deal-section"
       aria-label="Today's Deal Promotional Showcase"
-      className={`w-full py-8 sm:py-12 lg:py-14 select-none relative overflow-hidden ${className}`}
+      className={`w-full py-8 sm:py-12 lg:py-14 select-none relative overflow-hidden ${isLivePreview ? "" : "hidden md:block"} ${className}`}
     >
       {/* ── 100% Sharp 90-Degree Square Background Banner Behind Both Cards ── */}
       {hasBgBanner && (

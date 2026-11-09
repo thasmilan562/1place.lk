@@ -232,20 +232,44 @@ export default function SpinWinModal() {
       }
 
       const { winningSegmentIndex, segment, reward, giftProduct } = data;
-      setWinningSegment(segment);
-      setWonReward(reward);
-      setWonGiftProduct(giftProduct);
 
-      // Calculate deceleration landing angle
+      // Calculate deceleration landing angle - STRICT REQUIREMENT: MUST ALWAYS land on 10% DISCOUNT
       const segments = settings.segments || DEFAULT_SPIN_SETTINGS.segments;
       const numSegments = segments.length || 6;
       const sliceAngle = 360 / numSegments;
 
-      // Pointer is at the top (90 deg counter-clockwise in SVG coordinates, or top 0)
-      const targetSliceCenter = winningSegmentIndex * sliceAngle + sliceAngle / 2;
-      const landingOffset = 360 - targetSliceCenter;
+      const discount10Index = segments.findIndex(
+        (s) => s.id === "seg_discount" || s.discountPercent === 10 || s.label.includes("10%")
+      );
+      const finalWinningIndex = discount10Index >= 0 ? discount10Index : (winningSegmentIndex >= 0 ? winningSegmentIndex : (numSegments - 1));
+
+      // Pointer is at the top (0° or -90° SVG center)
+      const targetSliceCenter = finalWinningIndex * sliceAngle + sliceAngle / 2;
+      const landingOffset = (360 - targetSliceCenter) % 360;
       const dramaticSpins = 360 * 6; // 6 full turns
       const nextRotation = wheelRotation + dramaticSpins + ((landingOffset - (wheelRotation % 360) + 360) % 360);
+
+      // Force reward to 10% DISCOUNT
+      const guaranteed10DiscountReward: SpinReward = {
+        id: reward?.id || `RW-SPIN-${Date.now()}`,
+        userId: user?.uid || "guest",
+        customerName: user?.displayName || "First Order Customer",
+        customerEmail: user?.email || "",
+        customerPhone: user?.phoneNumber || "",
+        rewardType: "discount",
+        segmentId: segments[finalWinningIndex]?.id || "seg_discount",
+        segmentLabel: "10% DISCOUNT",
+        productName: "10% Off First Order Discount",
+        productImage: "/assets/promo/gift-box.png",
+        discountPercent: 10,
+        status: "issued",
+        issuedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+
+      setWinningSegment(segments[finalWinningIndex] || segment);
+      setWonReward(guaranteed10DiscountReward);
+      setWonGiftProduct(giftProduct);
 
       setModalState("spinning");
       setSpinningLoading(false);
@@ -263,22 +287,12 @@ export default function SpinWinModal() {
     setIsWheelSpinning(false);
     setModalState("won");
 
-    // Automatically integrate reward into cart!
-    if (wonReward) {
-      if (wonReward.rewardType === "gift" && wonGiftProduct) {
-        addFreeGiftToCart(
-          {
-            productId: wonGiftProduct.id,
-            name: wonGiftProduct.name,
-            image: wonGiftProduct.image,
-            originalPrice: wonGiftProduct.originalPrice,
-          },
-          wonReward.id
-        );
-      } else if (wonReward.rewardType === "free_shipping") {
-        setShippingReward(wonReward);
-      }
-    }
+    // Automatically integrate 10% discount coupon into checkout
+    try {
+      localStorage.setItem("sm_active_coupon", "SPIN10");
+      localStorage.setItem("oneplace_active_coupon", "SPIN10");
+      window.dispatchEvent(new CustomEvent("coupon-applied", { detail: { code: "SPIN10", discountPercent: 10 } }));
+    } catch {}
   };
 
   if (!settings.enabled || isBlockedRoute) return null;
@@ -395,13 +409,13 @@ export default function SpinWinModal() {
                             </>
                           ) : isWheelSpinning ? (
                             <>
-                              <Gift className="w-5 h-5 animate-bounce text-[#FFE875]" />
-                              <span>Spinning For Your Gift...</span>
+                              <RotateCw className="w-5 h-5 animate-spin text-[#FFE875]" />
+                              <span>Spinning For 10% Discount...</span>
                             </>
                           ) : (
                             <>
                               <Gift className="w-5 h-5 text-[#FFE875]" />
-                              <span>SPIN NOW &amp; WIN FREE GIFT</span>
+                              <span>SPIN NOW &amp; WIN 10% DISCOUNT</span>
                             </>
                           )}
                           <motion.span
@@ -440,7 +454,7 @@ export default function SpinWinModal() {
                     </>
                   )}
 
-                  {/* ── STATE D: WINNING RESULT ── */}
+                  {/* ── STATE D: WINNING RESULT (STRICT 10% DISCOUNT) ── */}
                   {modalState === "won" && wonReward && (
                     <motion.div
                       initial={{ opacity: 0, y: 15 }}
@@ -448,42 +462,32 @@ export default function SpinWinModal() {
                       className="space-y-4"
                     >
                       <div>
-                        <span className="text-[#68122F] text-xs sm:text-sm font-semibold tracking-widest uppercase">
+                        <span className="text-[#68122F] text-xs sm:text-sm font-bold tracking-widest uppercase flex items-center justify-center lg:justify-start gap-1.5">
                           🎉 CONGRATULATIONS!
                         </span>
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-[#1D1D1F] mt-1">
-                          {wonReward.rewardType === "gift"
-                            ? `YOU WON A ${wonReward.productName || wonReward.segmentLabel}!`
-                            : wonReward.rewardType === "free_shipping"
-                            ? "YOU WON FREE ISLANDWIDE SHIPPING!"
-                            : `YOU WON ${wonReward.segmentLabel}!`}
+                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-[#1D1D1F] mt-1">
+                          YOU WON 10% OFF YOUR ORDER!
                         </h2>
+                        <p className="text-xs sm:text-sm text-[#6E6E73] mt-1">
+                          Your special 10% first-order discount has been unlocked.
+                        </p>
                       </div>
 
-                      {/* Automatic Cart Success Card */}
-                      <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E5E7] shadow-sm flex items-center gap-4 text-left">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-[#F5F5F7] border border-[#E5E5E7] p-2 shrink-0 flex items-center justify-center overflow-hidden relative">
-                          <img
-                            src={wonReward.productImage || "/assets/promo/gift-box.png"}
-                            alt={wonReward.productName || "Reward"}
-                            className="w-full h-full object-contain"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = "/placeholder-phone.webp";
-                            }}
-                          />
-                          <span className="absolute top-1 left-1 bg-rose-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded">
-                            FREE
-                          </span>
+                      {/* 10% Discount Coupon Card */}
+                      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-white to-[#FBF8F9] border-2 border-[#E7D8DF] shadow-md flex items-center gap-4 text-left">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-[#68122F] text-white p-2 shrink-0 flex flex-col items-center justify-center overflow-hidden relative shadow-inner">
+                          <span className="text-xl sm:text-2xl font-black leading-none text-[#FFE875]">10%</span>
+                          <span className="text-[9px] font-bold tracking-wider uppercase mt-0.5">OFF</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold uppercase mb-1">
-                            ✓ Automatically Added to Bag
+                          <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-extrabold uppercase mb-1">
+                            ✓ Coupon Code Auto-Applied
                           </span>
-                          <h4 className="text-sm sm:text-base font-semibold text-[#1D1D1F] truncate">
-                            {wonReward.productName || wonReward.segmentLabel}
+                          <h4 className="text-base sm:text-lg font-black text-[#1D1D1F] tracking-tight">
+                            PROMO CODE: <span className="font-mono text-[#68122F] bg-rose-50 px-2 py-0.5 rounded border border-rose-200">SPIN10</span>
                           </h4>
-                          <p className="text-xs font-semibold text-emerald-700 mt-0.5">
-                            Price: LKR 0 (Promotional Gift)
+                          <p className="text-xs font-semibold text-emerald-700 mt-1">
+                            10% off your entire order at checkout!
                           </p>
                         </div>
                       </div>
@@ -492,7 +496,7 @@ export default function SpinWinModal() {
                       <div className="p-3 rounded-xl bg-white border border-[#E5E5E7] text-[11px] sm:text-xs text-[#6E6E73] text-left flex items-start gap-2.5">
                         <HelpCircle className="w-4 h-4 text-[#68122F] shrink-0 mt-0.5" />
                         <p>
-                          <strong className="text-[#1D1D1F]">Redemption Policy:</strong> Simply add any regular smartphone, audio, or tech item to your bag to checkout with your free gift.
+                          <strong className="text-[#1D1D1F]">Redemption:</strong> Coupon code <code className="font-bold text-[#68122F]">SPIN10</code> has been saved to your session. It will be deducted automatically from your cart total!
                         </p>
                       </div>
 
@@ -501,23 +505,21 @@ export default function SpinWinModal() {
                         <button
                           onClick={() => {
                             handleClose();
-                            if (typeof window !== "undefined") {
-                              window.dispatchEvent(new CustomEvent("open-cart-drawer"));
-                            }
+                            router.push("/products");
                           }}
-                          className="py-3.5 px-4 rounded-xl bg-white text-black font-extrabold text-xs sm:text-sm hover:bg-neutral-200 transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="py-3.5 px-4 rounded-xl bg-[#68122F] hover:bg-[#520D23] text-white font-bold text-xs sm:text-sm transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                           <ShoppingBag className="w-4 h-4" />
-                          <span>View My Cart</span>
+                          <span>Shop Products (10% Off)</span>
                         </button>
                         <button
                           onClick={() => {
                             handleClose();
-                            router.push("/products");
+                            router.push("/checkout");
                           }}
-                          className="py-3.5 px-4 rounded-xl bg-[#F2E9ED] hover:bg-[#E9D9E0] text-[#68122F] font-semibold text-xs sm:text-sm border border-[#E7D8DF] transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="py-3.5 px-4 rounded-xl bg-white hover:bg-neutral-100 text-[#1D1D1F] font-bold text-xs sm:text-sm border border-[#E5E5E7] transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          <span>Shop Products</span>
+                          <span>Go to Checkout</span>
                           <ArrowRight className="w-4 h-4" />
                         </button>
                       </div>
@@ -573,7 +575,7 @@ export default function SpinWinModal() {
 
                 {/* ══ RIGHT COLUMN: INTERACTIVE PRIZE WHEEL ══ */}
                 <div className="lg:col-span-5 flex flex-col items-center justify-center relative py-2 sm:py-4">
-                  <div className="transform scale-95 sm:scale-100 transition-transform">
+                  <div className="flex items-center justify-center">
                     <SpinWheel
                       segments={settings.segments || DEFAULT_SPIN_SETTINGS.segments}
                       rotation={wheelRotation}

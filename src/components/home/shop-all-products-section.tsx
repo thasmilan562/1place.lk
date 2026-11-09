@@ -275,7 +275,7 @@ export default function ShopAllProductsSection({
 
           {/* Insertion 2: Today's Deal Promotional Banner */}
           {segment.insertionAfter?.type === "today_deal" && todayDealSettings && (
-            <div className="w-full my-8 sm:my-14">
+            <div className="w-full my-8 sm:my-14 hidden md:block">
               <TodayDealSection settings={todayDealSettings} />
             </div>
           )}

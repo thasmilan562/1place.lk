@@ -1365,6 +1365,7 @@ export interface SpinReward {
   productImage?: string;
   discountPercent?: number;
   discountAmount?: number;
+  couponCode?: string;
   status: "issued" | "redeemed" | "expired";
   issuedAt: string;
   expiresAt: string;

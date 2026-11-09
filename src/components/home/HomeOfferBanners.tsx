@@ -43,7 +43,7 @@ export default function HomeOfferBanners({ products, fallbackEndsAt = "" }: { pr
   const dealLink = safeOfferLink(settings.dealLink);
 
   return (
-    <section className="home-offers" aria-label="Today's deal">
+    <section className="home-offers hidden md:block" aria-label="Today's deal">
       <article className={`home-offers__banner${expired ? " is-expired" : ""}`} style={{ "--deal-banner-color": settings.dealBackgroundColor || "#118a22" } as CSSProperties}>
         <div className="home-offers__panel" aria-hidden="true" />
         <div className="home-offers__copy home-offers__copy--left">

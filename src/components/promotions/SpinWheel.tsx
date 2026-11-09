@@ -47,11 +47,12 @@ export default function SpinWheel({
       style={{ width: size, height: size }}
       title={!isSpinning ? "Click or tap to spin the wheel!" : "Spinning..."}
     >
-      {/* Outer Glow Halo */}
+      {/* Outer Glow Halo & Static Shadow (Static, so it does not wobble during rotation) */}
       <div className="absolute inset-[2px] rounded-full bg-[#68122F]/[0.06] blur-xl pointer-events-none" />
+      <div className="absolute inset-1 rounded-full shadow-[0_10px_26px_rgba(29,29,31,0.16)] pointer-events-none" />
 
       {/* Top Fixed Gold Pointer */}
-      <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-30 drop-shadow-[0_2px_4px_rgba(0,0,0,0.16)]">
+      <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-30 drop-shadow-[0_2px_4px_rgba(0,0,0,0.16)] pointer-events-none">
         <svg width="34" height="42" viewBox="0 0 34 42" fill="none">
           <path
             d="M17 40L4 6C3 4 4.5 1 7 1H27C29.5 1 31 4 30 6L17 40Z"
@@ -69,11 +70,16 @@ export default function SpinWheel({
         </svg>
       </div>
 
-      {/* Rotating Wheel Container */}
+      {/* Rotating Wheel Container (GPU Hardware-Accelerated, zero jitter) */}
       <div
         className="w-full h-full relative"
         style={{
-          transform: `rotate(${rotation}deg)`,
+          transform: `rotate(${rotation}deg) translateZ(0)`,
+          WebkitTransform: `rotate(${rotation}deg) translateZ(0)`,
+          transformOrigin: "50% 50%",
+          willChange: isSpinning ? "transform" : "auto",
+          backfaceVisibility: "hidden",
+          WebkitBackfaceVisibility: "hidden",
           transition: isSpinning
             ? "transform 6.5s cubic-bezier(0.12, 0.85, 0.2, 1)"
             : "transform 0.4s ease-out",
@@ -82,7 +88,7 @@ export default function SpinWheel({
       >
         <svg
           viewBox="0 0 300 300"
-          className="w-full h-full filter drop-shadow-[0_8px_16px_rgba(29,29,31,0.14)]"
+          className="w-full h-full block"
         >
           <defs>
             {/* Outer Gold Rim Gradient */}
