@@ -310,18 +310,31 @@ function DashboardContent() {
       // Banners (Merge offer_banners and banners collections)
       let banList: OfferBanner[] = [];
       try {
-        const banSnap = await getDocs(collection(db, "offer_banners"));
-        banList = banSnap.docs.map((d) => {
-          const data = d.data();
-          return {
-            ...data,
-            id: d.id,
-            status: data.status || "active",
-            placement: data.placement || "homepage_after_categories",
-          } as OfferBanner;
-        });
+        const banRes = await fetch(`/api/admin/banners?_t=${Date.now()}`, { cache: "no-store" });
+        if (banRes.ok) {
+          const banData = await banRes.json();
+          if (banData.success && Array.isArray(banData.banners)) {
+            banList = banData.banners;
+          }
+        }
       } catch (banErr) {
-        console.warn("Error fetching offer_banners:", banErr);
+        console.warn("Error fetching offer_banners from API:", banErr);
+      }
+      if (banList.length === 0) {
+        try {
+          const banSnap = await getDocs(collection(db, "offer_banners"));
+          banList = banSnap.docs.map((d) => {
+            const data = d.data();
+            return {
+              ...data,
+              id: d.id,
+              status: data.status || "active",
+              placement: data.placement || "homepage_after_categories",
+            } as OfferBanner;
+          });
+        } catch (banErr) {
+          console.warn("Error fetching offer_banners:", banErr);
+        }
       }
 
       let legacyBanList: OfferBanner[] = [];
@@ -372,11 +385,19 @@ function DashboardContent() {
         console.warn("Error fetching coupons:", coupErr);
       }
 
-      // Hero Slides
+      // Hero Slides (Server API with fallback)
       try {
-        const heroSnap = await getDocs(collection(db, "hero_slides"));
-        const heroList = heroSnap.docs.map((d) => ({ id: d.id, ...d.data() } as HeroSlide));
-        setHeroSlides(heroList);
+        const heroRes = await fetch(`/api/admin/hero?_t=${Date.now()}`, { cache: "no-store" });
+        if (heroRes.ok) {
+          const heroData = await heroRes.json();
+          if (heroData.success && Array.isArray(heroData.slides)) {
+            setHeroSlides(heroData.slides);
+          }
+        } else {
+          const heroSnap = await getDocs(collection(db, "hero_slides"));
+          const heroList = heroSnap.docs.map((d) => ({ id: d.id, ...d.data() } as HeroSlide));
+          setHeroSlides(heroList);
+        }
       } catch (heroErr) {
         console.warn("Error fetching hero slides:", heroErr);
       }
@@ -1132,19 +1153,35 @@ function DashboardContent() {
 
   const handleSaveBanner = async (bannerData: Partial<OfferBanner>) => {
     try {
-      if (editingBanner && editingBanner.id) {
-        await setDoc(doc(db, "offer_banners", editingBanner.id), { ...editingBanner, ...bannerData }, { merge: true });
-        setBanners((prev) => prev.map((b) => (b.id === editingBanner.id ? ({ ...b, ...bannerData } as OfferBanner) : b)));
-      } else {
-        const docRef = await addDoc(collection(db, "offer_banners"), bannerData);
-        setBanners((prev) => [...prev, { ...bannerData, id: docRef.id } as OfferBanner]);
+      const bannerId = editingBanner?.id || `banner-${Date.now()}`;
+      const payload = { ...(editingBanner || {}), ...bannerData, id: bannerId };
+
+      const res = await fetch("/api/admin/banners", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ banner: payload }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to save offer banner");
       }
+
+      const saved = data.banner || payload;
+      setBanners((prev) => {
+        const exists = prev.some((b) => b.id === bannerId);
+        if (exists) {
+          return prev.map((b) => (b.id === bannerId ? ({ ...b, ...saved } as OfferBanner) : b));
+        }
+        return [...prev, saved as OfferBanner];
+      });
+
       setIsBannerModalOpen(false);
       setEditingBanner(null);
       refreshData();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error saving offer banner:", e);
-      alert("Failed to save offer banner");
+      alert(`Failed to save offer banner: ${e?.message || "Check network/permissions"}`);
     }
   };
 
@@ -1152,12 +1189,10 @@ function DashboardContent() {
     if (!confirm("Are you sure you want to delete / remove this offer banner?")) return;
     try {
       if (id) {
-        if (id.startsWith("default-")) {
-          const target = banners.find((b) => b.id === id);
-          await setDoc(doc(db, "offer_banners", id), { ...(target || {}), id, status: "archived" }, { merge: true });
-        } else {
-          await deleteDoc(doc(db, "offer_banners", id));
-        }
+        setBanners((prev) => prev.filter((b) => b.id !== id));
+        await fetch(`/api/admin/banners?id=${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        });
       }
     } catch (e) {
       console.error("Error deleting banner:", e);
@@ -1174,8 +1209,16 @@ function DashboardContent() {
         created_at: new Date().toISOString(),
       };
       delete (duplicatedData as any).id;
-      const docRef = await addDoc(collection(db, "offer_banners"), duplicatedData);
-      setBanners((prev) => [...prev, { ...duplicatedData, id: docRef.id } as OfferBanner]);
+
+      const res = await fetch("/api/admin/banners", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ banner: duplicatedData }),
+      });
+      const data = await res.json();
+      if (data.success && data.banner) {
+        setBanners((prev) => [...prev, data.banner]);
+      }
     } catch (e) {
       console.error("Error duplicating banner:", e);
     }
@@ -1183,14 +1226,17 @@ function DashboardContent() {
 
   const handleToggleBannerStatus = async (id: string, newStatus: BannerStatus) => {
     try {
-      const target = banners.find((b) => b.id === id);
       if (id) {
-        await setDoc(doc(db, "offer_banners", id), { ...(target || {}), id, status: newStatus }, { merge: true });
+        setBanners((prev) => prev.map((b) => (b.id === id ? { ...b, status: newStatus } : b)));
+        await fetch("/api/admin/banners", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status: newStatus }),
+        });
       }
     } catch (e) {
       console.error("Error toggling banner status:", e);
     }
-    setBanners((prev) => prev.map((b) => (b.id === id ? { ...b, status: newStatus } : b)));
   };
 
   const handleDeleteCoupon = async (id: string) => {
@@ -1235,14 +1281,25 @@ function DashboardContent() {
     try {
       const slideId = editingHeroSlide?.id || `hero-${Date.now()}`;
       const payload = { ...slideData, id: slideId, updated_at: new Date().toISOString() };
-      await setDoc(doc(db, "hero_slides", slideId), payload, { merge: true });
 
+      const res = await fetch("/api/admin/hero", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slide: payload }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to save hero slide on server");
+      }
+
+      const saved = data.slide || payload;
       setHeroSlides((prev) => {
         const exists = prev.some((s) => s.id === slideId);
         if (exists) {
-          return prev.map((s) => (s.id === slideId ? ({ ...s, ...payload } as HeroSlide) : s));
+          return prev.map((s) => (s.id === slideId ? ({ ...s, ...saved } as HeroSlide) : s));
         }
-        return [...prev, payload as HeroSlide];
+        return [...prev, saved as HeroSlide];
       });
 
       setIsHeroModalOpen(false);
@@ -1257,8 +1314,12 @@ function DashboardContent() {
   const handleToggleHeroSlideStatus = async (id: string, active: boolean) => {
     try {
       if (id) {
-        await setDoc(doc(db, "hero_slides", id), { active }, { merge: true });
         setHeroSlides((prev) => prev.map((s) => (s.id === id ? { ...s, active } : s)));
+        await fetch("/api/admin/hero", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, active }),
+        });
       }
     } catch (e) {
       console.error("Error toggling hero slide status:", e);
@@ -1269,7 +1330,10 @@ function DashboardContent() {
     if (!confirm("Are you sure you want to delete this hero slider image?")) return;
     try {
       if (id) {
-        await deleteDoc(doc(db, "hero_slides", id));
+        setHeroSlides((prev) => prev.filter((s) => s.id !== id));
+        await fetch(`/api/admin/hero?id=${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        });
       }
     } catch (e) {
       console.error("Error deleting hero slide:", e);

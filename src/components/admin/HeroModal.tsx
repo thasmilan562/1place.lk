@@ -13,10 +13,10 @@ interface HeroModalProps {
 }
 
 const presets = [
-  { url: "/hero-slide-1.png", label: "iPhone 16 Pro Flagship Showcase" },
-  { url: "/hero-slide-2.png", label: "Smartwatches & Wearables Collection" },
-  { url: "/hero-slide-3.png", label: "Premium Audio & ANC Headphones" },
-  { url: "/hero-slide-4.png", label: "Fast Chargers & Power Solutions" },
+  { url: "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?q=80&w=2200&auto=format&fit=crop", label: "iPhone & Flagships Showcase" },
+  { url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=2200&auto=format&fit=crop", label: "Smartwatches & Wearables" },
+  { url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=2200&auto=format&fit=crop", label: "Premium Audio & ANC Headphones" },
+  { url: "https://images.unsplash.com/photo-1583394838336-acd977736f90?q=80&w=2200&auto=format&fit=crop", label: "Accessories & Everyday Tech" },
 ];
 
 export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalProps) {
@@ -248,7 +248,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
         finalMobileUrl = await uploadImageWithFallback(mobileFile, "hero_slides");
       }
 
-      const mainImg = finalDesktopUrl || desktopPreview || "/hero-slide-1.png";
+      const mainImg = finalDesktopUrl || desktopPreview || "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?q=80&w=2200&auto=format&fit=crop";
 
       const computedHeading = (headingLine1.trim() || headingLine2.trim())
         ? [headingLine1.trim(), headingLine2.trim()].filter(Boolean).join(" ")

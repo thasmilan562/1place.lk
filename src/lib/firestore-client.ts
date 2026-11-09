@@ -297,6 +297,22 @@ export async function getBanners(): Promise<Banner[]> {
 export async function getOfferBanners(placement?: string): Promise<OfferBanner[]> {
   const allBanners = await cachedFetch("offer_banners:all", async () => {
     try {
+      if (typeof window === "undefined") {
+        try {
+          const { getLocalOfferBanners } = await import("@/lib/banners-store");
+          const localBanners = getLocalOfferBanners();
+          if (Array.isArray(localBanners) && localBanners.length > 0) {
+            return localBanners.map((b) => ({
+              ...b,
+              desktopImage: normalizeImageUrl(b.desktopImage),
+              mobileImage: normalizeImageUrl(b.mobileImage),
+            }));
+          }
+        } catch {
+          // ignore server local banners import error
+        }
+      }
+
       const q = query(collection(db, "offer_banners"));
       const snapshot = await getDocs(q);
       let docs = snapshot.docs.map((d) => {
@@ -348,6 +364,28 @@ export async function getOfferBanners(placement?: string): Promise<OfferBanner[]
 export async function getHeroSlides(): Promise<HeroSlide[]> {
   return cachedFetch("hero_slides:all", async () => {
     try {
+      if (typeof window === "undefined") {
+        try {
+          const { getLocalHeroSlides } = await import("@/lib/hero-store");
+          const localList = getLocalHeroSlides();
+          if (Array.isArray(localList) && localList.length > 0) {
+            const activeList = localList.filter((s) => s.active !== false);
+            if (activeList.length > 0) {
+              return activeList
+                .map((s) => ({
+                  ...s,
+                  image_url: normalizeImageUrl(s.image_url),
+                  desktop_image_url: normalizeImageUrl(s.desktop_image_url || s.image_url),
+                  mobile_image_url: normalizeImageUrl(s.mobile_image_url || s.desktop_image_url || s.image_url),
+                }))
+                .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+            }
+          }
+        } catch {
+          // ignore server local store lookup error
+        }
+      }
+
       const q = query(collection(db, "hero_slides"));
       const snapshot = await getDocs(q);
       const slides = snapshot.docs.map((d) => {
@@ -356,8 +394,8 @@ export async function getHeroSlides(): Promise<HeroSlide[]> {
           ...data,
           id: d.id,
           image_url: normalizeImageUrl(data.image_url),
-          desktop_image_url: normalizeImageUrl(data.desktop_image_url),
-          mobile_image_url: normalizeImageUrl(data.mobile_image_url),
+          desktop_image_url: normalizeImageUrl(data.desktop_image_url || data.image_url),
+          mobile_image_url: normalizeImageUrl(data.mobile_image_url || data.desktop_image_url || data.image_url),
         } as HeroSlide;
       });
       const activeSlides = slides.filter((s) => s.active !== false);
@@ -370,8 +408,8 @@ export async function getHeroSlides(): Promise<HeroSlide[]> {
     return DEFAULT_HERO_SLIDES.map((s) => ({
       ...s,
       image_url: normalizeImageUrl(s.image_url),
-      desktop_image_url: normalizeImageUrl(s.desktop_image_url),
-      mobile_image_url: normalizeImageUrl(s.mobile_image_url),
+      desktop_image_url: normalizeImageUrl(s.desktop_image_url || s.image_url),
+      mobile_image_url: normalizeImageUrl(s.mobile_image_url || s.desktop_image_url || s.image_url),
     }));
   }, CACHE_TTL.BANNERS);
 }

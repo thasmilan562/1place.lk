@@ -14,6 +14,7 @@ import {
   getProducts,
   getReviews,
   getGalleryImages,
+  getHeroSlides,
   getUiSettings,
   getGoogleReviewsSettings,
   getShowcaseSettings,
@@ -57,6 +58,7 @@ export default async function HomePage() {
     products,
     reviews,
     galleryImages,
+    heroSlides,
     uiSettings,
     googleReviewsSettings,
     showcaseSettings,
@@ -70,6 +72,7 @@ export default async function HomePage() {
     getProducts().catch(() => []),
     getReviews().catch(() => []),
     getGalleryImages().catch(() => []),
+    getHeroSlides().catch(() => []),
     getUiSettings().catch(() => null),
     getGoogleReviewsSettings().catch(() => null),
     getShowcaseSettings().catch(() => null),
@@ -84,7 +87,7 @@ export default async function HomePage() {
       <HomeScrollReset />
 
       {/* 1. Full-Width Hero Banner (Matching Reference Layout) */}
-      <HeroSection />
+      <HeroSection initialSlides={heroSlides} />
 
       {/* Visual Showcase: Below Hero Banner */}
       <VisualProductShowcase settings={showcaseSettings} placement="below_hero" />

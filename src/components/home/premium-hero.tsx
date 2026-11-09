@@ -25,9 +25,14 @@ function formatCase(text: string, casing?: string) {
   return text;
 }
 
-export default function PremiumHero() {
-  const [slides, setSlides] = useState(() => activeSlides(DEFAULT_HERO_SLIDES));
-  const [isLoading, setIsLoading] = useState(true);
+export default function PremiumHero({ initialSlides }: { initialSlides?: HeroSlide[] } = {}) {
+  const [slides, setSlides] = useState<HeroSlide[]>(() => {
+    if (initialSlides && initialSlides.length > 0) {
+      return activeSlides(initialSlides);
+    }
+    return activeSlides(DEFAULT_HERO_SLIDES);
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() => !(initialSlides && initialSlides.length > 0));
   const [index, setIndex] = useState(0);
   // Rotation is opt-in so customers can read the campaign at their own pace.
   const [playing, setPlaying] = useState(false);
@@ -43,18 +48,53 @@ export default function PremiumHero() {
     return () => media.removeEventListener("change", update);
   }, []);
 
-  useEffect(() => onSnapshot(collection(db, "hero_slides"), { includeMetadataChanges: true }, (snapshot) => {
-    // Ignore cache-only snapshots so an old/default image does not flash before
-    // the current server-side hero configuration arrives.
-    if (snapshot.metadata.fromCache) return;
-    setSlides(snapshot.empty ? activeSlides(DEFAULT_HERO_SLIDES) : activeSlides(
-      snapshot.docs.map((item) => ({ ...item.data(), id: item.id }) as HeroSlide)
-    ));
-    setIsLoading(false);
-  }, () => {
-    setSlides(activeSlides(DEFAULT_HERO_SLIDES));
-    setIsLoading(false);
-  }), []);
+  useEffect(() => {
+    let isMounted = true;
+
+    // 1. Fetch latest slides via API endpoint
+    fetch(`/api/hero?_t=${Date.now()}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!isMounted || !data || !Array.isArray(data.slides)) return;
+        const valid = activeSlides(data.slides);
+        if (valid.length > 0) {
+          setSlides(valid);
+          setIsLoading(false);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Real-time Firestore snapshot listener
+    let unsubSnapshot: (() => void) | null = null;
+    try {
+      unsubSnapshot = onSnapshot(
+        collection(db, "hero_slides"),
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (!isMounted) return;
+          if (snapshot.metadata.fromCache && slides.length > 0) return;
+          if (!snapshot.empty) {
+            const firestoreSlides = snapshot.docs.map((item) => ({ ...item.data(), id: item.id }) as HeroSlide);
+            const valid = activeSlides(firestoreSlides);
+            if (valid.length > 0) {
+              setSlides(valid);
+            }
+          }
+          setIsLoading(false);
+        },
+        () => {
+          if (isMounted) setIsLoading(false);
+        }
+      );
+    } catch {
+      if (isMounted) setIsLoading(false);
+    }
+
+    return () => {
+      isMounted = false;
+      if (unsubSnapshot) unsubSnapshot();
+    };
+  }, []);
 
   const safeIndex = slides.length ? index % slides.length : 0;
   const slide = slides[safeIndex];
