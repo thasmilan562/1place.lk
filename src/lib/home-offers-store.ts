@@ -37,3 +37,4 @@ export function saveLocalHomeOffers(settings: Partial<HomeOfferSettings>): HomeO
     return { ...HOME_OFFER_DEFAULTS, ...settings };
   }
 }
+

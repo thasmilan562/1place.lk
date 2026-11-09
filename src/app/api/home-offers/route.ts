@@ -37,3 +37,4 @@ export async function GET() {
     return NextResponse.json({ success: true, settings: getLocalHomeOffers() }, { headers: NO_CACHE_HEADERS });
   }
 }
+

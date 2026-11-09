@@ -50,18 +50,54 @@ export function compressImageToBase64(file: File, maxDimension = 1000, quality =
   });
 }
 
+function withTimeout<T>(promise: Promise<T>, ms = 2500): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Upload timeout")), ms)),
+  ]);
+}
+
 /**
- * Uploads an image file to Firebase Storage. If Firebase Storage fails (e.g. storage rules,
- * unauthenticated session, quota, CORS), falls back to compressed Base64 data URL.
+ * Uploads an image file.
+ * 1. Tries the fast server-side upload API (/api/admin/upload).
+ * 2. If unavailable, falls back to Firebase Storage with a 2.5s timeout.
+ * 3. If that fails, falls back to compressed Base64 data URL.
  */
 export async function uploadImageWithFallback(file: File, folder: string): Promise<string> {
+  // 1. Try local server-side upload endpoint first (instant, 0% cloud quota)
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("folder", folder);
+
+    const res = await withTimeout(
+      fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      }),
+      4000
+    );
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.url) {
+        return data.url;
+      }
+    }
+  } catch (serverErr) {
+    console.warn(`[UploadUtils] Server upload to /api/admin/upload failed:`, serverErr);
+  }
+
+  // 2. Try Firebase Storage with 2.5s timeout guard
   try {
     const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const storageRef = ref(storage, `${folder}/${Date.now()}_${safeFileName}`);
-    const uploadResult = await uploadBytes(storageRef, file);
+    const uploadResult = await withTimeout(uploadBytes(storageRef, file), 2500);
     return await getDownloadURL(uploadResult.ref);
   } catch (error) {
-    console.warn(`Firebase Storage upload failed for ${folder}/${file.name}. Falling back to compressed base64 image:`, error);
-    return await compressImageToBase64(file);
+    console.warn(`[UploadUtils] Firebase Storage upload failed for ${folder}/${file.name}. Falling back to compressed base64:`, error);
   }
+
+  // 3. Fallback to compressed base64
+  return await compressImageToBase64(file);
 }

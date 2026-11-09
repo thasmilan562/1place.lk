@@ -782,9 +782,24 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
               {/* Desktop Image */}
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-white/80">
-                  Desktop Banner Image URL *
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-white/80">
+                    Desktop Banner Image URL *
+                  </label>
+                  {(imageUrl || desktopPreview || desktopFile) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDesktopFile(null);
+                        setImageUrl("");
+                        setDesktopPreview("");
+                      }}
+                      className="text-[10px] text-red-400 hover:text-red-300 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <X className="w-3 h-3" /> Remove image
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="file"
@@ -805,6 +820,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                     onChange={(e) => {
                       setImageUrl(e.target.value);
                       setDesktopPreview(e.target.value);
+                      setDesktopFile(null);
                     }}
                     placeholder="https://images.unsplash.com/..."
                     className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs font-mono focus:ring-1 focus:ring-emerald-500 outline-none"
@@ -814,9 +830,24 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
 
               {/* Mobile Image */}
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-white/80">
-                  Mobile Banner Image URL (Optional)
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-white/80">
+                    Mobile Banner Image URL (Optional)
+                  </label>
+                  {(mobileImageUrl || mobilePreview || mobileFile) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileFile(null);
+                        setMobileImageUrl("");
+                        setMobilePreview("");
+                      }}
+                      className="text-[10px] text-red-400 hover:text-red-300 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <X className="w-3 h-3" /> Remove image
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="file"
@@ -837,6 +868,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                     onChange={(e) => {
                       setMobileImageUrl(e.target.value);
                       setMobilePreview(e.target.value);
+                      setMobileFile(null);
                     }}
                     placeholder="https://... (Leave blank to use Desktop image)"
                     className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs font-mono focus:ring-1 focus:ring-emerald-500 outline-none"

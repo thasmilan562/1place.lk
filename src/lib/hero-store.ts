@@ -16,8 +16,8 @@ export function getLocalHeroSlides(): HeroSlide[] {
       fs.writeFileSync(HERO_FILE_PATH, JSON.stringify(DEFAULT_HERO_SLIDES, null, 2), "utf8");
       return DEFAULT_HERO_SLIDES;
     }
-    const parsed = JSON.parse(raw) as HeroSlide[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_HERO_SLIDES;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as HeroSlide[]) : DEFAULT_HERO_SLIDES;
   } catch (e) {
     console.error("Error reading local-hero-slides.json:", e);
     return DEFAULT_HERO_SLIDES;

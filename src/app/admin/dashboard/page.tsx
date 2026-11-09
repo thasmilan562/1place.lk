@@ -1288,7 +1288,7 @@ function DashboardContent() {
         if (exists) {
           return prev.map((s) => (s.id === slideId ? { ...s, ...saved } : s));
         }
-        return [...prev, saved];
+        return [saved, ...prev];
       });
 
       setIsHeroModalOpen(false);
@@ -1319,14 +1319,17 @@ function DashboardContent() {
     try {
       if (id) {
         setHeroSlides((prev) => prev.filter((s) => s.id !== id));
-        await fetch(`/api/admin/hero?id=${encodeURIComponent(id)}`, {
+        const res = await fetch(`/api/admin/hero?id=${encodeURIComponent(id)}`, {
           method: "DELETE",
         });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          console.warn("Delete hero slide warning:", data);
+        }
       }
     } catch (e) {
       console.error("Error deleting hero slide:", e);
     }
-    setHeroSlides((prev) => prev.filter((s) => s.id !== id));
   };
 
   const handleDeleteGalleryImage = async (id: string) => {

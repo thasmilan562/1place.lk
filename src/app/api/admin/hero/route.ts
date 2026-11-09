@@ -46,22 +46,7 @@ export async function GET(req: Request) {
   if (!verifyAdminRequest(req)) return unauthorized();
 
   try {
-    let slides: HeroSlide[] = getLocalHeroSlides();
-
-    // Fast check for Firestore documents (max 1.5s timeout)
-    try {
-      const db = getAdminDb();
-      const snap = await withTimeout(db.collection("hero_slides").get(), 1500);
-      if (!snap.empty) {
-        const firestoreSlides = snap.docs.map((d) => ({ ...(d.data() as HeroSlide), id: d.id }));
-        if (firestoreSlides.length > 0) {
-          slides = firestoreSlides;
-        }
-      }
-    } catch (e) {
-      // Cloud quota exceeded or offline: smoothly serve local slides
-    }
-
+    const slides: HeroSlide[] = getLocalHeroSlides();
     slides.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     return NextResponse.json({ success: true, slides }, { headers: NO_CACHE_HEADERS });
   } catch (err: any) {
@@ -87,12 +72,13 @@ export async function POST(req: Request) {
       mobile_image_url: slideData.mobile_image_url || slideData.desktop_image_url || slideData.image_url || DEFAULT_IMAGE,
       active: slideData.active !== false,
       sort_order: typeof slideData.sort_order === "number" ? slideData.sort_order : 1,
+      updated_at: new Date().toISOString(),
     } as HeroSlide;
 
-    // 1. ALWAYS save to local JSON store immediately (0ms guarantee)
+    // 1. ALWAYS save to local JSON store immediately (authoritative truth)
     const saved = saveLocalHeroSlide(payload) || payload;
 
-    // 2. Try to sync to Firestore with 2s timeout
+    // 2. Best-effort async sync to Firestore with 2s timeout
     try {
       const db = getAdminDb();
       await withTimeout(db.collection("hero_slides").doc(slideId).set(sanitize(payload), { merge: true }), 2000);
@@ -127,7 +113,7 @@ export async function PUT(req: Request) {
       return NextResponse.json({ success: false, error: "Hero slide id is required" }, { status: 400 });
     }
 
-    const updates: Partial<HeroSlide> = { id, ...(active !== undefined ? { active } : {}), ...rest };
+    const updates: Partial<HeroSlide> = { id, ...(active !== undefined ? { active } : {}), ...rest, updated_at: new Date().toISOString() };
     const saved = saveLocalHeroSlide(updates);
 
     try {
@@ -167,7 +153,7 @@ export async function DELETE(req: Request) {
     // 1. Delete from local JSON store immediately (0ms guarantee)
     deleteLocalHeroSlide(id);
 
-    // 2. Delete from Firestore with 2s timeout
+    // 2. Best-effort delete from Firestore with 2s timeout
     try {
       const db = getAdminDb();
       await withTimeout(db.collection("hero_slides").doc(id).delete(), 2000);
