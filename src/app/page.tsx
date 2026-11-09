@@ -24,6 +24,7 @@ import {
   getTodayDealSettings,
 } from "@/lib/firestore-client";
 import { siteSettings } from "@/lib/data";
+import { getLocalHomeOffers } from "@/lib/home-offers-store";
 import { GalleryImage } from "@/lib/types";
 import { Metadata } from "next";
 
@@ -94,7 +95,7 @@ export default async function HomePage() {
 
       {/* 2. Circular Category Navigation Strip */}
       <CircularCategories categories={categories} products={products} />
-      <HomeOfferBanners products={products} fallbackEndsAt={todayDealSettings?.endsAt || ""} />
+      <HomeOfferBanners products={products} fallbackEndsAt={todayDealSettings?.endsAt || ""} initialSettings={getLocalHomeOffers()} />
 
       {/* Visual Showcase: Below Categories */}
       <VisualProductShowcase settings={showcaseSettings} placement="below_category" />

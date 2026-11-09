@@ -13,13 +13,41 @@ function formatPrice(amount?: number) {
   return typeof amount === "number" ? `LKR ${amount.toLocaleString("en-LK")}` : "";
 }
 
-export default function HomeOfferBanners({ products, fallbackEndsAt = "" }: { products: Product[]; fallbackEndsAt?: string }) {
-  const [settings, setSettings] = useState<HomeOfferSettings>(HOME_OFFER_DEFAULTS);
+export default function HomeOfferBanners({
+  products,
+  fallbackEndsAt = "",
+  initialSettings,
+}: {
+  products: Product[];
+  fallbackEndsAt?: string;
+  initialSettings?: HomeOfferSettings | null;
+}) {
+  const [settings, setSettings] = useState<HomeOfferSettings>(initialSettings || HOME_OFFER_DEFAULTS);
   const [now, setNow] = useState<number | null>(null);
 
-  useEffect(() => onSnapshot(doc(db, "settings", "home_offers"), (snapshot) => {
-    if (snapshot.exists()) setSettings({ ...HOME_OFFER_DEFAULTS, ...snapshot.data() } as HomeOfferSettings);
-  }), []);
+  useEffect(() => {
+    // 1. Fetch from public API endpoint
+    fetch("/api/home-offers")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.settings) {
+          setSettings({ ...HOME_OFFER_DEFAULTS, ...data.settings });
+        }
+      })
+      .catch(() => {});
+
+    // 2. Real-time Firestore snapshot listener if available
+    try {
+      const unsub = onSnapshot(
+        doc(db, "settings", "home_offers"),
+        (snapshot) => {
+          if (snapshot.exists()) setSettings({ ...HOME_OFFER_DEFAULTS, ...snapshot.data() } as HomeOfferSettings);
+        },
+        (err) => console.warn("Home offers snapshot listener error:", err)
+      );
+      return () => unsub();
+    } catch {}
+  }, []);
   useEffect(() => {
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 1000);

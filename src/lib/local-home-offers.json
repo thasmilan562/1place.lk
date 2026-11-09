@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "dealTitle": "Today's Deal",
+  "dealImage": "",
+  "dealLink": "/products",
+  "ctaTitle": "Your next favourite. Awaits.",
+  "ctaText": "Discover the collection",
+  "ctaImage": "",
+  "ctaLink": "/products",
+  "endsAt": "",
+  "dealBadge": "LIMITED TIME DEAL",
+  "dealDescription": "Limited-time savings on selected favourites.",
+  "dealBackgroundColor": "#118a22"
+}

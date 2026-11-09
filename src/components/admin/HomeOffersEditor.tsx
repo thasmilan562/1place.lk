@@ -23,11 +23,21 @@ export default function HomeOffersEditor() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    Promise.all([getDoc(doc(db, "settings", "home_offers")), getDoc(doc(db, "settings", "today_deal"))])
-      .then(([snapshot, todayDeal]) => {
-        const loaded = { ...HOME_OFFER_DEFAULTS, ...(snapshot.exists() ? snapshot.data() : {}) } as HomeOfferSettings;
-        if (!loaded.endsAt && todayDeal.exists()) loaded.endsAt = String(todayDeal.data().endsAt || "");
-        setSettings(loaded);
+    // 1. Fetch from server API first (resilient, no auth rule blocks)
+    fetch("/api/admin/home-offers")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.settings) {
+          setSettings({ ...HOME_OFFER_DEFAULTS, ...data.settings });
+        } else {
+          // Fallback to client Firestore
+          return Promise.all([getDoc(doc(db, "settings", "home_offers")), getDoc(doc(db, "settings", "today_deal"))])
+            .then(([snapshot, todayDeal]) => {
+              const loaded = { ...HOME_OFFER_DEFAULTS, ...(snapshot.exists() ? snapshot.data() : {}) } as HomeOfferSettings;
+              if (!loaded.endsAt && todayDeal.exists()) loaded.endsAt = String(todayDeal.data().endsAt || "");
+              setSettings(loaded);
+            });
+        }
       })
       .catch(() => setMessage("Couldn't load the deal settings. Refresh before saving."))
       .finally(() => setLoading(false));
@@ -64,10 +74,28 @@ export default function HomeOffersEditor() {
     setSaving(true);
     setMessage("");
     try {
-      await setDoc(doc(db, "settings", "home_offers"), settings, { merge: true });
-      setMessage("Today's Deal banner saved. The homepage will update live.");
+      // 1. Post to server-side admin API (uses service account / local store, immune to client rule blocks)
+      const res = await fetch("/api/admin/home-offers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        setMessage("Today's Deal banner saved. The homepage will update live.");
+        if (data.settings) setSettings(data.settings);
+      } else {
+        throw new Error(data.error || "Save failed");
+      }
     } catch {
-      setMessage("Couldn't save the deal banner. Try again.");
+      // 2. Client fallback attempt
+      try {
+        await setDoc(doc(db, "settings", "home_offers"), settings, { merge: true });
+        setMessage("Today's Deal banner saved. The homepage will update live.");
+      } catch {
+        setMessage("Couldn't save the deal banner. Try again.");
+      }
     } finally {
       setSaving(false);
     }
