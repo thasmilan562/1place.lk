@@ -1921,9 +1921,15 @@ function DashboardContent() {
           setIsProductModalOpen(false);
           setEditingProduct(null);
         }}
-        onSave={() => {
+        onSave={(savedProduct) => {
           setIsProductModalOpen(false);
           setEditingProduct(null);
+          if (savedProduct && savedProduct.id) {
+            setProducts((prev) => [
+              savedProduct,
+              ...prev.filter((p) => p.id !== savedProduct.id && p.slug !== savedProduct.slug),
+            ]);
+          }
           refreshData();
         }}
         onDelete={async (id) => {

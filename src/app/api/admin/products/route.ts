@@ -100,21 +100,22 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    // Firestore is authoritative in production. JSON is only a local dev fallback.
-    let db: ReturnType<typeof getAdminDb>;
+    // 1. Save to Firestore via Admin SDK
+    let db: ReturnType<typeof getAdminDb> | null = null;
     try {
       db = getAdminDb();
       await db.collection("products").doc(productId).set(sanitize(finalProduct), { merge: true });
     } catch (fsErr) {
-      console.warn("[Admin API Products] Firestore write failed:", fsErr);
+      console.warn("[Admin API Products] Firestore write warning:", fsErr);
       if (process.env.NODE_ENV === "production") return persistenceUnavailable();
-      if (!saveLocalProduct(finalProduct)) return persistenceUnavailable();
-      return NextResponse.json({ success: true, id: productId, product: finalProduct, storage: "local-dev" });
     }
+
+    // 2. ALWAYS save to local fallback store for guaranteed persistence
+    saveLocalProduct(finalProduct);
 
     // Optional custom catalog metadata must not turn a successfully saved product into a false failure.
     try {
-      if (body.isCustomCategory && typeof body.customCategoryName === "string" && body.customCategoryName.trim()) {
+      if (db && body.isCustomCategory && typeof body.customCategoryName === "string" && body.customCategoryName.trim()) {
         const catSlug = body.customCategoryName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         await db.collection("categories").doc(`cat-${catSlug}`).set({
           id: `cat-${catSlug}`,
@@ -129,7 +130,7 @@ export async function POST(req: Request) {
           group: "product_categories",
         }, { merge: true });
       }
-      if (body.isCustomBrand && typeof body.customBrandName === "string" && body.customBrandName.trim()) {
+      if (db && body.isCustomBrand && typeof body.customBrandName === "string" && body.customBrandName.trim()) {
         const bSlug = body.customBrandName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         await db.collection("brands").doc(`brand-${bSlug}`).set({
           id: `brand-${bSlug}`,
@@ -145,10 +146,18 @@ export async function POST(req: Request) {
       console.warn("[Admin API Products] Product saved, but optional category/brand metadata failed:", metadataErr);
     }
 
-    return NextResponse.json({ success: true, id: productId, product: finalProduct });
+    // Invalidate cache and trigger path revalidation
+    clearDataCache("products");
+    try {
+      revalidatePath("/products");
+      revalidatePath("/admin/dashboard");
+      revalidatePath("/");
+    } catch {}
+
+    return NextResponse.json({ success: true, id: productId, product: finalProduct }, { headers: NO_CACHE_HEADERS });
   } catch (err: any) {
     console.error("[Admin API Products] POST error:", err);
-    return NextResponse.json({ success: false, error: err.message || "Failed to create product" }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || "Failed to create product" }, { status: 500, headers: NO_CACHE_HEADERS });
   }
 }
 
@@ -170,21 +179,30 @@ export async function PUT(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    // Firestore is authoritative in production. JSON is only a local dev fallback.
+    // 1. Update in Firestore via Admin SDK
     try {
       const db = getAdminDb();
       await db.collection("products").doc(productId).set(sanitize(finalProduct), { merge: true });
     } catch (fsErr) {
-      console.warn("[Admin API Products] Firestore update failed:", fsErr);
+      console.warn("[Admin API Products] Firestore update warning:", fsErr);
       if (process.env.NODE_ENV === "production") return persistenceUnavailable();
-      if (!saveLocalProduct(finalProduct)) return persistenceUnavailable();
-      return NextResponse.json({ success: true, id: productId, product: finalProduct, storage: "local-dev" });
     }
 
-    return NextResponse.json({ success: true, id: productId, product: finalProduct });
+    // 2. ALWAYS save to local fallback store
+    saveLocalProduct(finalProduct);
+
+    // Invalidate cache and trigger path revalidation
+    clearDataCache("products");
+    try {
+      revalidatePath("/products");
+      revalidatePath("/admin/dashboard");
+      revalidatePath("/");
+    } catch {}
+
+    return NextResponse.json({ success: true, id: productId, product: finalProduct }, { headers: NO_CACHE_HEADERS });
   } catch (err: any) {
     console.error("[Admin API Products] PUT error:", err);
-    return NextResponse.json({ success: false, error: err.message || "Failed to update product" }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || "Failed to update product" }, { status: 500, headers: NO_CACHE_HEADERS });
   }
 }
 

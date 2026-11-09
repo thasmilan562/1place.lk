@@ -45,7 +45,7 @@ import { deduplicateCategories, generateCategorySlug, getCategoryDocId, formatCa
 interface ProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (savedProduct?: Product) => void;
   onDelete?: (id: string) => void;
   categories: Category[];
   initialData?: Product | null;
@@ -615,8 +615,9 @@ export default function ProductModal({
       setName("");
       setCode(`1P-${Date.now().toString(36).toUpperCase()}`);
       setSlug("");
-      const defaultCatId = "";
-      const defaultCatName = "";
+      const defaultCat = mergedCategories[0];
+      const defaultCatId = defaultCat?.id || "cat-smartphones";
+      const defaultCatName = defaultCat?.name || "Smartphones";
       const detected = detectProductType(defaultCatName);
 
       setProductType(detected);
@@ -624,7 +625,7 @@ export default function ProductModal({
       setHasStorageVariants(detected === "laptop" || detected === "phone");
 
       setCategoryId(defaultCatId);
-      setBrand("");
+      setBrand(brandOptions[0] || "ONEPLACE");
       setDescription("");
       setShortDesc("");
       setFeatured(false);
@@ -902,13 +903,9 @@ export default function ProductModal({
   const handleSaveProduct = async (publishStatus: "active" | "draft" = "active") => {
     if (isSubmitting) return;
     setEditorError("");
-    if (publishStatus === "active" && !brand.trim() && !customBrandName.trim()) {
-      setEditorError("Choose a brand, or add your store name as the brand.");
-      setActiveTab(1);
-      return;
-    }
+
     if (!name.trim()) {
-      setEditorError("Add a product name to continue.");
+      setEditorError("Please enter a product name to continue.");
       setActiveTab(1);
       return;
     }
@@ -918,56 +915,21 @@ export default function ProductModal({
 
       const finalCategoryObj = mergedCategories.find((c) => c.id === categoryId);
       const rawCatName = isCustomCategory
-        ? customCategoryName.trim()
-        : (finalCategoryObj?.name || "Smartphones");
+        ? (customCategoryName.trim() || "General")
+        : (finalCategoryObj?.name || "General");
 
       // Strip emoji prefix from category name for database consistency
-      const finalCategoryName = rawCatName.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F004}\u{1F0CF}\u{1F170}-\u{1F251}]/gu, "").trim() || "Smartphones";
+      const finalCategoryName = rawCatName.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F004}\u{1F0CF}\u{1F170}-\u{1F251}]/gu, "").trim() || "General";
       const finalCategorySlug = generateCategorySlug(finalCategoryName);
       const finalCategoryId = isCustomCategory
         ? getCategoryDocId(finalCategorySlug)
         : (finalCategoryObj?.id || getCategoryDocId(finalCategorySlug));
 
-      const finalBrand = isCustomBrand ? customBrandName.trim() : (brand.trim() || "Apple");
+      // Brand: Fall back seamlessly to ONEPLACE if not explicitly specified
+      const finalBrand = isCustomBrand
+        ? (customBrandName.trim() || "ONEPLACE")
+        : (brand.trim() || "ONEPLACE");
       const finalBrandSlug = finalBrand.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-
-      // Save Custom Category or Brand to Firestore Catalog Collections if new
-      if (isCustomCategory && customCategoryName.trim()) {
-        try {
-          const catSlug = customCategoryName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-          await setDoc(doc(db, "categories", `cat-${catSlug}`), {
-            id: `cat-${catSlug}`,
-            name: customCategoryName.trim(),
-            slug: catSlug,
-            icon: "📱",
-            image_url: "",
-            sort_order: 99,
-            status: "active",
-            show_on_homepage: true,
-            show_in_selector: true,
-            group: "product_categories",
-          }, { merge: true });
-        } catch (err) {
-          console.warn("Failed to save custom category to catalog:", err);
-        }
-      }
-
-      if (isCustomBrand && customBrandName.trim()) {
-        try {
-          const bSlug = customBrandName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-          await setDoc(doc(db, "brands", `brand-${bSlug}`), {
-            id: `brand-${bSlug}`,
-            name: customBrandName.trim(),
-            slug: bSlug,
-            logo_url: "",
-            sort_order: 99,
-            status: "active",
-            show_on_homepage: true,
-          }, { merge: true });
-        } catch (err) {
-          console.warn("Failed to save custom brand to catalog:", err);
-        }
-      }
 
       const hasAnyVariants = (hasColorVariants || hasStorageVariants) && variantCombos.length > 0;
       // Compute Total Stock from active variants or direct baseStock
@@ -1132,11 +1094,11 @@ export default function ProductModal({
       clearDataCache("products:all");
 
       setHasUnsavedChanges(false);
-      onSave();
+      onSave(resData.product);
       onClose();
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error saving product:", e);
-      setEditorError("Could not save this product. Check your connection and try again.");
+      setEditorError(e?.message || "Could not save this product. Check your connection and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -1166,9 +1128,16 @@ export default function ProductModal({
                 </span>
               )}
             </h2>
-            <p className="text-xs text-gray-500 font-medium">
-              Start with the basics. Add photos, then publish when ready.
-            </p>
+            {editorError ? (
+              <p role="alert" className="text-xs text-red-600 font-bold flex items-center gap-1 mt-0.5">
+                <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                <span>{editorError}</span>
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 font-medium">
+                Start with the basics. Add photos, then publish when ready.
+              </p>
+            )}
           </div>
         </div>
 
@@ -1187,16 +1156,18 @@ export default function ProductModal({
             </button>
           )}
           <button
+            type="button"
             onClick={() => handleSaveProduct("draft")}
             disabled={isSubmitting}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl transition-all border border-gray-200"
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl transition-all border border-gray-200 cursor-pointer"
           >
             Save draft
           </button>
           <button
+            type="button"
             onClick={() => handleSaveProduct("active")}
             disabled={isSubmitting}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-600/30 flex items-center gap-2"
+            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-blue-600/30 flex items-center gap-2 cursor-pointer"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {Boolean(initialData && initialData.id) ? "Save changes" : "Publish product"}
