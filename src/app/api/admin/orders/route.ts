@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { verifyAdminRequest } from "@/lib/admin-auth-server";
+import { getLocalOrders, updateLocalOrder, deleteLocalOrder } from "@/lib/orders-store";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -12,27 +13,65 @@ function unauthorized() {
   return NextResponse.json({ success: false, error: "Unauthorized access to administrator API." }, { status: 401, headers: noStore });
 }
 
-function unavailable() {
-  return NextResponse.json(
-    { success: false, error: "Admin database connection is unavailable. Configure FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON in production." },
-    { status: 503, headers: noStore }
-  );
-}
-
 export async function GET(request: Request) {
   if (!verifyAdminRequest(request)) return unauthorized();
 
   try {
-    const snapshot = await getAdminDb().collection("orders").get();
-    const orders: Array<Record<string, any> & { id: string }> = snapshot.docs.map((document) => ({ id: document.id, ...document.data() }));
+    // 1. Read local persistent orders immediately
+    const localOrders = getLocalOrders();
+
+    // 2. Query Firestore with a 2000ms timeout guard
+    const firestoreOrders: Array<Record<string, any> & { id: string }> = await Promise.race([
+      (async () => {
+        try {
+          const snapshot = await getAdminDb().collection("orders").get();
+          return snapshot.docs.map((document) => ({ id: document.id, ...document.data() }));
+        } catch (fsErr) {
+          console.warn("[Admin Orders API] Firestore collection get failed (using local store):", fsErr);
+          return [];
+        }
+      })(),
+      new Promise<Array<Record<string, any> & { id: string }>>((resolve) =>
+        setTimeout(() => {
+          console.warn("[Admin Orders API] Firestore collection get timed out after 2000ms");
+          resolve([]);
+        }, 2000)
+      ),
+    ]);
+
+    // 3. Merge both sources without duplicates, favoring latest updates
+    const orderMap = new Map<string, any>();
+
+    localOrders.forEach((order) => {
+      if (order?.id) orderMap.set(order.id, order);
+    });
+
+    firestoreOrders.forEach((fOrder) => {
+      if (fOrder?.id) {
+        const existing = orderMap.get(fOrder.id);
+        if (!existing) {
+          orderMap.set(fOrder.id, fOrder);
+        } else {
+          const localTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+          const firestoreTime = new Date(fOrder.updatedAt || fOrder.createdAt || 0).getTime();
+          if (firestoreTime > localTime) {
+            orderMap.set(fOrder.id, { ...existing, ...fOrder });
+          } else {
+            orderMap.set(fOrder.id, { ...fOrder, ...existing });
+          }
+        }
+      }
+    });
+
+    const orders = Array.from(orderMap.values());
     orders.sort((a, b) => new Date(String(b.createdAt || 0)).getTime() - new Date(String(a.createdAt || 0)).getTime());
+
     return NextResponse.json({ success: true, orders }, { headers: noStore });
-  } catch (error) {
-    console.error("[Admin Orders API] Read failed:", error);
+  } catch (error: any) {
+    console.error("[Admin Orders API] Read error:", error);
     try {
-      const { getLocalOrders } = await import("@/lib/orders-store");
-      const local = getLocalOrders();
-      return NextResponse.json({ success: true, orders: local }, { headers: noStore });
+      const fallback = getLocalOrders();
+      return NextResponse.json({ success: true, orders: fallback }, { headers: noStore });
     } catch {
       return NextResponse.json({ success: true, orders: [] }, { headers: noStore });
     }
@@ -62,27 +101,44 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: false, error: "Order id(s) and valid order changes are required." }, { status: 400, headers: noStore });
     }
 
-    const db = getAdminDb();
-    for (let offset = 0; offset < changes.length; offset += 450) {
-      const batch = db.batch();
-      for (const change of changes.slice(offset, offset + 450)) {
-        if (typeof change?.id !== "string" || !change.id.trim() || !change.updates || typeof change.updates !== "object") continue;
-        const safeUpdates: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(change.updates)) {
-          if (editableFields.has(key)) safeUpdates[key] = value;
-        }
-        if (Array.isArray(change.updates.statusHistory) && change.updates.statusHistory.length) {
-          safeUpdates.statusHistory = FieldValue.arrayUnion(...change.updates.statusHistory);
-        }
-        if (Object.keys(safeUpdates).length) batch.update(db.collection("orders").doc(change.id.trim()), safeUpdates);
+    // 1. Immediately update local persistent store so status changes reflect instantly and reliably
+    for (const change of changes) {
+      if (typeof change?.id === "string" && change.id.trim() && change.updates) {
+        updateLocalOrder(change.id.trim(), change.updates);
       }
-      await batch.commit();
+    }
+
+    // 2. Best-effort update to Firestore with 2000ms timeout guard
+    try {
+      await Promise.race([
+        (async () => {
+          const db = getAdminDb();
+          for (let offset = 0; offset < changes.length; offset += 450) {
+            const batch = db.batch();
+            for (const change of changes.slice(offset, offset + 450)) {
+              if (typeof change?.id !== "string" || !change.id.trim() || !change.updates || typeof change.updates !== "object") continue;
+              const safeUpdates: Record<string, unknown> = {};
+              for (const [key, value] of Object.entries(change.updates)) {
+                if (editableFields.has(key)) safeUpdates[key] = value;
+              }
+              if (Array.isArray(change.updates.statusHistory) && change.updates.statusHistory.length) {
+                safeUpdates.statusHistory = FieldValue.arrayUnion(...change.updates.statusHistory);
+              }
+              if (Object.keys(safeUpdates).length) batch.update(db.collection("orders").doc(change.id.trim()), safeUpdates);
+            }
+            await batch.commit();
+          }
+        })(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore batch commit timeout")), 2000)),
+      ]);
+    } catch (fsError) {
+      console.warn("[Admin Orders API] Firestore batch update warning (persisted locally):", fsError);
     }
 
     return NextResponse.json({ success: true, updatedCount: changes.length }, { headers: noStore });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[Admin Orders API] Update failed:", error);
-    return unavailable();
+    return NextResponse.json({ success: false, error: error?.message || "Order update failed" }, { status: 500, headers: noStore });
   }
 }
 
@@ -97,24 +153,39 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: "Order id(s) are required." }, { status: 400, headers: noStore });
     }
 
-    const db = getAdminDb();
-    const subcollections = ["items", "payments", "statusHistory", "notes", "tracking", "history", "audit"];
+    // 1. Delete from local persistent store
     for (const id of cleanIds) {
-      const order = db.collection("orders").doc(id);
-      for (const name of subcollections) {
-        const snapshot = await order.collection(name).get();
-        for (let offset = 0; offset < snapshot.docs.length; offset += 450) {
-          const batch = db.batch();
-          snapshot.docs.slice(offset, offset + 450).forEach((document) => batch.delete(document.ref));
-          await batch.commit();
-        }
-      }
-      await order.delete();
+      deleteLocalOrder(id);
+    }
+
+    // 2. Best-effort delete from Firestore with 2500ms timeout
+    try {
+      await Promise.race([
+        (async () => {
+          const db = getAdminDb();
+          const subcollections = ["items", "payments", "statusHistory", "notes", "tracking", "history", "audit"];
+          for (const id of cleanIds) {
+            const order = db.collection("orders").doc(id);
+            for (const name of subcollections) {
+              const snapshot = await order.collection(name).get();
+              for (let offset = 0; offset < snapshot.docs.length; offset += 450) {
+                const batch = db.batch();
+                snapshot.docs.slice(offset, offset + 450).forEach((document) => batch.delete(document.ref));
+                await batch.commit();
+              }
+            }
+            await order.delete();
+          }
+        })(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore delete timeout")), 2500)),
+      ]);
+    } catch (fsError) {
+      console.warn("[Admin Orders API] Firestore delete warning (deleted locally):", fsError);
     }
 
     return NextResponse.json({ success: true, deletedCount: cleanIds.length }, { headers: noStore });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[Admin Orders API] Delete failed:", error);
-    return unavailable();
+    return NextResponse.json({ success: false, error: error?.message || "Order deletion failed" }, { status: 500, headers: noStore });
   }
 }

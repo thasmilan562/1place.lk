@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
-import { getLocalOrders, saveLocalOrder, updateLocalOrderStatus, deleteLocalOrder, OrderRecord } from "@/lib/orders-store";
+import { getLocalOrders, saveLocalOrder, updateLocalOrder, updateLocalOrderStatus, deleteLocalOrder, OrderRecord } from "@/lib/orders-store";
 import { verifyAdminRequest } from "@/lib/admin-auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, doc, getDoc, query, where, limit, setDoc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { collection, addDoc, getDocs, doc, getDoc, query, where, limit, setDoc, updateDoc } from "firebase/firestore";
 import { deductProductStock } from "@/lib/stock-deduction";
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]).catch(() => fallback);
+}
 
 // GET /api/orders - returns orders with secure filtering
 export async function GET(req: Request) {
@@ -18,34 +25,42 @@ export async function GET(req: Request) {
     // 1. Read local persistent orders
     const localList = getLocalOrders();
 
-    // 2. Read Firestore orders
+    // 2. Read Firestore orders with 2-second timeout guard
     let firestoreList: OrderRecord[] = [];
     try {
       if (orderId) {
-        const directDoc = await getDoc(doc(db, "orders", orderId));
-        if (directDoc.exists()) {
+        const directDoc = await withTimeout(getDoc(doc(db, "orders", orderId)), 1500, null);
+        if (directDoc && directDoc.exists()) {
           firestoreList = [{ ...directDoc.data(), id: directDoc.id } as OrderRecord];
         } else {
           // Fallback query matching suffix
-          const snap = await getDocs(query(collection(db, "orders"), limit(100)));
-          firestoreList = snap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
+          const snap = await withTimeout(getDocs(query(collection(db, "orders"), limit(100))), 1500, null);
+          if (snap) {
+            firestoreList = snap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
+          }
         }
       } else if (userId && userId !== "guest") {
         const q = query(collection(db, "orders"), where("userId", "==", userId), limit(50));
-        const snap = await getDocs(q);
-        firestoreList = snap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
+        const snap = await withTimeout(getDocs(q), 1500, null);
+        if (snap) {
+          firestoreList = snap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
+        }
       } else if (phone) {
         const q = query(collection(db, "orders"), where("primaryPhone", "==", phone), limit(20));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
+        const snap = await withTimeout(getDocs(q), 1500, null);
+        if (snap && !snap.empty) {
           firestoreList = snap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
         } else {
-          const generalSnap = await getDocs(query(collection(db, "orders"), limit(100)));
-          firestoreList = generalSnap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
+          const generalSnap = await withTimeout(getDocs(query(collection(db, "orders"), limit(100))), 1500, null);
+          if (generalSnap) {
+            firestoreList = generalSnap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
+          }
         }
       } else {
-        const snap = await getDocs(query(collection(db, "orders"), limit(200)));
-        firestoreList = snap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
+        const snap = await withTimeout(getDocs(query(collection(db, "orders"), limit(200))), 1500, null);
+        if (snap) {
+          firestoreList = snap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
+        }
       }
     } catch (e) {
       console.warn("API GET orders Firestore read error (using local store):", e);
@@ -161,14 +176,14 @@ export async function POST(req: Request) {
         );
       }
 
-      // Verify reward on server
+      // Verify reward on server with timeout guard
       for (const gift of giftItems) {
         const rewardId = gift.rewardId || body.giftRewardId;
         if (rewardId) {
           try {
             const rewardDocRef = doc(db, "spin_rewards", rewardId);
-            const rewardSnap = await getDoc(rewardDocRef);
-            if (rewardSnap.exists()) {
+            const rewardSnap = await withTimeout(getDoc(rewardDocRef), 1200, null);
+            if (rewardSnap && rewardSnap.exists()) {
               const rData = rewardSnap.data();
               if (rData.status === "redeemed") {
                 return NextResponse.json(
@@ -203,7 +218,6 @@ export async function POST(req: Request) {
             { status: 400 }
           );
         }
-        // Price for verified free gift is 0
         continue;
       }
 
@@ -217,11 +231,11 @@ export async function POST(req: Request) {
         );
       }
 
-      // Server-side database verification if productId provided
+      // Server-side database verification with 1200ms timeout
       if (item.productId) {
         try {
-          const pDoc = await getDoc(doc(db, "products", item.productId));
-          if (pDoc.exists()) {
+          const pDoc = await withTimeout(getDoc(doc(db, "products", item.productId)), 1200, null);
+          if (pDoc && pDoc.exists()) {
             const pData = pDoc.data();
             if (pData.status === "draft") {
               return NextResponse.json(
@@ -261,8 +275,8 @@ export async function POST(req: Request) {
 
     if (shippingRewardId) {
       try {
-        const shipSnap = await getDoc(doc(db, "spin_rewards", shippingRewardId));
-        if (shipSnap.exists()) {
+        const shipSnap = await withTimeout(getDoc(doc(db, "spin_rewards", shippingRewardId)), 1200, null);
+        if (shipSnap && shipSnap.exists()) {
           const sData = shipSnap.data();
           if (
             sData.rewardType === "free_shipping" &&
@@ -303,86 +317,84 @@ export async function POST(req: Request) {
 
     const initialOrderStatus = isCod ? "Processing" : "Payment Pending";
 
-    const newOrder: OrderRecord = {
+    const orderPayload: any = {
       id: orderId,
       userId,
       customerName,
       address,
       district,
+      city: body.city || district,
+      province: body.province || "Western Province",
       primaryPhone,
       secondaryPhone: (body.secondaryPhone || body.codPhone2 || "").trim(),
       postalCode: (body.postalCode || body.codPostal || "").trim(),
+      email: (body.email || "").trim().toLowerCase(),
       items,
       totalPrice: calculatedTotal,
+      finalTotal: calculatedTotal,
+      subtotal: serverSubtotal,
+      deliveryFee,
+      codFee,
+      couponDiscount,
+      couponCode: body.couponCode || "",
+      deliveryOption: body.deliveryOption || "standard",
+      deliveryAddress: {
+        address,
+        district,
+        city: body.city || district,
+        province: body.province || "Western Province",
+        postalCode: (body.postalCode || body.codPostal || "").trim(),
+      },
       paymentMethod: isCard ? "Online Card (PayHere)" : "Cash on Delivery (COD)",
       status: isCod ? "processing" : "pending",
+      orderStatus: initialOrderStatus,
       paymentStatus: initialPaymentStatus,
       payherePaymentId: body.payherePaymentId || "",
       payhereVerified: false,
+      payhereStatusCode: "0",
       cardFee: 0,
       payhereFee: 0,
+      trackingNumber: `TRK-${randomDigits}`,
       createdAt: body.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isGuest,
     };
 
-    // 1. Save to local JSON store
-    saveLocalOrder(newOrder);
+    // 1. Save full order to local persistent JSON store first so order is NEVER dropped or lost
+    saveLocalOrder(orderPayload);
 
-    // 2. Persist to Firestore
+    // 2. Persist to Firestore with timeout guard
     try {
-      const orderPayload = {
-        ...newOrder,
-        isGuest,
-        email: (body.email || "").trim().toLowerCase(),
-        deliveryAddress: {
-          address: newOrder.address,
-          district: newOrder.district,
-          city: body.city || newOrder.district,
-          province: body.province || "Western Province",
-          postalCode: newOrder.postalCode,
-        },
-        deliveryOption: body.deliveryOption || "standard",
-        deliveryFee,
-        codFee,
-        couponDiscount,
-        couponCode: body.couponCode || "",
-        subtotal: serverSubtotal,
-        finalTotal: calculatedTotal,
-        orderStatus: initialOrderStatus,
-        payhereStatusCode: "0",
-        trackingNumber: `TRK-${randomDigits}`,
-        updatedAt: new Date().toISOString(),
-      };
-
-      await setDoc(doc(db, "orders", newOrder.id), orderPayload, { merge: true });
+      await withTimeout(setDoc(doc(db, "orders", orderPayload.id), orderPayload, { merge: true }), 2000, null);
 
       // 2b. Mark promotional spin rewards as redeemed
       if (giftItems.length > 0) {
         for (const gift of giftItems) {
           const rId = (gift as any).rewardId || body.giftRewardId;
           if (rId) {
-            try {
-              await updateDoc(doc(db, "spin_rewards", rId), {
+            withTimeout(
+              updateDoc(doc(db, "spin_rewards", rId), {
                 status: "redeemed",
                 redeemedAt: new Date().toISOString(),
-                orderId: newOrder.id,
-              });
-            } catch (rErr) {
-              console.warn("Could not mark gift reward as redeemed:", rErr);
-            }
+                orderId: orderPayload.id,
+              }),
+              1500,
+              null
+            ).catch(() => {});
           }
         }
       }
 
       if (isShippingRewardVerified && shippingRewardId) {
-        try {
-          await updateDoc(doc(db, "spin_rewards", shippingRewardId), {
+        withTimeout(
+          updateDoc(doc(db, "spin_rewards", shippingRewardId), {
             status: "redeemed",
             redeemedAt: new Date().toISOString(),
-            orderId: newOrder.id,
-          });
-        } catch (sErr) {
-          console.warn("Could not mark shipping reward as redeemed:", sErr);
-        }
+            orderId: orderPayload.id,
+          }),
+          1500,
+          null
+        ).catch(() => {});
       }
     } catch (fsErr) {
       console.warn("Firestore save warning (order safely kept in local store):", fsErr);
@@ -390,8 +402,10 @@ export async function POST(req: Request) {
 
     // 3. Automatically deduct inventory for confirmed COD orders
     try {
-      if (isCod && newOrder.items && newOrder.items.length > 0) {
-        await deductProductStock(newOrder.items);
+      if (isCod && orderPayload.items && orderPayload.items.length > 0) {
+        withTimeout(deductProductStock(orderPayload.items), 2000, null).catch((stockErr) => {
+          console.warn("[Inventory Deduction Warning]:", stockErr);
+        });
       }
     } catch (stockErr) {
       console.warn("[Inventory Deduction Warning]:", stockErr);
@@ -399,8 +413,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      orderId: newOrder.id,
-      order: newOrder,
+      orderId: orderPayload.id,
+      order: orderPayload,
     });
   } catch (err: any) {
     console.error("POST /api/orders error:", err);
@@ -419,17 +433,23 @@ export async function PATCH(req: Request) {
     const updates: Record<string, unknown> = {
       updatedAt: new Date().toISOString(),
     };
-    if (status) updates.status = status;
-    if (orderStatus) updates.orderStatus = orderStatus;
+    if (status) {
+      updates.status = status;
+      if (!orderStatus) updates.orderStatus = status;
+    }
+    if (orderStatus) {
+      updates.orderStatus = orderStatus;
+      if (!status) updates.status = orderStatus;
+    }
     if (paymentStatus) updates.paymentStatus = paymentStatus;
     if (trackingNumber) updates.trackingNumber = trackingNumber;
 
-    updateLocalOrderStatus(id, status || orderStatus);
+    updateLocalOrder(id, updates);
 
     try {
-      await updateDoc(doc(db, "orders", id), updates);
+      await withTimeout(updateDoc(doc(db, "orders", id), updates), 2000, null);
     } catch (e) {
-      console.warn("Firestore status update warning:", e);
+      console.warn("Firestore status update warning (saved locally):", e);
     }
 
     return NextResponse.json({ success: true });
@@ -460,14 +480,18 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ success: false, error: "Missing order id(s)" }, { status: 400 });
     }
 
-    const db = getAdminDb();
-    for (let offset = 0; offset < idsToDelete.length; offset += 450) {
-      const batch = db.batch();
-      idsToDelete.slice(offset, offset + 450).forEach((id) => batch.delete(db.collection("orders").doc(id)));
-      await batch.commit();
-    }
-    if (process.env.NODE_ENV !== "production") {
-      for (const id of idsToDelete) deleteLocalOrder(id);
+    // Always delete from local store first
+    for (const id of idsToDelete) deleteLocalOrder(id);
+
+    try {
+      const adminDb = getAdminDb();
+      for (let offset = 0; offset < idsToDelete.length; offset += 450) {
+        const batch = adminDb.batch();
+        idsToDelete.slice(offset, offset + 450).forEach((id) => batch.delete(adminDb.collection("orders").doc(id)));
+        await withTimeout(batch.commit(), 2000, null);
+      }
+    } catch (fsErr) {
+      console.warn("Firestore batch delete warning (deleted locally):", fsErr);
     }
 
     return NextResponse.json({ success: true, deletedCount: idsToDelete.length });

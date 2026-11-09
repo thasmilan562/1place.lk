@@ -9,28 +9,32 @@ export interface OrderItem {
   quantity: number;
   storage?: string;
   color?: string;
+  [key: string]: any;
 }
 
-export interface OrderRecord {
+export type OrderRecord = Record<string, any> & {
   id: string;
   userId?: string;
-  customerName: string;
-  address: string;
-  district: string;
-  primaryPhone: string;
+  customerName?: string;
+  address?: string;
+  district?: string;
+  primaryPhone?: string;
   secondaryPhone?: string;
   postalCode?: string;
-  items: OrderItem[];
-  totalPrice: number;
-  paymentMethod: string;
-  status: string;
+  items?: OrderItem[];
+  totalPrice?: number;
+  finalTotal?: number;
+  paymentMethod?: string;
+  status?: string;
+  orderStatus?: string;
   paymentStatus?: string;
   payherePaymentId?: string;
   payhereVerified?: boolean;
   cardFee?: number;
   payhereFee?: number;
-  createdAt: string;
-}
+  createdAt?: string;
+  updatedAt?: string;
+};
 
 const ORDERS_FILE_PATH = path.join(process.cwd(), "src", "lib", "local-orders.json");
 
@@ -121,12 +125,19 @@ export function updateLocalOrderStatus(id: string, status: string): boolean {
   try {
     const orders = getLocalOrders();
     const idx = orders.findIndex((o) => o.id === id);
+    const now = new Date().toISOString();
     if (idx !== -1) {
       orders[idx].status = status;
+      orders[idx].orderStatus = status;
+      orders[idx].updatedAt = now;
+      fs.writeFileSync(ORDERS_FILE_PATH, JSON.stringify(orders, null, 2), "utf-8");
+      return true;
+    } else {
+      // If order not yet in local store, insert it with the status
+      orders.unshift({ id, status, orderStatus: status, updatedAt: now, createdAt: now });
       fs.writeFileSync(ORDERS_FILE_PATH, JSON.stringify(orders, null, 2), "utf-8");
       return true;
     }
-    return false;
   } catch (err) {
     console.error("Error updating local order status:", err);
     return false;
@@ -138,12 +149,23 @@ export function updateLocalOrder(id: string, updates: Partial<OrderRecord & Reco
   try {
     const orders = getLocalOrders();
     const idx = orders.findIndex((o) => o.id === id);
-    if (idx !== -1) {
-      orders[idx] = { ...orders[idx], ...updates };
-      fs.writeFileSync(ORDERS_FILE_PATH, JSON.stringify(orders, null, 2), "utf-8");
-      return true;
+    const now = new Date().toISOString();
+    
+    // Normalize status and orderStatus
+    const safeUpdates = { ...updates };
+    if (safeUpdates.status && !safeUpdates.orderStatus) {
+      safeUpdates.orderStatus = safeUpdates.status;
+    } else if (safeUpdates.orderStatus && !safeUpdates.status) {
+      safeUpdates.status = safeUpdates.orderStatus;
     }
-    return false;
+
+    if (idx !== -1) {
+      orders[idx] = { ...orders[idx], ...safeUpdates, updatedAt: now };
+    } else {
+      orders.unshift({ id, ...safeUpdates, updatedAt: now, createdAt: now });
+    }
+    fs.writeFileSync(ORDERS_FILE_PATH, JSON.stringify(orders, null, 2), "utf-8");
+    return true;
   } catch (err) {
     console.error("Error updating local order fields:", err);
     return false;

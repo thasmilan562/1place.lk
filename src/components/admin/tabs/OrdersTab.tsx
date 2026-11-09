@@ -428,6 +428,7 @@ export default function OrdersTab({
 
       if (onUpdateStatus) {
         await onUpdateStatus(orderId, newOrderStatus);
+        onRefresh?.();
       } else {
         await persistAdminOrderChanges(orderId, {
           orderStatus: newOrderStatus, status: newOrderStatus,

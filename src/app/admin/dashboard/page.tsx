@@ -278,7 +278,7 @@ function DashboardContent() {
 
       // Orders
       try {
-        const ordRes = await fetch("/api/admin/orders", { cache: "no-store" });
+        const ordRes = await fetch(`/api/admin/orders?_t=${Date.now()}`, { cache: "no-store" });
         const ordData = await ordRes.json().catch(() => ({}));
         if (!ordRes.ok || !ordData.success || !Array.isArray(ordData.orders)) {
           throw new Error(ordData.error || `Orders API returned ${ordRes.status}`);
@@ -520,6 +520,32 @@ function DashboardContent() {
     };
     window.addEventListener("admin-orders-updated", handleAdminOrdersUpdate);
 
+    // Periodic order sync interval (every 10 seconds)
+    const pollOrders = async () => {
+      try {
+        const res = await fetch(`/api/admin/orders?_t=${Date.now()}`, { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success && Array.isArray(data.orders)) {
+          setOrders((prev) => {
+            const prevIds = new Set(prev.map((o) => o.id));
+            const newOrders = data.orders.filter((o: any) => !prevIds.has(o.id));
+            if (newOrders.length > 0 && prev.length > 0) {
+              const newest = newOrders[0];
+              setNewOrderAlert({
+                id: newest.id,
+                customerName: newest.customerName || newest.name || "Customer",
+                total: Number(newest.finalTotal || newest.totalPrice || 0),
+                itemsCount: newest.items?.length || 1,
+              });
+            }
+            return data.orders;
+          });
+        }
+      } catch {}
+    };
+
+    const ordersPollInterval = setInterval(pollOrders, 10000);
+
     // 2. Live Products Listener
     const unsubProducts = onSnapshot(
       collection(db, "products"),
@@ -611,6 +637,7 @@ function DashboardContent() {
 
     return () => {
       window.removeEventListener("admin-orders-updated", handleAdminOrdersUpdate);
+      clearInterval(ordersPollInterval);
       unsubProducts();
       unsubUsers();
       unsubCategories();
@@ -1375,6 +1402,11 @@ function DashboardContent() {
   const handleUpdateOrderStatus = async (id: string, newStatus: string) => {
     try {
       const previousOrder = orders.find((order) => order.id === id);
+      // Optimistically update React state immediately
+      setOrders((prev) =>
+        prev.map((o) => (o.id === id ? { ...o, status: newStatus, orderStatus: newStatus, updatedAt: new Date().toISOString() } : o))
+      );
+
       const response = await fetch("/api/admin/orders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1390,7 +1422,6 @@ function DashboardContent() {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result.success) throw new Error(result.error || "Order status update failed");
-      setOrders(orders.map((o) => (o.id === id ? { ...o, status: newStatus, orderStatus: newStatus } : o)));
 
       // Trigger automated email when status changes to completed/delivered/shipped/packing
       const targetOrder = orders.find((o) => o.id === id);
@@ -1420,6 +1451,7 @@ function DashboardContent() {
       }
     } catch (e) {
       console.error("Error updating order status:", e);
+      refreshData();
       throw e;
     }
   };

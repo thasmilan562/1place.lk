@@ -522,14 +522,21 @@ export default function CheckoutClient() {
         });
         const data = await res.json();
         if (data.orderId) generatedOrderId = data.orderId;
+        if (!res.ok && !data.success) {
+          throw new Error(data.error || "Order creation failed");
+        }
       } catch (saveErr) {
         console.warn("API order save fallback:", saveErr);
-        const docRef = await addDoc(collection(db, "orders"), {
-          ...orderPayload,
-          id: generatedOrderId,
-          status: paymentMethod === "card" ? "pending" : "processing",
-        });
-        generatedOrderId = docRef.id;
+        try {
+          const docRef = await addDoc(collection(db, "orders"), {
+            ...orderPayload,
+            id: generatedOrderId,
+            status: paymentMethod === "card" ? "pending" : "processing",
+          });
+          if (docRef.id) generatedOrderId = docRef.id;
+        } catch (dbErr) {
+          console.warn("Firestore client write error (proceeding with order ID):", dbErr);
+        }
       }
 
       // Store in user's recent orders in local storage
