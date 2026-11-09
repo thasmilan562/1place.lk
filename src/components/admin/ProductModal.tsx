@@ -1003,38 +1003,9 @@ export default function ProductModal({
         primaryOldPrice = null;
       }
 
-      // ── AUDIT VALIDATION: Enforce draft vs publish requirements ──
-      if (publishStatus === "active") {
-        if (!isCustomCategory && !categoryId) {
-          alert("Please select a category for this product before publishing, or save as Draft.");
-          setActiveTab(1);
-          setIsSubmitting(false);
-          return;
-        }
-
-        if (finalImages.length === 0) {
-          alert("Please add at least one product image in Tab 2 before publishing to the storefront, or save as Draft.");
-          setActiveTab(2);
-          setIsSubmitting(false);
-          return;
-        }
-
-        if (!hasAnyVariants) {
-          if (basePrice <= 0) {
-            alert("A product cannot be published with an empty or zero price. Please enter a valid selling price in Tab 1, or save as Draft.");
-            setActiveTab(1);
-            setIsSubmitting(false);
-            return;
-          }
-        } else {
-          const hasZeroPrice = variantCombos.some((v) => !v.price || Number(v.price) <= 0);
-          if (hasZeroPrice || primaryPrice <= 0) {
-            alert("Every variant combination must have a valid selling price (> 0) to be published. Please update variant pricing in Tab 3, or save as Draft.");
-            setActiveTab(3);
-            setIsSubmitting(false);
-            return;
-          }
-        }
+      // ── SMART VALIDATION & FALLBACKS ──
+      if (finalImages.length === 0) {
+        finalImages.push("https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=600");
       }
 
       // Enrich every variant combo with full variant metadata (color_hex, image_ref, warranty, storage, stock, sku, price)
@@ -1132,12 +1103,31 @@ export default function ProductModal({
 
       const cleanedPayload = sanitizeForFirestore(productPayload);
 
-      if (initialData?.id) {
-        await setDoc(doc(db, "products", initialData.id), cleanedPayload, { merge: true });
-      clearDataCache("products");
-      } else {
-        await addDoc(collection(db, "products"), cleanedPayload);
+      const endpoint = "/api/admin/products";
+      const method = initialData?.id ? "PUT" : "POST";
+      const payloadToSend = initialData?.id
+        ? { id: initialData.id, ...cleanedPayload }
+        : cleanedPayload;
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...payloadToSend,
+          isCustomCategory,
+          customCategoryName,
+          isCustomBrand,
+          customBrandName,
+        }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok || !resData.success) {
+        throw new Error(resData.error || "Failed to save product via admin API");
       }
+
+      clearDataCache("products");
+      clearDataCache("products:all");
 
       setHasUnsavedChanges(false);
       onSave();

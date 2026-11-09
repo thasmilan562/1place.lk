@@ -228,7 +228,15 @@ export default function CategoryModal({
         group: "product_categories",
       };
 
-      await setDoc(doc(db, "categories", categoryId), categoryData, { merge: true });
+      const res = await fetch("/api/admin/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(categoryData),
+      });
+      const resData = await res.json();
+      if (!res.ok || !resData.success) {
+        throw new Error(resData.error || "Failed to save category via server API");
+      }
 
       // Invalidate cache
       clearDataCache("categories");

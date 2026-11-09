@@ -246,9 +246,27 @@ function DashboardContent() {
     try {
       setLoading(true);
       // Products
-      const prodSnap = await getDocs(collection(db, "products"));
-      const prodList = prodSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
-      setProducts(prodList.length > 0 ? prodList : fallbackProducts);
+      try {
+        const prodRes = await fetch("/api/admin/products");
+        if (prodRes.ok) {
+          const prodData = await prodRes.json();
+          if (prodData.products && prodData.products.length > 0) {
+            setProducts(prodData.products);
+          } else {
+            const prodSnap = await getDocs(collection(db, "products"));
+            const prodList = prodSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
+            setProducts(prodList.length > 0 ? prodList : fallbackProducts);
+          }
+        } else {
+          const prodSnap = await getDocs(collection(db, "products"));
+          const prodList = prodSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
+          setProducts(prodList.length > 0 ? prodList : fallbackProducts);
+        }
+      } catch {
+        const prodSnap = await getDocs(collection(db, "products"));
+        const prodList = prodSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
+        setProducts(prodList.length > 0 ? prodList : fallbackProducts);
+      }
 
       // Categories
       const catSnap = await getDocs(collection(db, "categories"));
@@ -268,34 +286,51 @@ function DashboardContent() {
       }
 
       // Orders
-      const ordSnap = await getDocs(collection(db, "orders"));
-      const ordList: any[] = ordSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      ordList.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      setOrders(ordList);
+      try {
+        const ordSnap = await getDocs(collection(db, "orders"));
+        const ordList: any[] = ordSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        ordList.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        setOrders(ordList);
+      } catch (ordErr) {
+        console.warn("Error fetching orders:", ordErr);
+      }
 
       // Reviews
-      const revSnap = await getDocs(collection(db, "reviews"));
-      const revList = revSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Review));
-      revList.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-      setReviews(revList);
+      try {
+        const revSnap = await getDocs(collection(db, "reviews"));
+        const revList = revSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Review));
+        revList.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        setReviews(revList);
+      } catch (revErr) {
+        console.warn("Error fetching reviews:", revErr);
+      }
 
       // Google Reviews Settings
-      const googleSnap = await getDoc(doc(db, "settings", "google_reviews"));
-      if (googleSnap.exists()) {
-        setGoogleReviewsSettings({ ...DEFAULT_GOOGLE_REVIEWS_SETTINGS, ...googleSnap.data() });
+      try {
+        const googleSnap = await getDoc(doc(db, "settings", "google_reviews"));
+        if (googleSnap.exists()) {
+          setGoogleReviewsSettings({ ...DEFAULT_GOOGLE_REVIEWS_SETTINGS, ...googleSnap.data() });
+        }
+      } catch (gErr) {
+        console.warn("Error fetching google reviews settings:", gErr);
       }
 
       // Banners (Merge offer_banners and banners collections)
-      const banSnap = await getDocs(collection(db, "offer_banners"));
-      const banList = banSnap.docs.map((d) => {
-        const data = d.data();
-        return {
-          ...data,
-          id: d.id,
-          status: data.status || "active",
-          placement: data.placement || "homepage_after_categories",
-        } as OfferBanner;
-      });
+      let banList: OfferBanner[] = [];
+      try {
+        const banSnap = await getDocs(collection(db, "offer_banners"));
+        banList = banSnap.docs.map((d) => {
+          const data = d.data();
+          return {
+            ...data,
+            id: d.id,
+            status: data.status || "active",
+            placement: data.placement || "homepage_after_categories",
+          } as OfferBanner;
+        });
+      } catch (banErr) {
+        console.warn("Error fetching offer_banners:", banErr);
+      }
 
       let legacyBanList: OfferBanner[] = [];
       try {
@@ -346,18 +381,31 @@ function DashboardContent() {
       }
 
       // Hero Slides
-      const heroSnap = await getDocs(collection(db, "hero_slides"));
-      const heroList = heroSnap.docs.map((d) => ({ id: d.id, ...d.data() } as HeroSlide));
-      setHeroSlides(heroList);
+      try {
+        const heroSnap = await getDocs(collection(db, "hero_slides"));
+        const heroList = heroSnap.docs.map((d) => ({ id: d.id, ...d.data() } as HeroSlide));
+        setHeroSlides(heroList);
+      } catch (heroErr) {
+        console.warn("Error fetching hero slides:", heroErr);
+      }
 
       // Gallery Images
-      const galSnap = await getDocs(collection(db, "gallery"));
-      const galList = galSnap.docs.map((d) => ({ id: d.id, ...d.data() } as GalleryImage));
-      setGalleryImages(galList);
+      try {
+        const galSnap = await getDocs(collection(db, "gallery"));
+        const galList = galSnap.docs.map((d) => ({ id: d.id, ...d.data() } as GalleryImage));
+        setGalleryImages(galList);
+      } catch (galErr) {
+        console.warn("Error fetching gallery images:", galErr);
+      }
 
       // Users / Customers (Merge registered users and guest checkout profiles)
-      const userSnap = await getDocs(collection(db, "users"));
-      const userList = userSnap.docs.map((d) => ({ id: d.id, isGuest: false, ...d.data() }));
+      let userList: any[] = [];
+      try {
+        const userSnap = await getDocs(collection(db, "users"));
+        userList = userSnap.docs.map((d) => ({ id: d.id, isGuest: false, ...d.data() }));
+      } catch (userErr) {
+        console.warn("Could not fetch users directly from client (server-side only):", userErr);
+      }
 
       let guestList: any[] = [];
       try {
@@ -915,11 +963,20 @@ function DashboardContent() {
       const newStock = Math.max(0, currentQty + quickStockQty);
       const newStatus = newStock === 0 ? "out_of_stock" : newStock <= 5 ? "low_stock" : "in_stock";
 
-      await updateDoc(doc(db, "products", quickStockProduct.id), {
-        stock_count: newStock,
-        stock_status: newStatus,
-        updated_at: new Date().toISOString(),
+      const res = await fetch("/api/admin/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: quickStockProduct.id,
+          stock_count: newStock,
+          stock_quantity: newStock,
+          stock_status: newStatus,
+          updated_at: new Date().toISOString(),
+        }),
       });
+      if (!res.ok) {
+        throw new Error("Failed to update stock via server API");
+      }
 
       setProducts((prev) =>
         prev.map((p) =>
@@ -940,10 +997,15 @@ function DashboardContent() {
   const handleDeleteProduct = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
     try {
-      await deleteDoc(doc(db, "products", id));
+      const res = await fetch(`/api/admin/products?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to delete product via server API");
+      }
       setProducts(products.filter((p) => p.id !== id));
-    } catch (e) {
-      alert("Error deleting product");
+    } catch (e: any) {
+      alert(e.message || "Error deleting product");
     }
   };
 

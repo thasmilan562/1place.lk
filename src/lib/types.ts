@@ -84,6 +84,8 @@ export interface Product {
   metaTitle?: string;
   meta_description?: string;
   metaDescription?: string;
+  updated_at?: string;
+  updatedAt?: string;
 }
 
 export interface Department {
