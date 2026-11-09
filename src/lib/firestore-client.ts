@@ -146,12 +146,15 @@ export async function getProducts(): Promise<Product[]> {
       const q = query(collection(db, "products"));
       const snapshot = await getDocs(q);
       const docs = snapshot.docs.map((d) => normalizeProduct({ ...d.data(), id: d.id } as Product));
-      const uniqueDocs = deduplicateProductsBySlug(docs);
-      if (uniqueDocs.length > 0) return uniqueDocs;
+      // An empty catalog is valid. Do not replace it with bundled demo products,
+      // which can leak into public pages and search engine indexes.
+      return deduplicateProductsBySlug(docs);
     } catch (e) {
       console.warn("Offline/Error fetching products:", e);
     }
-    return deduplicateProductsBySlug(fallbackProducts.map(normalizeProduct));
+    return process.env.NODE_ENV === "production"
+      ? []
+      : deduplicateProductsBySlug(fallbackProducts.map(normalizeProduct));
   }, CACHE_TTL.PRODUCTS);
 }
 

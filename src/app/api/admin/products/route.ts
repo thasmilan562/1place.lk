@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { getLocalProducts, saveLocalProduct, deleteLocalProduct } from "@/lib/products-store";
 import { verifyAdminRequest } from "@/lib/admin-auth-server";
+import { clearDataCache } from "@/lib/data-cache";
 import { Product } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const NO_CACHE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
 
 function unauthorized() {
   return NextResponse.json({ success: false, error: "Unauthorized access to administrator API." }, { status: 401 });
@@ -57,15 +66,15 @@ export async function GET(req: Request) {
     if (id) {
       const found = products.find((p) => p.id === id);
       if (!found) {
-        return NextResponse.json({ success: false, error: "Product not found" }, { status: 404 });
+        return NextResponse.json({ success: false, error: "Product not found" }, { status: 404, headers: NO_CACHE_HEADERS });
       }
-      return NextResponse.json({ success: true, product: found });
+      return NextResponse.json({ success: true, product: found }, { headers: NO_CACHE_HEADERS });
     }
 
-    return NextResponse.json({ success: true, products });
+    return NextResponse.json({ success: true, products }, { headers: NO_CACHE_HEADERS });
   } catch (err: any) {
     console.error("[Admin API Products] GET error:", err);
-    return NextResponse.json({ success: false, error: err.message || "Failed to fetch products" }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || "Failed to fetch products" }, { status: 500, headers: NO_CACHE_HEADERS });
   }
 }
 
@@ -252,12 +261,22 @@ export async function DELETE(req: Request) {
       if (process.env.NODE_ENV === "production") return persistenceUnavailable();
     }
 
-    // 2. ALWAYS delete from local store as well to guarantee persistence
-    deleteLocalProduct(cleanId);
+    // Keep the development fallback in sync so a later Firestore outage cannot
+    // make this deleted product reappear. Production reads are Firestore-only.
+    const localDeleted = deleteLocalProduct(cleanId);
+    if (process.env.NODE_ENV !== "production" && !localDeleted) return persistenceUnavailable();
 
-    return NextResponse.json({ success: true, id: cleanId });
+    // Invalidate caches and trigger Next.js path revalidation
+    clearDataCache("products");
+    try {
+      revalidatePath("/products");
+      revalidatePath("/admin/dashboard");
+      revalidatePath("/");
+    } catch {}
+
+    return NextResponse.json({ success: true, id: cleanId }, { headers: NO_CACHE_HEADERS });
   } catch (err: any) {
     console.error("[Admin API Products] DELETE error:", err);
-    return NextResponse.json({ success: false, error: err.message || "Failed to delete product" }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || "Failed to delete product" }, { status: 500, headers: NO_CACHE_HEADERS });
   }
 }

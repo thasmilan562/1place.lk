@@ -78,9 +78,6 @@ export const metadata: Metadata = {
     shortcut: "/icon.svg",
     apple: "/icon.svg",
   },
-  alternates: {
-    canonical: BUSINESS_INFO.websiteUrl,
-  },
   openGraph: {
     title: "1place.lk — Sri Lanka's Premier Online Store",
     description:

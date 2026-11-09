@@ -70,6 +70,7 @@ import StoreSettingsTab from "@/components/admin/tabs/StoreSettingsTab";
 import SimpleBrandsTab from "@/components/admin/tabs/SimpleBrandsTab";
 import { deduplicateCategories } from "@/lib/category-utils";
 import { KNOWN_BRAND_NAMES } from "@/lib/migration-audit";
+import { clearDataCache } from "@/lib/data-cache";
 import { jsPDF } from "jspdf";
 
 // Admin Tabs
@@ -247,7 +248,7 @@ function DashboardContent() {
       setLoading(true);
       // Products
       try {
-        const prodRes = await fetch("/api/admin/products", { cache: "no-store" });
+        const prodRes = await fetch(`/api/admin/products?_t=${Date.now()}`, { cache: "no-store" });
         if (!prodRes.ok) throw new Error(`Product API returned ${prodRes.status}`);
         const prodData = await prodRes.json();
         if (!prodData.success || !Array.isArray(prodData.products)) {
@@ -987,7 +988,14 @@ function DashboardContent() {
     const cleanId = id.trim();
     if (!confirm("Are you sure you want to delete this product?")) return;
     try {
-      // Keep the row visible until the persistent delete succeeds.
+      // Optimistically remove from state immediately
+      setProducts((prev) => prev.filter((p) => p.id !== cleanId && p.slug !== cleanId && (p as any)._id !== cleanId));
+      if (editingProduct?.id === cleanId) {
+        setIsProductModalOpen(false);
+        setEditingProduct(null);
+      }
+      clearDataCache("products");
+
       const res = await fetch(`/api/admin/products?id=${encodeURIComponent(cleanId)}`, {
         method: "DELETE",
       });
@@ -995,8 +1003,6 @@ function DashboardContent() {
         const result = await res.json().catch(() => null);
         throw new Error(result?.error || "Failed to delete product");
       }
-
-      setProducts((prev) => prev.filter((p) => p.id !== cleanId && p.slug !== cleanId && (p as any)._id !== cleanId));
     } catch (e: any) {
       console.error("Error deleting product:", e);
       alert(e.message || "Error deleting product");
@@ -1921,8 +1927,6 @@ function DashboardContent() {
           refreshData();
         }}
         onDelete={async (id) => {
-          setIsProductModalOpen(false);
-          setEditingProduct(null);
           await handleDeleteProduct(id);
         }}
         categories={categories}

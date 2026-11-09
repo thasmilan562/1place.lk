@@ -25,21 +25,20 @@ function cleanSlug(text: string | undefined | null): string {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || BUSINESS_INFO.domain;
+  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL || BUSINESS_INFO.websiteUrl;
+  const baseUrl = new URL(configuredUrl.startsWith("http") ? configuredUrl : `https://${configuredUrl}`).origin;
 
   // Static informational and landing routes
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: `${baseUrl}`, lastModified: new Date(), changeFrequency: "daily", priority: 1.0 },
-    { url: `${baseUrl}/products`, lastModified: new Date(), changeFrequency: "daily", priority: 0.95 },
-    { url: `${baseUrl}/orders`, lastModified: new Date(), changeFrequency: "daily", priority: 0.85 },
-    { url: `${baseUrl}/categories`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.8 },
-    { url: `${baseUrl}/blog`, lastModified: new Date(), changeFrequency: "daily", priority: 0.8 },
-    { url: `${baseUrl}/reviews`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.7 },
-    { url: `${baseUrl}/gallery`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.6 },
-    { url: `${baseUrl}/contact`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.6 },
-    { url: `${baseUrl}/return-policy`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.5 },
-    { url: `${baseUrl}/privacy-policy`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.4 },
-    { url: `${baseUrl}/terms-and-conditions`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.4 },
+    { url: `${baseUrl}`, changeFrequency: "daily", priority: 1.0 },
+    { url: `${baseUrl}/products`, changeFrequency: "daily", priority: 0.95 },
+    { url: `${baseUrl}/blog`, changeFrequency: "daily", priority: 0.8 },
+    { url: `${baseUrl}/reviews`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${baseUrl}/gallery`, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${baseUrl}/contact`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${baseUrl}/return-policy`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${baseUrl}/privacy-policy`, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${baseUrl}/terms-and-conditions`, changeFrequency: "monthly", priority: 0.4 },
   ];
 
   try {
@@ -57,7 +56,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return [
         {
           url: `${baseUrl}/category/${slug}`,
-          lastModified: new Date(),
           changeFrequency: "daily",
           priority: 0.85,
         },
@@ -66,19 +64,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     // 2. Dynamic Product Routes (Exclude draft/inactive products)
     const productRoutes: MetadataRoute.Sitemap = products
-      .filter((prod) => prod.slug && (prod as any).status !== "draft" && (prod as any).status !== "inactive")
+      .filter((prod) => prod.slug && (prod as any).status !== "draft" && (prod as any).status !== "inactive" && (prod as any).status !== "deleted" && (prod as any).isDeleted !== true)
       .flatMap((prod) => {
         const slug = cleanSlug(prod.slug);
         if (!slug) return [];
-        let lastMod = new Date();
-        if (prod.created_at) {
-          const parsed = new Date(prod.created_at);
-          if (!isNaN(parsed.getTime())) lastMod = parsed;
-        }
+        const changedAt = (prod as any).updatedAt || (prod as any).updated_at || prod.created_at;
+        const parsed = changedAt ? new Date(changedAt) : null;
         return [
           {
             url: `${baseUrl}/products/${slug}`,
-            lastModified: lastMod,
+            ...(parsed && !isNaN(parsed.getTime()) ? { lastModified: parsed } : {}),
             changeFrequency: "daily",
             priority: 0.9,
           },
@@ -94,22 +89,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const bSlug = cleanSlug(brand.slug);
       if (!bSlug) return;
 
-      // Primary Brand Route
-      brandRoutes.push({
-        url: `${baseUrl}/brand/${bSlug}`,
-        lastModified: new Date(),
-        changeFrequency: "weekly",
-        priority: 0.8,
-      });
-
-      // Department-Brand specific routes
+      // /brand/:slug redirects, so publish its canonical destination instead.
       const assigned = brand.assigned_departments || (activeDepts.map((d) => d.slug));
       assigned.forEach((deptSlug) => {
         const dSlug = cleanSlug(deptSlug);
         if (!dSlug) return;
         brandRoutes.push({
           url: `${baseUrl}/shop-by-brand/${dSlug}/${bSlug}`,
-          lastModified: new Date(),
           changeFrequency: "weekly",
           priority: 0.8,
         });

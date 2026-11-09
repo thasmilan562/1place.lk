@@ -1177,11 +1177,7 @@ export default function ProductModal({
           {Boolean(initialData && initialData.id && onDelete) && (
             <button
               type="button"
-              onClick={() => {
-                if (window.confirm(`Are you sure you want to permanently delete "${name || initialData?.name || "this product"}"? This cannot be undone.`)) {
-                  onDelete?.(initialData!.id);
-                }
-              }}
+              onClick={() => onDelete?.(initialData!.id)}
               disabled={isSubmitting}
               className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl transition-all border border-red-200 flex items-center gap-1.5 cursor-pointer"
               title="Delete Product"

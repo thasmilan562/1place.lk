@@ -35,6 +35,15 @@ function resolveProductBrand(product: any): string {
   return product.category_name || "1PLACE.LK";
 }
 
+function isProductPreorder(product: any): boolean {
+  return Boolean(
+    product.is_preorder ||
+    product.pre_order ||
+    product.pre_booking ||
+    product.stock_status === "pre_order"
+  );
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
@@ -59,7 +68,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const hasValidPrice = typeof effectivePrice === "number" && !isNaN(effectivePrice) && effectivePrice > 0;
   const priceStr = hasValidPrice ? `Rs. ${Math.round(effectivePrice).toLocaleString("en-LK")}` : "Price Coming Soon";
   const warranty = product.warranty || product.brand_warranty || "Official Company Warranty";
-  const stockText = product.stock_status === "out_of_stock" ? "Available for Pre-Order" : "In Stock & Ready for Delivery";
+  const isPreOrder = isProductPreorder(product);
+  const stockText = isPreOrder
+    ? "Available for Pre-Order"
+    : product.stock_status === "out_of_stock"
+      ? "Currently out of stock"
+      : "In Stock & Ready for Delivery";
 
   const title = `${fullName} Price in Sri Lanka | 1PLACE.LK`;
   const description =
@@ -119,12 +133,8 @@ export default async function ProductDetailPage({
     : product.price;
 
   const hasValidPrice = typeof effectivePrice === "number" && !isNaN(effectivePrice) && effectivePrice > 0;
-  const isPreOrder = Boolean(
-    (product as any).is_preorder ||
-    (product as any).pre_order ||
-    (product as any).pre_booking ||
-    product.stock_status === "pre_order"
-  );
+  const isPreOrder = isProductPreorder(product);
+  const reviewCount = Number(product.review_count ?? product.reviews_count ?? 0);
 
   const productJsonLd: Record<string, any> = {
     "@context": "https://schema.org",
@@ -146,11 +156,12 @@ export default async function ProductDetailPage({
             "url": `https://www.1place.lk/products/${product.slug || slug}`,
             "priceCurrency": "LKR",
             "price": effectivePrice,
-            "priceValidUntil": new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
             "itemCondition": "https://schema.org/NewCondition",
-            "availability": product.stock_status === "out_of_stock"
-              ? (isPreOrder ? "https://schema.org/PreOrder" : "https://schema.org/OutOfStock")
-              : "https://schema.org/InStock",
+            "availability": isPreOrder
+              ? "https://schema.org/PreOrder"
+              : product.stock_status === "out_of_stock"
+                ? "https://schema.org/OutOfStock"
+                : "https://schema.org/InStock",
             "seller": {
               "@type": "Organization",
               "@id": "https://www.1place.lk/#organization",
@@ -174,12 +185,12 @@ export default async function ProductDetailPage({
             }
           }
         }),
-    ...(product.rating && product.rating > 0
+    ...(product.rating && product.rating > 0 && reviewCount > 0
       ? {
           "aggregateRating": {
             "@type": "AggregateRating",
             "ratingValue": product.rating,
-            "reviewCount": product.review_count || product.reviews_count || 1,
+            "reviewCount": reviewCount,
             "bestRating": "5",
             "worstRating": "1"
           }
