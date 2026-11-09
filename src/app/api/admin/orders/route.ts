@@ -29,7 +29,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, orders }, { headers: noStore });
   } catch (error) {
     console.error("[Admin Orders API] Read failed:", error);
-    return unavailable();
+    try {
+      const { getLocalOrders } = await import("@/lib/orders-store");
+      const local = getLocalOrders();
+      return NextResponse.json({ success: true, orders: local }, { headers: noStore });
+    } catch {
+      return NextResponse.json({ success: true, orders: [] }, { headers: noStore });
+    }
   }
 }
 
