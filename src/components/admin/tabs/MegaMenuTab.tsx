@@ -28,7 +28,7 @@ import {
   Sliders,
 } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import {
   MegaMenuSettings,
   MegaMenuColumn,

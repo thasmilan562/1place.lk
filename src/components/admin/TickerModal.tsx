@@ -22,7 +22,7 @@ import {
   Heart,
   Award,
 } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { TickerSettings, TickerMessage } from "@/lib/types";
 

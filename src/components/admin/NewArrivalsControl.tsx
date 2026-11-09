@@ -23,7 +23,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { Product, NewArrivalsSettings } from "@/lib/types";
 import { DEFAULT_NEW_ARRIVALS_SETTINGS } from "@/lib/data";
 import { formatPrice } from "@/lib/utils";

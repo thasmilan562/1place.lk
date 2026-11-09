@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { CircleCheck as Sparkles, Save, Check, Image as ImageIcon, Eye, RefreshCw, Smartphone, Monitor, Upload, Trash2, Calendar, Link as LinkIcon, AlertCircle, CheckCircle2 } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { Product, Category } from "@/lib/types";
 import { getCategories } from "@/lib/firestore-client";
 import { uploadImageWithFallback } from "@/lib/upload-utils";

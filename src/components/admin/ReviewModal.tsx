@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Upload, Loader2, Link, Star, Eye, EyeOff, CircleCheck as Sparkles } from "lucide-react";
 import { Review } from "@/lib/types";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { addDoc, updateDoc, doc, collection } from "firebase/firestore";
 import { uploadImageWithFallback } from "@/lib/upload-utils";
 

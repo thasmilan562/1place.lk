@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { formatPrice } from "@/lib/utils";
 import { Product, Category, Brand } from "@/lib/types";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { doc, updateDoc, writeBatch, setDoc } from "firebase/firestore";
 import { 
   Package, 

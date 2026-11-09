@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { Supplier } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import {

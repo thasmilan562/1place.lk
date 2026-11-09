@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { DEFAULT_FOOTER_SETTINGS } from "@/lib/data";
 import { FooterSettings } from "@/lib/types";
 

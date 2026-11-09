@@ -14,7 +14,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { Category } from "@/lib/types";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { uploadImageWithFallback } from "@/lib/upload-utils";
 import CategoryIcon, {

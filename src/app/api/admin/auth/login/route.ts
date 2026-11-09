@@ -5,9 +5,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
-    const hasAdminUser = Boolean((process.env.ADMIN_USER || "admin").trim());
-    const hasAdminPassword = Boolean(process.env.ADMIN_PASSWORD || "oneplace2026");
-    const hasSessionSecret = Boolean(process.env.ADMIN_SESSION_SECRET || process.env.AUTH_SECRET || "oneplace_super_secret_session_key_2026_lk");
+    const hasAdminUser = Boolean(process.env.ADMIN_USER?.trim());
+    const hasAdminPassword = Boolean(process.env.ADMIN_PASSWORD);
+    const hasSessionSecret = Boolean(process.env.ADMIN_SESSION_SECRET || process.env.AUTH_SECRET);
     if (!hasAdminUser || !hasAdminPassword || !hasSessionSecret) {
       return NextResponse.json(
         { success: false, error: "Admin login is not configured on this server. Set the required admin environment variables and redeploy." },

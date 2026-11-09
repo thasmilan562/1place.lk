@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { siteSettings as defaultSiteSettings } from "@/lib/data";
 import { SiteSettings } from "@/lib/types";

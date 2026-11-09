@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Smartphone, Save, Check } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { useAdminTheme } from "@/app/admin/dashboard/layout";
 
 export default function MobileExperienceTab() {

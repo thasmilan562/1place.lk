@@ -25,7 +25,7 @@ import {
   Smartphone,
   RotateCcw,
 } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { useAdminTheme } from "@/app/admin/dashboard/layout";
 

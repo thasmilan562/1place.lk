@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { CircleCheck as Sparkles, Save, Check, Image as ImageIcon, Eye, Clock, Layers, Calendar, Tag, X, ArrowRight } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { CampaignPopupSettings } from "@/components/ui/CampaignPopup";
 
 export default function CampaignPopupControl() {

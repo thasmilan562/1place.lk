@@ -19,7 +19,7 @@ import {
   ArrowRight,
   Loader2,
 } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
 import { useAdminTheme } from "@/app/admin/dashboard/layout";
 import CategoryIcon from "@/components/ui/CategoryIcon";

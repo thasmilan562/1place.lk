@@ -24,7 +24,7 @@ import {
   Maximize2,
 } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { TodayDealSettings, TodayDealStatus } from "@/lib/types";
 import { DEFAULT_TODAY_DEAL_SETTINGS } from "@/lib/data";
 import { uploadImageWithFallback } from "@/lib/upload-utils";

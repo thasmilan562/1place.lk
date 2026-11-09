@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { doc, getDoc, writeBatch } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 
 export default function StoreSettingsTab() {
   const [settings, setSettings] = useState({ googleAuthEnabled: true, appleAuthEnabled: true });

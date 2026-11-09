@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Settings, CircleCheck as Sparkles, Star, Image as ImageIcon, Bot, Save, Check } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { useAdminTheme } from "@/app/admin/dashboard/layout";
 
 export default function SettingsTab({

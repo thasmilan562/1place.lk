@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { collection, onSnapshot, deleteDoc, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { CashFlowTransaction } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import {

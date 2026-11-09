@@ -11,6 +11,9 @@ import { AdminThemeContext } from "@/app/admin/dashboard/layout";
 import { useDialogFocus } from "@/lib/use-dialog-focus";
 import ProductModal from "./ProductModal";
 import CommandPalette from "./CommandPalette";
+import { collection, onSnapshot } from "firebase/firestore";
+import { playOrderChime } from "@/lib/audio-chime";
+import { db, connectAdminFirebase, disconnectAdminFirebase } from "@/lib/admin-firebase";
 
 export default function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -19,7 +22,7 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
   const active = searchParams.get("tab") || "overview";
   const current = ADMIN_NAVIGATION.find((item) => item.id === active) || ADMIN_NAVIGATION[0];
   const [authed, setAuthed] = useState(false);
-  const [authError, setAuthError] = useState(false);
+  const [authError, setAuthError] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -39,9 +42,12 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
       if (!res.ok) throw new Error("Session unavailable");
       const result = await res.json();
       if (!active) return;
-      if (result.authenticated) setAuthed(true);
+      if (result.authenticated) {
+        await connectAdminFirebase();
+        if (active) setAuthed(true);
+      }
       else router.replace("/admin/login");
-    }).catch(() => { if (active) setAuthError(true); });
+    }).catch((error) => { if (active) setAuthError(error instanceof Error ? error.message : "Unable to connect to the admin database."); });
     return () => { active = false; };
   }, [router]);
 
@@ -56,46 +62,26 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
     if (!authed) return;
     getCategories().then(setCategories).catch(() => {});
     let initialized = false;
-    let stopped = false;
-    let loadingOrders = false;
     const known = new Set<string>();
-    const refreshOrders = async () => {
-      if (stopped || loadingOrders) return;
-      loadingOrders = true;
-      try {
-        const response = await fetch("/api/admin/orders", { cache: "no-store" });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok || !result.success || !Array.isArray(result.orders)) {
-          throw new Error(result.error || `Orders API returned ${response.status}`);
-        }
-
-        if (stopped) return;
-        const orders = result.orders as Array<Record<string, any>>;
-        setNotificationError("");
-        setPending(orders.filter((order) => ["pending", "pending cod", "processing", "payment pending"].includes(String(order.status || order.orderStatus || "").toLowerCase())).length);
-        const added = orders.filter((order) => order.id && !known.has(order.id));
-        orders.forEach((order) => { if (order.id) known.add(order.id); });
-        if (initialized && added.length) {
-          setOrderAlert(`${added.length === 1 ? "A new order has" : `${added.length} new orders have`} arrived. Review it in Orders.`);
-        }
-        initialized = true;
-        window.dispatchEvent(new CustomEvent("admin-orders-updated", { detail: orders }));
-      } catch (error) {
-        if (!stopped) {
-          console.error("Admin order refresh failed:", error);
-          setNotificationError(error instanceof Error ? error.message : "Unable to reach the admin orders API.");
-        }
-      } finally {
-        loadingOrders = false;
+    return onSnapshot(collection(db, "orders"), { includeMetadataChanges: true }, (snapshot) => {
+      if (snapshot.metadata.fromCache) return;
+      const orders = snapshot.docs.map((document) => ({ ...document.data(), id: document.id })) as Array<Record<string, any>>;
+      setNotificationError("");
+      setPending(orders.filter((order) => ["pending", "pending cod", "processing", "payment pending"].includes(String(order.status || order.orderStatus || "").toLowerCase())).length);
+      const added = orders.filter((order) => !known.has(order.id));
+      orders.forEach((order) => known.add(order.id));
+      if (initialized && added.length) {
+        playOrderChime();
+        setOrderAlert(`${added.length} new order(s) arrived. Review them in Orders.`);
       }
-
-    };
-    void refreshOrders();
-    const intervalId = window.setInterval(() => { void refreshOrders(); }, 10000);
-    return () => {
-      stopped = true;
-      window.clearInterval(intervalId);
-    };
+      initialized = true;
+      window.dispatchEvent(new CustomEvent("admin-orders-updated", { detail: orders }));
+    }, (error) => {
+      console.error("Admin order listener failed:", error.code);
+      setNotificationError(error.code === "permission-denied"
+        ? "Your admin account cannot access orders. Check the deployed Firebase admin permissions."
+        : "Orders are temporarily unavailable. Refresh to reconnect.");
+    });
   }, [authed]);
 
   useEffect(() => {
@@ -124,10 +110,11 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
   const logout = async () => {
     const result = await fetch("/api/admin/auth/logout", { method: "POST" }).catch(() => null);
     if (!result?.ok) { window.alert("Could not sign out. Please try again."); return; }
+    await disconnectAdminFirebase();
     sessionStorage.removeItem("admin_auth"); localStorage.removeItem("admin_auth"); router.replace("/admin/login");
   };
 
-  if (!authed) return <div data-admin-root className="admin-workspace-loading"><p>{authError ? "Your workspace couldn't connect." : "Opening your store workspace…"}</p>{authError && <button type="button" onClick={() => window.location.reload()}>Try again</button>}</div>;
+  if (!authed) return <div data-admin-root className="admin-workspace-loading"><p role={authError ? "alert" : "status"}>{authError || "Opening your store workspace…"}</p>{authError && <button type="button" onClick={() => window.location.reload()}>Try again</button>}</div>;
 
   return <AdminThemeContext.Provider value={{ theme, isLight: theme === "light", toggleTheme }}>
     <div data-admin-root data-admin-theme={theme} data-theme={theme} className={`minimal-admin ${theme}`}>

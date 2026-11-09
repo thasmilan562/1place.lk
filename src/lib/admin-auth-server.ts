@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
-function getSecretKey(): string {
-  return process.env.ADMIN_SESSION_SECRET || process.env.AUTH_SECRET || "oneplace_super_secret_session_key_2026_lk";
+function getSecretKey(): string | null {
+  return process.env.ADMIN_SESSION_SECRET || process.env.AUTH_SECRET || null;
 }
 
 export interface AdminSessionData {
@@ -76,61 +76,24 @@ export function verifyAdminSessionToken(token?: string | null): AdminSessionData
 }
 
 /**
- * Server-side check for valid admin credentials
+ * Server-side check for valid admin credentials (constant-time comparison)
  */
 export function verifyAdminCredentials(user: string, pass: string): boolean {
-  if (!user || !pass) return false;
-
-  const configuredUser = (process.env.ADMIN_USER || "admin").trim().toLowerCase();
-  const configuredPass = (process.env.ADMIN_PASSWORD || "oneplace2026").trim();
+  const expectedUser = (process.env.ADMIN_USER || "").trim().toLowerCase();
+  const expectedPass = process.env.ADMIN_PASSWORD;
+  if (!expectedUser || !expectedPass) return false;
 
   const cleanUser = user.trim().toLowerCase();
   const cleanPass = pass.trim();
 
-  if (!cleanUser || !cleanPass) return false;
-
-  // Allowed administrative usernames & email aliases
-  const validUsers = new Set([
-    configuredUser,
-    "admin",
-    "admin@1place.lk",
-    "orders@1place.lk",
-    "oneplace",
-    "1place",
-    "administrator",
-  ]);
-
-  if (!validUsers.has(cleanUser)) {
+  // Primary credential check (constant time)
+  if (cleanUser !== expectedUser) {
     return false;
   }
 
-  // Allowed passwords: configured password, case-insensitive matches, and store variants
-  const allowedPasswords = new Set([
-    configuredPass,
-    configuredPass.toLowerCase(),
-    "oneplace2026",
-    "Oneplace2026",
-    "ONEPLACE2026",
-    "1place2026",
-    "1Place2026",
-    "oneplace@2026",
-    "Oneplace@2026",
-  ]);
-
-  if (allowedPasswords.has(cleanPass)) {
-    return true;
-  }
-
-  // Also accept case-insensitive match against configured password or "oneplace2026"
-  if (
-    cleanPass.toLowerCase() === configuredPass.toLowerCase() ||
-    cleanPass.toLowerCase() === "oneplace2026" ||
-    cleanPass.toLowerCase() === "1place2026"
-  ) {
-    return true;
-  }
-
-  return false;
+  const bufA = Buffer.from(cleanPass);
+  const bufB = Buffer.from(expectedPass);
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
 }
 
 /** Verifies the signed admin cookie at the data route itself, not only in Proxy. */

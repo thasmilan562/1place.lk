@@ -27,7 +27,7 @@ import {
   Maximize2,
 } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { Product, Category, VisualShowcaseSettings, VisualShowcaseSlide, ShowcasePlacement } from "@/lib/types";
 import { DEFAULT_SHOWCASE_SETTINGS } from "@/lib/data";
 import { uploadImageWithFallback } from "@/lib/upload-utils";

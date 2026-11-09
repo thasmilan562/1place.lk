@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { X, CircleCheck as Sparkles, Tag, Percent, DollarSign, Truck, Calendar, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
 import { Coupon, CouponDiscountType } from "@/lib/types";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { doc, setDoc, addDoc, collection } from "firebase/firestore";
 
 interface CouponModalProps {

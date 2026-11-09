@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { Product, ProductVariantCombo } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { doc, writeBatch } from "firebase/firestore";
 import {
   getProductCategory,

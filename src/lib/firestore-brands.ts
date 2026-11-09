@@ -53,6 +53,7 @@ export async function getDepartmentsFromDb(): Promise<Department[]> {
 }
 
 export async function saveDepartmentToDb(dept: Partial<Department>): Promise<void> {
+  const { db } = await import("./admin-firebase");
   const slug = (dept.slug || dept.name || "department").toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const id = dept.id || `dept-${slug}`;
   const docRef = doc(db, "departments", id);
@@ -165,6 +166,7 @@ export async function getBrandsFromDb(): Promise<Brand[]> {
 }
 
 export async function saveBrandToDb(brand: Partial<Brand>): Promise<void> {
+  const { db } = await import("./admin-firebase");
   const slug = (brand.slug || brand.name || "brand").toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const id = brand.id || `brand-${slug}`;
   const docRef = doc(db, "brands", id);
@@ -202,6 +204,7 @@ export async function saveBrandToDb(brand: Partial<Brand>): Promise<void> {
 }
 
 export async function deleteBrandFromDb(id: string, brandInfo?: Partial<Brand>): Promise<void> {
+  const { db } = await import("./admin-firebase");
   try {
     // Write tombstone in Firestore so brand will NEVER resurrect on reload
     await setDoc(
@@ -319,6 +322,7 @@ export async function getDepartmentBrandPageConfig(
 export async function saveDepartmentBrandPageConfig(
   config: DepartmentBrandPageConfig
 ): Promise<void> {
+  const { db } = await import("./admin-firebase");
   const docId = `${(config.departmentSlug || "phones").toLowerCase()}_${(config.brandSlug || "brand").toLowerCase()}`;
   const docRef = doc(db, "department_brand_pages", docId);
   const cleanConfig = JSON.parse(JSON.stringify(config || {}));

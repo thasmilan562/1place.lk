@@ -25,7 +25,7 @@ import {
   Globe,
   Loader2,
 } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import {
   collection,
   getDocs,

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import { Download, FileSpreadsheet, FileText, UserCheck, ShoppingBag } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { jsPDF } from "jspdf";
 

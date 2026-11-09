@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { CashFlowTransaction } from "@/lib/types";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
 import { X, DollarSign, Calendar, Tag, FileText } from "lucide-react";
 

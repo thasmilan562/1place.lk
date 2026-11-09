@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { RepairJob, RepairStatus } from "@/lib/types";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
 import { X, Wrench, Calendar, User, Phone, DollarSign, Smartphone } from "lucide-react";
 

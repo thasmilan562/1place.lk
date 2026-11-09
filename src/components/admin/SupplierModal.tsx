@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Supplier } from "@/lib/types";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
 import { X, Building, Phone, Mail, MapPin, DollarSign, Package } from "lucide-react";
 

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Product, WhatsAppCampaign } from "@/lib/types";
 import { Megaphone, MessageCircle, BarChart3, Users, Plus, CheckCircle2, AlertCircle, X, ChevronRight, Send, ArrowRight, Eye } from "lucide-react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { useAdminTheme } from "@/app/admin/dashboard/layout";
 import Image from "next/image";
 

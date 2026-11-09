@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { Clock, ImagePlus, Save } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { HOME_OFFER_DEFAULTS, HomeOfferSettings, offerEndTime } from "@/lib/home-offers";
 import { uploadImageWithFallback } from "@/lib/upload-utils";
 

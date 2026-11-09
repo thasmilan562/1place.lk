@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { GalleryImage, GalleryAnimationSettings, HeroSlide } from "@/lib/types";
 import { DEFAULT_GALLERY_ANIMATION_SETTINGS } from "@/lib/data";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { doc, setDoc } from "firebase/firestore";
 import {
   Plus,

@@ -33,7 +33,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Product, Category, ProductColor, ProductVariantCombo, WarrantyOption, InventoryLog, ProductImageSettings } from "@/lib/types";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { addDoc, updateDoc, doc, collection, setDoc } from "firebase/firestore";
 import { getBrands, getCategories, clearDataCache } from "@/lib/firestore-client";
 import { PRESET_COLORS, getColorCSS, normalizeColor } from "@/lib/color-utils";

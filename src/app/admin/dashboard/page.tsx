@@ -55,7 +55,7 @@ import {
   Settings,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/admin-firebase";
 import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, setDoc, getDoc, onSnapshot, writeBatch } from "firebase/firestore";
 import RealtimeOrderAlert, { LiveOrderNotification } from "@/components/admin/RealtimeOrderAlert";
 import GoogleSearchConsoleTraffic from "@/components/admin/GoogleSearchConsoleTraffic";
