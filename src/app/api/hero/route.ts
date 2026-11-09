@@ -7,11 +7,18 @@ import { normalizeImageUrl } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
+function withTimeout<T>(promise: Promise<T>, ms = 1500): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms)),
+  ]);
+}
+
 export async function GET() {
   try {
     let slides: HeroSlide[] = [];
 
-    // 1. Try local JSON store first for ultra-fast local response
+    // 1. Try local JSON store first for ultra-fast local response (0ms)
     try {
       const localSlides = getLocalHeroSlides();
       if (Array.isArray(localSlides) && localSlides.length > 0) {
@@ -21,10 +28,10 @@ export async function GET() {
       console.warn("[Public Hero API] Local store read error:", e);
     }
 
-    // 2. Also check Firestore if available
+    // 2. Fast check with Firestore (1.5s max timeout)
     try {
       const db = getAdminDb();
-      const snap = await db.collection("hero_slides").get();
+      const snap = await withTimeout(db.collection("hero_slides").get(), 1500);
       if (!snap.empty) {
         const firestoreSlides = snap.docs.map((d) => ({ ...(d.data() as HeroSlide), id: d.id }));
         if (firestoreSlides.length > 0) {
@@ -32,7 +39,7 @@ export async function GET() {
         }
       }
     } catch {
-      // Admin DB unavailable or offline - fallback to localSlides
+      // Admin DB unavailable or quota exceeded - seamlessly fallback to localSlides
     }
 
     if (!slides || slides.length === 0) {
@@ -69,4 +76,3 @@ export async function GET() {
     );
   }
 }
-

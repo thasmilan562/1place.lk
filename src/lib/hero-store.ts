@@ -30,13 +30,14 @@ export function saveLocalHeroSlide(slide: Partial<HeroSlide>): HeroSlide | null 
     const slideId = slide.id || `hero-${Date.now()}`;
     const existingIndex = list.findIndex((s) => s.id === slideId);
 
+    const fallbackImage = "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?q=80&w=2200&auto=format&fit=crop";
     const record: HeroSlide = {
       ...(existingIndex >= 0 ? list[existingIndex] : (DEFAULT_HERO_SLIDES[0] || {})),
       ...slide,
       id: slideId,
-      image_url: slide.image_url || slide.desktop_image_url || "/hero-slide-1.png",
-      desktop_image_url: slide.desktop_image_url || slide.image_url || "/hero-slide-1.png",
-      mobile_image_url: slide.mobile_image_url || slide.desktop_image_url || slide.image_url || "/hero-slide-1.png",
+      image_url: slide.image_url || slide.desktop_image_url || fallbackImage,
+      desktop_image_url: slide.desktop_image_url || slide.image_url || fallbackImage,
+      mobile_image_url: slide.mobile_image_url || slide.desktop_image_url || slide.image_url || fallbackImage,
       active: slide.active !== false,
       sort_order: typeof slide.sort_order === "number" ? slide.sort_order : 1,
     } as HeroSlide;

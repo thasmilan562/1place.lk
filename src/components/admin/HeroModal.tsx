@@ -255,6 +255,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
         : heading.trim();
 
       await onSave({
+        id: slide?.id,
         image_url: mainImg,
         desktop_image_url: mainImg,
         mobile_image_url: finalMobileUrl || mainImg,

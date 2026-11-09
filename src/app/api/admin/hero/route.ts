@@ -31,29 +31,38 @@ function sanitize(obj: any): any {
   return cleaned;
 }
 
+// Timeout helper: prevents any remote Firestore gRPC call from stalling the response
+function withTimeout<T>(promise: Promise<T>, ms = 2000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Firestore timeout")), ms)),
+  ]);
+}
+
+const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?q=80&w=2200&auto=format&fit=crop";
+
 // GET /api/admin/hero
 export async function GET(req: Request) {
   if (!verifyAdminRequest(req)) return unauthorized();
 
   try {
-    let slides: HeroSlide[] = [];
+    let slides: HeroSlide[] = getLocalHeroSlides();
+
+    // Fast check for Firestore documents (max 1.5s timeout)
     try {
       const db = getAdminDb();
-      const snap = await db.collection("hero_slides").get();
+      const snap = await withTimeout(db.collection("hero_slides").get(), 1500);
       if (!snap.empty) {
-        slides = snap.docs.map((d) => ({ ...(d.data() as HeroSlide), id: d.id }));
+        const firestoreSlides = snap.docs.map((d) => ({ ...(d.data() as HeroSlide), id: d.id }));
+        if (firestoreSlides.length > 0) {
+          slides = firestoreSlides;
+        }
       }
     } catch (e) {
-      console.warn("[Admin API Hero] Firestore read warning:", e);
+      // Cloud quota exceeded or offline: smoothly serve local slides
     }
 
-    if (!slides || slides.length === 0) {
-      slides = getLocalHeroSlides();
-    }
-
-    // Sort by sort_order
     slides.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
     return NextResponse.json({ success: true, slides }, { headers: NO_CACHE_HEADERS });
   } catch (err: any) {
     console.error("[Admin API Hero GET] Error:", err);
@@ -73,28 +82,30 @@ export async function POST(req: Request) {
     const payload: HeroSlide = {
       ...slideData,
       id: slideId,
-      image_url: slideData.image_url || slideData.desktop_image_url || "/hero-slide-1.png",
-      desktop_image_url: slideData.desktop_image_url || slideData.image_url || "/hero-slide-1.png",
-      mobile_image_url: slideData.mobile_image_url || slideData.desktop_image_url || slideData.image_url || "/hero-slide-1.png",
+      image_url: slideData.image_url || slideData.desktop_image_url || DEFAULT_IMAGE,
+      desktop_image_url: slideData.desktop_image_url || slideData.image_url || DEFAULT_IMAGE,
+      mobile_image_url: slideData.mobile_image_url || slideData.desktop_image_url || slideData.image_url || DEFAULT_IMAGE,
       active: slideData.active !== false,
       sort_order: typeof slideData.sort_order === "number" ? slideData.sort_order : 1,
     } as HeroSlide;
 
-    // 1. Save to local JSON store
-    saveLocalHeroSlide(payload);
+    // 1. ALWAYS save to local JSON store immediately (0ms guarantee)
+    const saved = saveLocalHeroSlide(payload) || payload;
 
-    // 2. Save to Firestore via Admin SDK
+    // 2. Try to sync to Firestore with 2s timeout
     try {
       const db = getAdminDb();
-      await db.collection("hero_slides").doc(slideId).set(sanitize(payload), { merge: true });
+      await withTimeout(db.collection("hero_slides").doc(slideId).set(sanitize(payload), { merge: true }), 2000);
     } catch (dbErr) {
-      console.warn("[Admin API Hero POST] Firestore write warning (local copy preserved):", dbErr);
+      console.warn("[Admin API Hero POST] Firestore sync warning (local copy preserved):", dbErr);
     }
 
-    revalidatePath("/");
-    revalidatePath("/admin/dashboard");
+    try {
+      revalidatePath("/");
+      revalidatePath("/admin/dashboard");
+    } catch {}
 
-    return NextResponse.json({ success: true, slide: payload }, { headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ success: true, slide: saved }, { headers: NO_CACHE_HEADERS });
   } catch (err: any) {
     console.error("[Admin API Hero POST] Error:", err);
     return NextResponse.json(
@@ -121,13 +132,15 @@ export async function PUT(req: Request) {
 
     try {
       const db = getAdminDb();
-      await db.collection("hero_slides").doc(id).set(sanitize(updates), { merge: true });
+      await withTimeout(db.collection("hero_slides").doc(id).set(sanitize(updates), { merge: true }), 2000);
     } catch (dbErr) {
-      console.warn("[Admin API Hero PUT] Firestore update warning:", dbErr);
+      console.warn("[Admin API Hero PUT] Firestore update warning (local copy updated):", dbErr);
     }
 
-    revalidatePath("/");
-    revalidatePath("/admin/dashboard");
+    try {
+      revalidatePath("/");
+      revalidatePath("/admin/dashboard");
+    } catch {}
 
     return NextResponse.json({ success: true, slide: saved }, { headers: NO_CACHE_HEADERS });
   } catch (err: any) {
@@ -151,19 +164,21 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ success: false, error: "Hero slide id is required" }, { status: 400 });
     }
 
-    // 1. Delete from local JSON store
+    // 1. Delete from local JSON store immediately (0ms guarantee)
     deleteLocalHeroSlide(id);
 
-    // 2. Delete from Firestore via Admin SDK
+    // 2. Delete from Firestore with 2s timeout
     try {
       const db = getAdminDb();
-      await db.collection("hero_slides").doc(id).delete();
+      await withTimeout(db.collection("hero_slides").doc(id).delete(), 2000);
     } catch (dbErr) {
       console.warn("[Admin API Hero DELETE] Firestore delete warning:", dbErr);
     }
 
-    revalidatePath("/");
-    revalidatePath("/admin/dashboard");
+    try {
+      revalidatePath("/");
+      revalidatePath("/admin/dashboard");
+    } catch {}
 
     return NextResponse.json({ success: true, message: "Hero slide deleted successfully" }, { headers: NO_CACHE_HEADERS });
   } catch (err: any) {
@@ -174,4 +189,3 @@ export async function DELETE(req: Request) {
     );
   }
 }
-

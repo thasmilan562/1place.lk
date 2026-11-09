@@ -609,16 +609,6 @@ function DashboardContent() {
       (err) => console.warn("Realtime gallery listener error:", err)
     );
 
-    // 9. Live Hero Slides
-    const unsubHero = onSnapshot(
-      collection(db, "hero_slides"),
-      (snapshot) => {
-        const heroList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as HeroSlide));
-        setHeroSlides(heroList);
-      },
-      (err) => console.warn("Realtime hero slides listener error:", err)
-    );
-
     return () => {
       window.removeEventListener("admin-orders-updated", handleAdminOrdersUpdate);
       unsubProducts();
@@ -628,7 +618,6 @@ function DashboardContent() {
       unsubCoupons();
       unsubReviews();
       unsubGallery();
-      unsubHero();
     };
   }, []);
 
@@ -1252,7 +1241,7 @@ function DashboardContent() {
 
   const handleSaveHeroSlide = async (slideData: Partial<HeroSlide>) => {
     try {
-      const slideId = editingHeroSlide?.id || `hero-${Date.now()}`;
+      const slideId = slideData.id || editingHeroSlide?.id || `hero-${Date.now()}`;
       const payload = { ...slideData, id: slideId, updated_at: new Date().toISOString() };
 
       const res = await fetch("/api/admin/hero", {
@@ -1266,18 +1255,17 @@ function DashboardContent() {
         throw new Error(data.error || "Failed to save hero slide on server");
       }
 
-      const saved = data.slide || payload;
+      const saved = (data.slide || payload) as HeroSlide;
       setHeroSlides((prev) => {
         const exists = prev.some((s) => s.id === slideId);
         if (exists) {
-          return prev.map((s) => (s.id === slideId ? ({ ...s, ...saved } as HeroSlide) : s));
+          return prev.map((s) => (s.id === slideId ? { ...s, ...saved } : s));
         }
-        return [...prev, saved as HeroSlide];
+        return [...prev, saved];
       });
 
       setIsHeroModalOpen(false);
       setEditingHeroSlide(null);
-      refreshData();
     } catch (e: any) {
       console.error("Error saving hero slide:", e);
       alert(`Failed to save hero slide: ${e?.message || "Check network/permissions"}`);
