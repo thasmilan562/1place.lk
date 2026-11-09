@@ -260,19 +260,24 @@ function DashboardContent() {
       }
 
       // Categories
-      const catSnap = await getDocs(collection(db, "categories"));
-      const rawCatList = catSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Category));
-      const validCats = rawCatList.filter((c) => {
-        if ((c as any).isDeleted === true || c.status === "deleted") return false;
-        const cName = (c.name || "").toLowerCase();
-        const cSlug = (c.slug || "").toLowerCase();
-        if (KNOWN_BRAND_NAMES.some((b) => b.toLowerCase() === cName || b.toLowerCase() === cSlug)) return false;
-        return true;
-      });
+      try {
+        const catSnap = await getDocs(collection(db, "categories"));
+        const rawCatList = catSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Category));
+        const validCats = rawCatList.filter((c) => {
+          if ((c as any).isDeleted === true || c.status === "deleted") return false;
+          const cName = (c.name || "").toLowerCase();
+          const cSlug = (c.slug || "").toLowerCase();
+          if (KNOWN_BRAND_NAMES.some((b) => b.toLowerCase() === cName || b.toLowerCase() === cSlug)) return false;
+          return true;
+        });
 
-      if (validCats.length > 0) {
-        setCategories(deduplicateCategories(validCats));
-      } else {
+        if (validCats.length > 0) {
+          setCategories(deduplicateCategories(validCats));
+        } else {
+          setCategories(deduplicateCategories(fallbackCategories));
+        }
+      } catch (catErr) {
+        console.warn("Could not fetch categories directly, using fallbacks:", catErr);
         setCategories(deduplicateCategories(fallbackCategories));
       }
 
@@ -541,7 +546,7 @@ function DashboardContent() {
             return data.orders;
           });
         }
-      } catch {}
+      } catch { }
     };
 
     const ordersPollInterval = setInterval(pollOrders, 10000);
@@ -1608,19 +1613,19 @@ function DashboardContent() {
       ════════════════════════════════════════════════════════════════════ */}
       {activeTab === "hero" && (
         <div><HomeOffersEditor />
-        <HeroTab
-          slides={heroSlides}
-          onAdd={() => {
-            setEditingHeroSlide(null);
-            setIsHeroModalOpen(true);
-          }}
-          onEdit={(slide: HeroSlide) => {
-            setEditingHeroSlide(slide);
-            setIsHeroModalOpen(true);
-          }}
-          onDelete={handleDeleteHeroSlide}
-          onToggleStatus={handleToggleHeroSlideStatus}
-        />
+          <HeroTab
+            slides={heroSlides}
+            onAdd={() => {
+              setEditingHeroSlide(null);
+              setIsHeroModalOpen(true);
+            }}
+            onEdit={(slide: HeroSlide) => {
+              setEditingHeroSlide(slide);
+              setIsHeroModalOpen(true);
+            }}
+            onDelete={handleDeleteHeroSlide}
+            onToggleStatus={handleToggleHeroSlideStatus}
+          />
         </div>
       )}
 
@@ -1670,14 +1675,12 @@ function DashboardContent() {
             </div>
           </div>
 
-          <div className={`rounded-2xl border p-5 shadow-xs overflow-x-auto ${
-            isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
-          }`}>
+          <div className={`rounded-2xl border p-5 shadow-xs overflow-x-auto ${isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
+            }`}>
             <table className="w-full text-xs text-left">
               <thead>
-                <tr className={`font-semibold border-b uppercase tracking-wider text-[10px] ${
-                  isLight ? "text-slate-500 border-[#E2E8F0]" : "text-slate-400 border-white/10"
-                }`}>
+                <tr className={`font-semibold border-b uppercase tracking-wider text-[10px] ${isLight ? "text-slate-500 border-[#E2E8F0]" : "text-slate-400 border-white/10"
+                  }`}>
                   <th className="pb-3">Customer</th>
                   <th className="pb-3">Contact Email</th>
                   <th className="pb-3">Phone</th>
@@ -1695,9 +1698,8 @@ function DashboardContent() {
                   return (
                     <tr key={c.id || i} className="hover:bg-white/[0.03] transition-colors">
                       <td className="py-3 font-semibold text-white flex items-center gap-2.5">
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
-                          c.isGuest ? "bg-purple-600/20 text-purple-400" : "bg-blue-600/20 text-blue-400"
-                        }`}>
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${c.isGuest ? "bg-purple-600/20 text-purple-400" : "bg-blue-600/20 text-blue-400"
+                          }`}>
                           {(c.displayName || c.customerName || "C").charAt(0).toUpperCase()}
                         </div>
                         <span className="truncate">{c.displayName || c.customerName || `Customer #${i + 1}`}</span>
@@ -1708,11 +1710,10 @@ function DashboardContent() {
                         {customerOrdersCount} {customerOrdersCount === 1 ? "Order" : "Orders"}
                       </td>
                       <td className="py-3">
-                        <span className={`px-2.5 py-0.5 rounded-md font-semibold text-[10px] border ${
-                          c.isGuest
+                        <span className={`px-2.5 py-0.5 rounded-md font-semibold text-[10px] border ${c.isGuest
                             ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
                             : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                        }`}>
+                          }`}>
                           {c.isGuest ? "Guest Customer" : "Registered User"}
                         </span>
                       </td>
@@ -1756,9 +1757,8 @@ function DashboardContent() {
             </div>
           </div>
 
-          <div className={`rounded-2xl border p-5 shadow-xs space-y-4 ${
-            isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
-          }`}>
+          <div className={`rounded-2xl border p-5 shadow-xs space-y-4 ${isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
+            }`}>
             <div className="flex items-center gap-2.5">
               <Search className="w-4 h-4 text-slate-400" />
               <input
@@ -1766,18 +1766,16 @@ function DashboardContent() {
                 value={inventorySearch}
                 onChange={(e) => setInventorySearch(e.target.value)}
                 placeholder="Search stock by product name or SKU..."
-                className={`w-full max-w-sm px-3.5 py-1.5 rounded-xl text-xs outline-none border transition-all ${
-                  isLight ? "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500" : "bg-white/5 border-white/10 text-white placeholder-slate-400 focus:border-blue-500"
-                }`}
+                className={`w-full max-w-sm px-3.5 py-1.5 rounded-xl text-xs outline-none border transition-all ${isLight ? "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500" : "bg-white/5 border-white/10 text-white placeholder-slate-400 focus:border-blue-500"
+                  }`}
               />
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead>
-                  <tr className={`font-semibold border-b uppercase tracking-wider text-[10px] ${
-                    isLight ? "text-slate-500 border-[#E2E8F0]" : "text-slate-400 border-white/10"
-                  }`}>
+                  <tr className={`font-semibold border-b uppercase tracking-wider text-[10px] ${isLight ? "text-slate-500 border-[#E2E8F0]" : "text-slate-400 border-white/10"
+                    }`}>
                     <th className="pb-2.5">Product Name</th>
                     <th className="pb-2.5">Category</th>
                     <th className="pb-2.5">Variants</th>
@@ -1793,37 +1791,36 @@ function DashboardContent() {
                       p.code?.toLowerCase().includes(inventorySearch.toLowerCase())
                     )
                     .map((p) => (
-                    <tr key={p.id} className="hover:bg-white/[0.03] transition-colors">
-                      <td className="py-3 font-semibold text-white flex items-center gap-3">
-                        <img src={p.images?.[0]} alt={p.name} className="w-8 h-8 rounded-md object-contain bg-white/5 border border-white/10 shrink-0" />
-                        <span className="truncate">{p.name}</span>
-                      </td>
-                      <td className="py-3 text-slate-300 font-medium">{p.category_name}</td>
-                      <td className="py-3 text-slate-400">
-                        {p.storage_options?.join(", ") || "Standard"}
-                      </td>
-                      <td className="py-3">
-                        <span className={`px-2.5 py-0.5 rounded-md font-semibold text-[10px] ${
-                          p.stock_status === "in_stock"
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : "bg-red-500/10 text-red-400 border border-red-500/20"
-                        }`}>
-                          {p.stock_status === "in_stock" ? "In Stock" : "Low Stock"}
-                        </span>
-                      </td>
-                      <td className="py-3 text-right">
-                        <button
-                          onClick={() => {
-                            setQuickStockProduct(p);
-                            setQuickStockQty(10);
-                          }}
-                          className="px-2.5 py-1 bg-blue-600/15 border border-blue-500/25 text-blue-400 hover:bg-blue-600/25 rounded-lg font-semibold text-xs transition-colors"
-                        >
-                          Update Stock
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                      <tr key={p.id} className="hover:bg-white/[0.03] transition-colors">
+                        <td className="py-3 font-semibold text-white flex items-center gap-3">
+                          <img src={p.images?.[0]} alt={p.name} className="w-8 h-8 rounded-md object-contain bg-white/5 border border-white/10 shrink-0" />
+                          <span className="truncate">{p.name}</span>
+                        </td>
+                        <td className="py-3 text-slate-300 font-medium">{p.category_name}</td>
+                        <td className="py-3 text-slate-400">
+                          {p.storage_options?.join(", ") || "Standard"}
+                        </td>
+                        <td className="py-3">
+                          <span className={`px-2.5 py-0.5 rounded-md font-semibold text-[10px] ${p.stock_status === "in_stock"
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                              : "bg-red-500/10 text-red-400 border border-red-500/20"
+                            }`}>
+                            {p.stock_status === "in_stock" ? "In Stock" : "Low Stock"}
+                          </span>
+                        </td>
+                        <td className="py-3 text-right">
+                          <button
+                            onClick={() => {
+                              setQuickStockProduct(p);
+                              setQuickStockQty(10);
+                            }}
+                            className="px-2.5 py-1 bg-blue-600/15 border border-blue-500/25 text-blue-400 hover:bg-blue-600/25 rounded-lg font-semibold text-xs transition-colors"
+                          >
+                            Update Stock
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -1859,9 +1856,8 @@ function DashboardContent() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* PayHere Online Gateway Status */}
-            <div className={`rounded-2xl border p-5 shadow-xs space-y-2 ${
-              isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
-            }`}>
+            <div className={`rounded-2xl border p-5 shadow-xs space-y-2 ${isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
+              }`}>
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">PayHere Gateway Status</span>
               <h3 className="text-base font-bold text-emerald-400 flex items-center gap-2">
                 <Check className="w-4 h-4" /> Connected & Verified
@@ -1870,9 +1866,8 @@ function DashboardContent() {
             </div>
 
             {/* Editable Cash on Delivery (COD) Fee */}
-            <div className={`rounded-2xl border p-5 shadow-xs space-y-3 ${
-              isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
-            }`}>
+            <div className={`rounded-2xl border p-5 shadow-xs space-y-3 ${isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
+              }`}>
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Cash on Delivery (COD) Fee</span>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-slate-400">Rs.</span>
@@ -1880,9 +1875,8 @@ function DashboardContent() {
                   type="number"
                   value={codFee}
                   onChange={(e) => setCodFee(Number(e.target.value))}
-                  className={`w-full px-3 py-1.5 rounded-lg text-sm font-bold outline-none border transition-all ${
-                    isLight ? "bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500" : "bg-white/5 border-white/10 text-white focus:border-blue-500"
-                  }`}
+                  className={`w-full px-3 py-1.5 rounded-lg text-sm font-bold outline-none border transition-all ${isLight ? "bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500" : "bg-white/5 border-white/10 text-white focus:border-blue-500"
+                    }`}
                   placeholder="250"
                 />
               </div>
@@ -1902,9 +1896,8 @@ function DashboardContent() {
             </div>
 
             {/* WhatsApp Direct Order */}
-            <div className={`rounded-2xl border p-5 shadow-xs space-y-2 ${
-              isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
-            }`}>
+            <div className={`rounded-2xl border p-5 shadow-xs space-y-2 ${isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
+              }`}>
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">WhatsApp Direct Order</span>
               <h3 className="text-base font-bold text-blue-400">+94 77 414 1118</h3>
               <p className="text-xs text-slate-400">Auto-formatted message redirect active for checkout</p>
@@ -2007,15 +2000,13 @@ function DashboardContent() {
       {quickStockProduct && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div
-            className={`border rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl animate-in zoom-in-95 duration-150 ${
-              isLight
+            className={`border rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl animate-in zoom-in-95 duration-150 ${isLight
                 ? "bg-white border-[#E5E7EB] text-[#111827]"
                 : "bg-[#0F172A] border-white/15 text-white"
-            }`}
+              }`}
           >
-            <div className={`flex items-center justify-between border-b pb-3 ${
-              isLight ? "border-[#E5E7EB]" : "border-white/10"
-            }`}>
+            <div className={`flex items-center justify-between border-b pb-3 ${isLight ? "border-[#E5E7EB]" : "border-white/10"
+              }`}>
               <h3 className="text-sm font-bold flex items-center gap-2">
                 <Plus className={`w-4 h-4 ${isLight ? "text-emerald-600" : "text-emerald-400"}`} /> Restock: {quickStockProduct.name}
               </h3>
@@ -2028,9 +2019,8 @@ function DashboardContent() {
             </div>
 
             <div className="space-y-3.5 text-xs">
-              <div className={`p-3 border rounded-xl flex items-center justify-between ${
-                isLight ? "bg-[#F8FAFC] border-[#E5E7EB]" : "bg-white/5 border-white/10"
-              }`}>
+              <div className={`p-3 border rounded-xl flex items-center justify-between ${isLight ? "bg-[#F8FAFC] border-[#E5E7EB]" : "bg-white/5 border-white/10"
+                }`}>
                 <span className={`font-medium ${isLight ? "text-[#667085]" : "text-slate-300"}`}>Current Stock on Hand:</span>
                 <span className={`font-bold text-sm font-mono ${isLight ? "text-emerald-600" : "text-emerald-400"}`}>
                   {quickStockProduct.stock_count || 0} Units
@@ -2047,11 +2037,10 @@ function DashboardContent() {
                     min={1}
                     value={quickStockQty}
                     onChange={(e) => setQuickStockQty(Number(e.target.value))}
-                    className={`w-full p-2.5 rounded-xl font-mono font-bold outline-none text-sm border ${
-                      isLight
+                    className={`w-full p-2.5 rounded-xl font-mono font-bold outline-none text-sm border ${isLight
                         ? "bg-white border-[#D1D5DB] text-[#111827] focus:border-[#111827]"
                         : "bg-white/5 border-white/10 text-white focus:border-blue-500"
-                    }`}
+                      }`}
                   />
                   <span className={`font-semibold shrink-0 ${isLight ? "text-[#667085]" : "text-slate-400"}`}>Units</span>
                 </div>
@@ -2064,11 +2053,10 @@ function DashboardContent() {
                     key={preset}
                     type="button"
                     onClick={() => setQuickStockQty(preset)}
-                    className={`flex-1 py-1.5 border rounded-lg font-mono font-semibold text-xs transition-colors cursor-pointer ${
-                      isLight
+                    className={`flex-1 py-1.5 border rounded-lg font-mono font-semibold text-xs transition-colors cursor-pointer ${isLight
                         ? "bg-[#F3F4F6] hover:bg-[#111827] hover:text-white border-[#E5E7EB] text-[#374151]"
                         : "bg-white/5 hover:bg-blue-600 hover:text-white border-white/10 text-white"
-                    }`}
+                      }`}
                   >
                     +{preset}
                   </button>
@@ -2076,17 +2064,15 @@ function DashboardContent() {
               </div>
             </div>
 
-            <div className={`flex items-center justify-end gap-2.5 pt-3 border-t ${
-              isLight ? "border-[#E5E7EB]" : "border-white/10"
-            }`}>
+            <div className={`flex items-center justify-end gap-2.5 pt-3 border-t ${isLight ? "border-[#E5E7EB]" : "border-white/10"
+              }`}>
               <button
                 type="button"
                 onClick={() => setQuickStockProduct(null)}
-                className={`px-3.5 py-1.5 font-semibold text-xs rounded-xl transition-colors cursor-pointer ${
-                  isLight
+                className={`px-3.5 py-1.5 font-semibold text-xs rounded-xl transition-colors cursor-pointer ${isLight
                     ? "bg-[#F3F4F6] hover:bg-[#E5E7EB] text-[#374151]"
                     : "bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white"
-                }`}
+                  }`}
               >
                 Cancel
               </button>
@@ -2094,11 +2080,10 @@ function DashboardContent() {
                 type="button"
                 onClick={handleSaveQuickStock}
                 disabled={isUpdatingStock}
-                className={`px-4 py-1.5 font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                  isLight
+                className={`px-4 py-1.5 font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer ${isLight
                     ? "bg-[#111827] hover:bg-[#1F2937] text-white"
                     : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                }`}
+                  }`}
               >
                 {isUpdatingStock ? "Updating..." : `Confirm +${quickStockQty} Stock`}
               </button>

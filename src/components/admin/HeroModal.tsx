@@ -328,14 +328,14 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
     }
   };
 
-  const currentPreviewImage = previewDevice === "mobile" 
+  const currentPreviewImage = previewDevice === "mobile"
     ? (mobilePreview || desktopPreview || imageUrl || "/hero-slide-1.png")
     : (desktopPreview || imageUrl || "/hero-slide-1.png");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
-        
+
         {/* Header */}
         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-slate-900/90 backdrop-blur sticky top-0 z-10">
           <div className="flex items-center gap-3">
@@ -356,7 +356,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
 
         {/* Form Content */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
-          
+
           {/* Live Device Preview Switch */}
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -367,18 +367,16 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                 <button
                   type="button"
                   onClick={() => setPreviewDevice("desktop")}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                    previewDevice === "desktop" ? "bg-white text-black shadow-sm" : "text-white/60 hover:text-white"
-                  }`}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${previewDevice === "desktop" ? "bg-white text-black shadow-sm" : "text-white/60 hover:text-white"
+                    }`}
                 >
                   <Monitor className="w-3.5 h-3.5" /> Desktop
                 </button>
                 <button
                   type="button"
                   onClick={() => setPreviewDevice("mobile")}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                    previewDevice === "mobile" ? "bg-white text-black shadow-sm" : "text-white/60 hover:text-white"
-                  }`}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${previewDevice === "mobile" ? "bg-white text-black shadow-sm" : "text-white/60 hover:text-white"
+                    }`}
                 >
                   <Smartphone className="w-3.5 h-3.5" /> Mobile
                 </button>
@@ -387,9 +385,8 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
 
             {/* Live Banner Box */}
             <div
-              className={`relative w-full rounded-2xl overflow-hidden border border-white/20 shadow-xl transition-all ${
-                previewDevice === "mobile" ? "aspect-video w-full" : "aspect-[2200/675]"
-              }`}
+              className={`relative w-full rounded-2xl overflow-hidden border border-white/20 shadow-xl transition-all ${previewDevice === "mobile" ? "aspect-video w-full" : "aspect-[2200/675]"
+                }`}
               style={{ background: "#f0eeeb" }}
             >
               {/* Background / Product Image */}
@@ -566,9 +563,8 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                     setImageUrl(p.url);
                     setDesktopPreview(p.url);
                   }}
-                  className={`p-2 rounded-xl border text-left text-xs transition-all ${
-                    imageUrl === p.url ? "border-emerald-400 bg-emerald-500/10 text-emerald-300 font-bold" : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
-                  }`}
+                  className={`p-2 rounded-xl border text-left text-xs transition-all ${imageUrl === p.url ? "border-emerald-400 bg-emerald-500/10 text-emerald-300 font-bold" : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                    }`}
                 >
                   <p className="truncate font-medium">{p.label}</p>
                 </button>
@@ -1147,7 +1143,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
             <h4 className="text-xs font-bold uppercase tracking-wider text-white/80 flex items-center gap-2">
               <LinkIcon className="w-3.5 h-3.5 text-emerald-400" /> CTA Button Configuration
             </h4>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-white/60 mb-1">Primary Button Label</label>

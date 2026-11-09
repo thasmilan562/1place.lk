@@ -365,7 +365,12 @@ export async function POST(req: Request) {
 
     // 2. Persist to Firestore with timeout guard
     try {
-      await withTimeout(setDoc(doc(db, "orders", orderPayload.id), orderPayload, { merge: true }), 2000, null);
+      try {
+        const adminDb = getAdminDb();
+        await withTimeout(adminDb.collection("orders").doc(orderPayload.id).set(orderPayload, { merge: true }), 2000, null);
+      } catch {
+        await withTimeout(setDoc(doc(db, "orders", orderPayload.id), orderPayload, { merge: true }), 1500, null);
+      }
 
       // 2b. Mark promotional spin rewards as redeemed
       if (giftItems.length > 0) {
@@ -447,7 +452,12 @@ export async function PATCH(req: Request) {
     updateLocalOrder(id, updates);
 
     try {
-      await withTimeout(updateDoc(doc(db, "orders", id), updates), 2000, null);
+      try {
+        const adminDb = getAdminDb();
+        await withTimeout(adminDb.collection("orders").doc(id).set(updates, { merge: true }), 2000, null);
+      } catch {
+        await withTimeout(updateDoc(doc(db, "orders", id), updates), 1500, null);
+      }
     } catch (e) {
       console.warn("Firestore status update warning (saved locally):", e);
     }

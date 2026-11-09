@@ -11,9 +11,8 @@ import { AdminThemeContext } from "@/app/admin/dashboard/layout";
 import { useDialogFocus } from "@/lib/use-dialog-focus";
 import ProductModal from "./ProductModal";
 import CommandPalette from "./CommandPalette";
-import { collection, onSnapshot } from "firebase/firestore";
 import { playOrderChime } from "@/lib/audio-chime";
-import { db, connectAdminFirebase, disconnectAdminFirebase } from "@/lib/admin-firebase";
+import { connectAdminFirebase, disconnectAdminFirebase } from "@/lib/admin-firebase";
 
 export default function AdminWorkspace({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -43,7 +42,9 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
       const result = await res.json();
       if (!active) return;
       if (result.authenticated) {
-        await connectAdminFirebase();
+        connectAdminFirebase().catch((e) => {
+          console.warn("Firebase client admin token warning (server API continues):", e);
+        });
         if (active) setAuthed(true);
       }
       else router.replace("/admin/login");
@@ -62,26 +63,55 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
     if (!authed) return;
     getCategories().then(setCategories).catch(() => {});
     let initialized = false;
+    let stopped = false;
+    let loadingOrders = false;
     const known = new Set<string>();
-    return onSnapshot(collection(db, "orders"), { includeMetadataChanges: true }, (snapshot) => {
-      if (snapshot.metadata.fromCache) return;
-      const orders = snapshot.docs.map((document) => ({ ...document.data(), id: document.id })) as Array<Record<string, any>>;
-      setNotificationError("");
-      setPending(orders.filter((order) => ["pending", "pending cod", "processing", "payment pending"].includes(String(order.status || order.orderStatus || "").toLowerCase())).length);
-      const added = orders.filter((order) => !known.has(order.id));
-      orders.forEach((order) => known.add(order.id));
-      if (initialized && added.length) {
-        playOrderChime();
-        setOrderAlert(`${added.length} new order(s) arrived. Review them in Orders.`);
+
+    const refreshOrders = async () => {
+      if (stopped || loadingOrders) return;
+      loadingOrders = true;
+      try {
+        const response = await fetch(`/api/admin/orders?_t=${Date.now()}`, { cache: "no-store" });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.success || !Array.isArray(result.orders)) {
+          throw new Error(result.error || `Orders API returned ${response.status}`);
+        }
+
+        if (stopped) return;
+        const orders = result.orders as Array<Record<string, any>>;
+        setNotificationError("");
+        setPending(
+          orders.filter((order) =>
+            ["pending", "pending cod", "processing", "payment pending"].includes(
+              String(order.status || order.orderStatus || "").toLowerCase()
+            )
+          ).length
+        );
+        const added = orders.filter((order) => order.id && !known.has(order.id));
+        orders.forEach((order) => { if (order.id) known.add(order.id); });
+        if (initialized && added.length) {
+          playOrderChime();
+          setOrderAlert(
+            `${added.length === 1 ? "A new order has" : `${added.length} new orders have`} arrived. Review in Orders.`
+          );
+        }
+        initialized = true;
+        window.dispatchEvent(new CustomEvent("admin-orders-updated", { detail: orders }));
+      } catch (error) {
+        if (!stopped) {
+          console.warn("Admin order refresh check:", error);
+        }
+      } finally {
+        loadingOrders = false;
       }
-      initialized = true;
-      window.dispatchEvent(new CustomEvent("admin-orders-updated", { detail: orders }));
-    }, (error) => {
-      console.error("Admin order listener failed:", error.code);
-      setNotificationError(error.code === "permission-denied"
-        ? "Your admin account cannot access orders. Check the deployed Firebase admin permissions."
-        : "Orders are temporarily unavailable. Refresh to reconnect.");
-    });
+    };
+
+    void refreshOrders();
+    const intervalId = window.setInterval(() => { void refreshOrders(); }, 8000);
+    return () => {
+      stopped = true;
+      window.clearInterval(intervalId);
+    };
   }, [authed]);
 
   useEffect(() => {
