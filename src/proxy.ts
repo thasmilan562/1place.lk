@@ -42,22 +42,6 @@ async function isValidAdminSession(token?: string | null): Promise<boolean> {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const launchAccessRoutes = pathname === "/launch" || pathname.startsWith("/api/launch-access");
-  const adminAuthRoutes = pathname === "/admin/login" || pathname.startsWith("/api/admin/auth");
-  const hasAdminSession = await isValidAdminSession(request.cookies.get("admin_session")?.value);
-  if (
-    Date.now() < SITE_LAUNCH_AT &&
-    !launchAccessRoutes &&
-    !adminAuthRoutes &&
-    !hasAdminSession &&
-    !(await isValidLaunchPreviewToken(request.cookies.get(LAUNCH_PREVIEW_COOKIE)?.value))
-  ) {
-    const response = NextResponse.rewrite(new URL("/launch", request.url));
-    response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
-    response.headers.set("Cache-Control", "no-store");
-    return response;
-  }
-
   // Protect Admin Dashboard Routes
   if (pathname === "/admin" || pathname.startsWith("/admin/dashboard")) {
     const token = request.cookies.get("admin_session")?.value;
@@ -81,6 +65,24 @@ export async function proxy(request: NextRequest) {
         { status: 401 }
       );
     }
+  }
+
+  const launchBypassRoutes =
+    pathname === "/launch" ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname.startsWith("/api/");
+  const hasAdminSession = await isValidAdminSession(request.cookies.get("admin_session")?.value);
+  if (
+    Date.now() < SITE_LAUNCH_AT &&
+    !launchBypassRoutes &&
+    !hasAdminSession &&
+    !(await isValidLaunchPreviewToken(request.cookies.get(LAUNCH_PREVIEW_COOKIE)?.value))
+  ) {
+    const response = NextResponse.rewrite(new URL("/launch", request.url));
+    response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+    response.headers.set("Cache-Control", "no-store");
+    return response;
   }
 
   // Canonical Category Redirects (Preserves merchant bookmarks & legacy links)
