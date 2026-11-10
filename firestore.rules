@@ -133,6 +133,19 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Public launch page: allow a single shared like counter to be read and incremented.
+    match /launchMetrics/likes {
+      allow get: if true;
+      allow list: if false;
+      allow create: if request.resource.data.keys().hasAll(['count'])
+        && request.resource.data.keys().hasOnly(['count'])
+        && request.resource.data.count == 1;
+      allow update: if request.resource.data.keys().hasAll(['count'])
+        && request.resource.data.keys().hasOnly(['count'])
+        && request.resource.data.count == resource.data.count + 1;
+      allow delete: if false;
+    }
+
     match /whatsapp_campaigns/{campaignId} {
       allow read, write: if isAdmin();
     }

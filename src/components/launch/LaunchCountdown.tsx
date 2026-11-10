@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowRight, KeyRound, LoaderCircle } from "lucide-react";
+import { ArrowRight, Heart, KeyRound, LoaderCircle } from "lucide-react";
+import { getDoc, runTransaction } from "firebase/firestore";
 import { SITE_LAUNCH_AT } from "@/lib/launch-config";
+import { launchLikesDb, launchLikesRef } from "@/lib/launch-likes";
 
 type TimeParts = { days: number; hours: number; minutes: number; seconds: number };
 
@@ -26,6 +28,10 @@ export default function LaunchCountdown() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [likes, setLikes] = useState(0);
+  const [hasLiked, setHasLiked] = useState(false);
+  const [likePending, setLikePending] = useState(false);
+  const [likeError, setLikeError] = useState("");
 
   useEffect(() => {
     const update = () => {
@@ -38,7 +44,35 @@ export default function LaunchCountdown() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    setHasLiked(window.localStorage.getItem("oneplace_launch_liked") === "yes");
+    getDoc(launchLikesRef)
+      .then((snapshot) => setLikes(Number(snapshot.data()?.count ?? 0)))
+      .catch(() => setLikeError("Likes are taking a short pause. Please try again soon."));
+  }, []);
+
   const parts = remaining === null ? null : getTimeParts(remaining);
+
+  const handleLike = async () => {
+    if (hasLiked || likePending) return;
+    setLikePending(true);
+    setLikeError("");
+    try {
+      const updatedCount = await runTransaction(launchLikesDb, async (transaction) => {
+        const snapshot = await transaction.get(launchLikesRef);
+        const count = Number(snapshot.data()?.count ?? 0);
+        transaction.set(launchLikesRef, { count: count + 1 });
+        return count + 1;
+      });
+      window.localStorage.setItem("oneplace_launch_liked", "yes");
+      setHasLiked(true);
+      setLikes(updatedCount);
+    } catch {
+      setLikeError("We couldn’t send your love just now. Please try again in a little while.");
+    } finally {
+      setLikePending(false);
+    }
+  };
 
   const handlePasswordSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -69,9 +103,9 @@ export default function LaunchCountdown() {
       </div>
 
       <section className="launch-screen__content" aria-labelledby="launch-title">
-        <p className="launch-screen__eyebrow">A NEW WAY TO SHOP IS ALMOST HERE</p>
-        <h1 id="launch-title">Something good<br />is on its way.</h1>
-        <p className="launch-screen__copy">OnePlace opens tomorrow at 11:00 PM. We’ll be ready when the clock turns.</p>
+        <p className="launch-screen__eyebrow">A LITTLE UPDATE FROM ONEPLACE</p>
+        <h1 id="launch-title">We’re sorry to<br />keep you waiting.</h1>
+        <p className="launch-screen__copy">An unavoidable delay means we can’t open our doors today. We’re truly sorry, and we’re using this little extra time to make your first visit even better. We’ll be ready to welcome you tomorrow at 11:00 PM Sri Lanka time.</p>
 
         <div className="launch-countdown" role="timer" aria-label="Countdown to launch">
           {([
@@ -88,6 +122,15 @@ export default function LaunchCountdown() {
         </div>
 
         <div className="launch-screen__date">12 November 2026 <span>·</span> 11:00 PM <span>·</span> Sri Lanka</div>
+
+        <div className="launch-love">
+          <button className="launch-love__button" type="button" onClick={handleLike} disabled={hasLiked || likePending} aria-label={hasLiked ? `You and ${likes} others like this launch` : `Like this launch; ${likes} likes`}>
+            {likePending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4" fill={hasLiked ? "currentColor" : "none"} />}
+            <span>{hasLiked ? "Thank you for the love" : "Send us a little love"}</span>
+            <span className="launch-love__count" aria-live="polite">{likes.toLocaleString()}</span>
+          </button>
+          {likeError && <p className="launch-love__error" role="status">{likeError}</p>}
+        </div>
       </section>
 
       <footer className="launch-screen__footer">
