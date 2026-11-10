@@ -31,7 +31,7 @@ export async function GET(request: Request) {
       const firestoreUsers = await Promise.race([
         (async () => {
           try {
-            const snap = await getAdminDb().collection("users").get();
+            const snap = await getAdminDb().collection("users").limit(50).get();
             return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
           } catch (e) {
             console.warn("[Admin Customers API] Firestore users get warning:", e);
@@ -107,7 +107,7 @@ export async function GET(request: Request) {
       const firestoreOrders = await Promise.race([
         (async () => {
           try {
-            const snap = await getAdminDb().collection("orders").get();
+            const snap = await getAdminDb().collection("orders").limit(50).get();
             return snap.docs.map((d): OrderRecord => {
               const data = d.data() || {};
               return { ...data, id: (typeof data.id === "string" && data.id.trim()) ? data.id.trim() : d.id };

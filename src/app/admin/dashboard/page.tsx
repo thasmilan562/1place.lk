@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -142,6 +142,9 @@ function DashboardContent() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [whatsappCampaigns, setWhatsappCampaigns] = useState<WhatsAppCampaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ordersNextPageToken, setOrdersNextPageToken] = useState<string | null>(null);
+  const [loadingMoreOrders, setLoadingMoreOrders] = useState(false);
+  const loadedTabsRef = useRef<Set<string>>(new Set());
 
   // COD Fee state
   const [codFee, setCodFee] = useState<number>(250);
@@ -149,6 +152,7 @@ function DashboardContent() {
   const [codSavedMsg, setCodSavedMsg] = useState(false);
 
   useEffect(() => {
+    if (activeTab !== "payments") return;
     async function loadCodFee() {
       try {
         const snap = await getDoc(doc(db, "settings", "store"));
@@ -160,7 +164,7 @@ function DashboardContent() {
       }
     }
     loadCodFee();
-  }, []);
+  }, [activeTab]);
 
   const handleSaveCodFee = async () => {
     try {
@@ -242,406 +246,188 @@ function DashboardContent() {
   const [quickStockQty, setQuickStockQty] = useState<number>(10);
   const [isUpdatingStock, setIsUpdatingStock] = useState(false);
 
-  // Load Real Firestore Data
-  const refreshData = async () => {
+  const loadOrdersPage = async (pageToken?: string) => {
+    const params = new URLSearchParams({ limit: "50", _t: String(Date.now()) });
+    if (pageToken) params.set("pageToken", pageToken);
+    const ordRes = await fetch(`/api/admin/orders?${params.toString()}`, { cache: "no-store" });
+    const ordData = await ordRes.json().catch(() => ({}));
+    if (!ordRes.ok || !ordData.success || !Array.isArray(ordData.orders)) {
+      const errMsg = ordData.error || `Orders API returned ${ordRes.status}`;
+      window.dispatchEvent(new CustomEvent("admin-orders-error", { detail: errMsg }));
+      throw new Error(errMsg);
+    }
+    setOrdersNextPageToken(ordData.nextPageToken || null);
+    if (pageToken) {
+      setOrders((prev) => {
+        const map = new Map<string, any>();
+        prev.forEach((o) => {
+          if (o?.id) map.set(o.id, o);
+        });
+        ordData.orders.forEach((o: any) => {
+          if (o?.id) map.set(o.id, o);
+        });
+        const merged = Array.from(map.values());
+        window.dispatchEvent(new CustomEvent("admin-orders-updated", { detail: merged }));
+        return merged;
+      });
+    } else {
+      setOrders(ordData.orders);
+      window.dispatchEvent(new CustomEvent("admin-orders-updated", { detail: ordData.orders }));
+    }
+  };
+
+  const handleLoadMoreOrders = async () => {
+    if (!ordersNextPageToken || loadingMoreOrders) return;
+    setLoadingMoreOrders(true);
     try {
-      setLoading(true);
-      // Products
-      try {
-        const prodRes = await fetch(`/api/admin/products?_t=${Date.now()}`, { cache: "no-store" });
-        if (!prodRes.ok) throw new Error(`Product API returned ${prodRes.status}`);
-        const prodData = await prodRes.json();
-        if (!prodData.success || !Array.isArray(prodData.products)) {
-          throw new Error("Product API returned an invalid catalog response");
+      await loadOrdersPage(ordersNextPageToken);
+    } catch (err) {
+      console.warn("Error loading next page of orders:", err);
+    } finally {
+      setLoadingMoreOrders(false);
+    }
+  };
+
+  const loadProductsCatalog = async () => {
+    try {
+      const prodRes = await fetch(`/api/admin/products?_t=${Date.now()}`, { cache: "no-store" });
+      if (!prodRes.ok) throw new Error(`Product API returned ${prodRes.status}`);
+      const prodData = await prodRes.json();
+      if (!prodData.success || !Array.isArray(prodData.products)) {
+        throw new Error("Product API returned an invalid catalog response");
+      }
+      setProducts(prodData.products);
+    } catch (productErr) {
+      console.warn("Could not refresh the admin product catalog:", productErr);
+    }
+  };
+
+  const loadCategoriesCatalog = async () => {
+    try {
+      const catSnap = await getDocs(collection(db, "categories"));
+      const rawCatList = catSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Category));
+      const validCats = rawCatList.filter((c) => {
+        if ((c as any).isDeleted === true || c.status === "deleted") return false;
+        const cName = (c.name || "").toLowerCase();
+        const cSlug = (c.slug || "").toLowerCase();
+        if (KNOWN_BRAND_NAMES.some((b) => b.toLowerCase() === cName || b.toLowerCase() === cSlug)) return false;
+        return true;
+      });
+      setCategories(deduplicateCategories(validCats.length > 0 ? validCats : fallbackCategories));
+    } catch (catErr) {
+      console.warn("Could not fetch categories directly, using fallbacks:", catErr);
+      setCategories(deduplicateCategories(fallbackCategories));
+    }
+  };
+
+  // Load ONLY the active tab's Firestore data to conserve Spark plan daily quota
+  const loadTabData = async (tab: Tab, options?: { force?: boolean }) => {
+    if (!options?.force && loadedTabsRef.current.has(tab)) {
+      return;
+    }
+    setLoading(true);
+    try {
+      switch (tab) {
+        case "overview": {
+          await Promise.allSettled([
+            loadOrdersPage(),
+            products.length === 0 || options?.force ? loadProductsCatalog() : Promise.resolve(),
+          ]);
+          break;
         }
-        // An empty catalog is real data; never repopulate it from bundled samples.
-        setProducts(prodData.products);
-      } catch (productErr) {
-        console.warn("Could not refresh the admin product catalog:", productErr);
-      }
-
-      // Categories
-      try {
-        const catSnap = await getDocs(collection(db, "categories"));
-        const rawCatList = catSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Category));
-        const validCats = rawCatList.filter((c) => {
-          if ((c as any).isDeleted === true || c.status === "deleted") return false;
-          const cName = (c.name || "").toLowerCase();
-          const cSlug = (c.slug || "").toLowerCase();
-          if (KNOWN_BRAND_NAMES.some((b) => b.toLowerCase() === cName || b.toLowerCase() === cSlug)) return false;
-          return true;
-        });
-
-        if (validCats.length > 0) {
-          setCategories(deduplicateCategories(validCats));
-        } else {
-          setCategories(deduplicateCategories(fallbackCategories));
-        }
-      } catch (catErr) {
-        console.warn("Could not fetch categories directly, using fallbacks:", catErr);
-        setCategories(deduplicateCategories(fallbackCategories));
-      }
-
-      // Orders
-      try {
-        const ordRes = await fetch(`/api/admin/orders?_t=${Date.now()}`, { cache: "no-store" });
-        const ordData = await ordRes.json().catch(() => ({}));
-        if (!ordRes.ok || !ordData.success || !Array.isArray(ordData.orders)) {
-          throw new Error(ordData.error || `Orders API returned ${ordRes.status}`);
-        }
-        setOrders(ordData.orders);
-      } catch (ordErr) {
-        console.warn("Error fetching orders:", ordErr);
-      }
-
-      // Reviews
-      try {
-        const revSnap = await getDocs(collection(db, "reviews"));
-        const revList = revSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Review));
-        revList.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-        setReviews(revList);
-      } catch (revErr) {
-        console.warn("Error fetching reviews:", revErr);
-      }
-
-      // Google Reviews Settings
-      try {
-        const googleSnap = await getDoc(doc(db, "settings", "google_reviews"));
-        if (googleSnap.exists()) {
-          setGoogleReviewsSettings({ ...DEFAULT_GOOGLE_REVIEWS_SETTINGS, ...googleSnap.data() });
-        }
-      } catch (gErr) {
-        console.warn("Error fetching google reviews settings:", gErr);
-      }
-
-      // Banners (Merge offer_banners and banners collections)
-      let banList: OfferBanner[] = [];
-      try {
-        const banRes = await fetch(`/api/admin/banners?_t=${Date.now()}`, { cache: "no-store" });
-        if (banRes.ok) {
-          const banData = await banRes.json();
-          if (banData.success && Array.isArray(banData.banners)) {
-            banList = banData.banners;
-          }
-        }
-      } catch (banErr) {
-        console.warn("Error fetching offer_banners from API:", banErr);
-      }
-      if (banList.length === 0) {
-        try {
-          const banSnap = await getDocs(collection(db, "offer_banners"));
-          banList = banSnap.docs.map((d) => {
-            const data = d.data();
-            return {
-              ...data,
-              id: d.id,
-              status: data.status || "active",
-              placement: data.placement || "homepage_after_categories",
-            } as OfferBanner;
+        case "orders": {
+          await loadOrdersPage().catch((ordErr) => {
+            console.warn("Error fetching orders:", ordErr);
           });
-        } catch (banErr) {
-          console.warn("Error fetching offer_banners:", banErr);
+          break;
         }
-      }
-
-      let legacyBanList: OfferBanner[] = [];
-      try {
-        const legacyBanSnap = await getDocs(collection(db, "banners"));
-        legacyBanList = legacyBanSnap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            internalName: data.title || "Banner",
-            headline: data.title || "",
-            subheadline: data.subtitle || "",
-            desktop_image_url: data.image_url || data.desktop_image_url || "",
-            mobile_image_url: data.mobile_image_url || data.image_url || "",
-            cta_url: data.link || data.cta_url || "/",
-            status: (data.is_active === false || data.status === "paused") ? "paused" : "active",
-            placement: data.placement || "homepage_after_categories",
-            ...data,
-          } as OfferBanner;
-        });
-      } catch (err) {
-        console.warn("Error fetching legacy banners collection:", err);
-      }
-
-      const bannerMap = new Map<string, OfferBanner>();
-      legacyBanList.forEach((b) => {
-        if (b.id) bannerMap.set(b.id, b);
-      });
-      banList.forEach((b) => {
-        if (b.id) bannerMap.set(b.id, b);
-      });
-
-      if (bannerMap.size === 0) {
-        fallbackOfferBanners.forEach((f) => {
-          if (!bannerMap.has(f.id)) bannerMap.set(f.id, f);
-        });
-      }
-
-      const mergedBanners = Array.from(bannerMap.values());
-      setBanners(mergedBanners.filter((b) => b.status !== "archived"));
-
-      // Coupons / Promo Codes
-      try {
-        const coupSnap = await getDocs(collection(db, "coupons"));
-        const coupList = coupSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Coupon));
-        setCoupons(coupList);
-      } catch (coupErr) {
-        console.warn("Error fetching coupons:", coupErr);
-      }
-
-      // Hero Slides (Server API with fallback)
-      try {
-        const heroRes = await fetch(`/api/admin/hero?_t=${Date.now()}`, { cache: "no-store" });
-        if (heroRes.ok) {
-          const heroData = await heroRes.json();
-          if (heroData.success && Array.isArray(heroData.slides)) {
-            setHeroSlides(heroData.slides);
+        case "products": {
+          await Promise.allSettled([
+            loadProductsCatalog(),
+            categories.length === 0 || options?.force ? loadCategoriesCatalog() : Promise.resolve(),
+            (async () => {
+              try {
+                const bList = await getBrands();
+                if (bList && bList.length > 0) setBrands(bList);
+              } catch {}
+            })(),
+          ]);
+          break;
+        }
+        case "inventory":
+        case "spin-win": {
+          if (products.length === 0 || options?.force) {
+            await loadProductsCatalog();
           }
-        } else {
-          const heroSnap = await getDocs(collection(db, "hero_slides"));
-          const heroList = heroSnap.docs.map((d) => ({ id: d.id, ...d.data() } as HeroSlide));
-          setHeroSlides(heroList);
+          break;
         }
-      } catch (heroErr) {
-        console.warn("Error fetching hero slides:", heroErr);
-      }
-
-      // Gallery Images
-      try {
-        const galSnap = await getDocs(collection(db, "gallery"));
-        const galList = galSnap.docs.map((d) => ({ id: d.id, ...d.data() } as GalleryImage));
-        setGalleryImages(galList);
-      } catch (galErr) {
-        console.warn("Error fetching gallery images:", galErr);
-      }
-
-      // Users / Customers (Fetch via authenticated admin API with fallback)
-      try {
-        const custRes = await fetch(`/api/admin/customers?_t=${Date.now()}`, { cache: "no-store" });
-        const custData = await custRes.json().catch(() => ({}));
-        if (custRes.ok && custData.success && Array.isArray(custData.customers)) {
-          setCustomers(custData.customers);
-        } else {
-          const userSnap = await getDocs(collection(db, "users"));
-          const userList = userSnap.docs.map((d) => ({ id: d.id, isGuest: false, ...d.data() }));
-          if (userList.length > 0) setCustomers(userList);
+        case "categories": {
+          await Promise.allSettled([
+            loadCategoriesCatalog(),
+            products.length === 0 ? loadProductsCatalog() : Promise.resolve(),
+          ]);
+          break;
         }
-      } catch (userErr) {
-        console.warn("Could not fetch users directly from client (server-side only):", userErr);
+        case "users": {
+          try {
+            const custRes = await fetch(`/api/admin/customers?_t=${Date.now()}`, { cache: "no-store" });
+            const custData = await custRes.json().catch(() => ({}));
+            if (custRes.ok && custData.success && Array.isArray(custData.customers)) {
+              setCustomers(custData.customers);
+            }
+          } catch (userErr) {
+            console.warn("Could not fetch users from server API:", userErr);
+          }
+          break;
+        }
+        case "coupons": {
+          try {
+            const coupSnap = await getDocs(collection(db, "coupons"));
+            setCoupons(coupSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Coupon)));
+          } catch (coupErr) {
+            console.warn("Error fetching coupons:", coupErr);
+          }
+          break;
+        }
+        case "hero": {
+          try {
+            const heroRes = await fetch(`/api/admin/hero?_t=${Date.now()}`, { cache: "no-store" });
+            if (heroRes.ok) {
+              const heroData = await heroRes.json();
+              if (heroData.success && Array.isArray(heroData.slides)) {
+                setHeroSlides(heroData.slides);
+              }
+            }
+          } catch (heroErr) {
+            console.warn("Error fetching hero slides:", heroErr);
+          }
+          break;
+        }
+        case "today-deal": {
+          try {
+            const td = await getTodayDealSettings();
+            if (td) setTodayDealSettings(td);
+          } catch (err) {
+            console.warn("Error fetching Today's Deal settings in admin:", err);
+          }
+          break;
+        }
+        default:
+          break;
       }
-
-      // Visual Showcase Settings
-      try {
-        const sc = await getShowcaseSettings();
-        if (sc) setShowcaseSettings(sc);
-      } catch (err) {
-        console.warn("Error fetching showcase settings in admin:", err);
-      }
-
-      // Today's Deal Settings
-      try {
-        const td = await getTodayDealSettings();
-        if (td) setTodayDealSettings(td);
-      } catch (err) {
-        console.warn("Error fetching Today's Deal settings in admin:", err);
-      }
-
-      // Category Mega Menu Settings
-      try {
-        const mm = await getMegaMenuSettings();
-        if (mm) setMegaMenuSettings(mm);
-      } catch (err) {
-        console.warn("Error fetching Category Mega Menu settings in admin:", err);
-      }
-
-      // Brands List
-      try {
-        const bList = await getBrands();
-        if (bList && bList.length > 0) setBrands(bList);
-      } catch (err) {
-        console.warn("Error fetching brands in admin:", err);
-      }
-
-      // Gallery Scroll Animation Settings
-      try {
-        const ga = await getGalleryAnimationSettings();
-        if (ga) setGalleryAnimationSettings(ga);
-      } catch (err) {
-        console.warn("Error fetching gallery animation settings in admin:", err);
-      }
-
-      // WhatsApp Campaigns
-      try {
-        const waSnap = await getDocs(collection(db, "whatsapp_campaigns"));
-        const waList = waSnap.docs.map(d => ({ id: d.id, ...d.data() } as WhatsAppCampaign));
-        waList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        setWhatsappCampaigns(waList);
-      } catch (err) {
-        console.warn("Error fetching WhatsApp Campaigns:", err);
-      }
-    } catch (e) {
-      console.error("Dashboard Data Fetch Error:", e);
+      loadedTabsRef.current.add(tab);
     } finally {
       setLoading(false);
     }
   };
 
-  // Real-time Firestore Synchronizations (Orders, Products, Customers)
+  const refreshData = async () => {
+    await loadTabData(activeTab, { force: true });
+  };
+
   useEffect(() => {
-    refreshData();
-
-    // Orders are fetched through the authenticated server API because admin
-    // browser sessions are not Firebase Auth identities.
-    const handleAdminOrdersUpdate = (event: Event) => {
-      const ordList = (event as CustomEvent<any[]>).detail;
-      if (Array.isArray(ordList)) setOrders(ordList);
-    };
-    window.addEventListener("admin-orders-updated", handleAdminOrdersUpdate);
-
-    // Periodic order sync interval (every 10 seconds)
-    const pollOrders = async () => {
-      try {
-        const res = await fetch(`/api/admin/orders?_t=${Date.now()}`, { cache: "no-store" });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.success && Array.isArray(data.orders)) {
-          setOrders((prev) => {
-            const prevIds = new Set(prev.map((o) => o.id));
-            const newOrders = data.orders.filter((o: any) => !prevIds.has(o.id));
-            if (newOrders.length > 0 && prev.length > 0) {
-              const newest = newOrders[0];
-              setNewOrderAlert({
-                id: newest.id,
-                customerName: newest.customerName || newest.name || "Customer",
-                total: Number(newest.finalTotal || newest.totalPrice || 0),
-                itemsCount: newest.items?.length || 1,
-              });
-            }
-            return data.orders;
-          });
-        }
-      } catch { }
-    };
-
-    const ordersPollInterval = setInterval(pollOrders, 10000);
-
-    // Periodic customer sync interval (every 10 seconds)
-    const pollCustomers = async () => {
-      try {
-        const res = await fetch(`/api/admin/customers?_t=${Date.now()}`, { cache: "no-store" });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.success && Array.isArray(data.customers)) {
-          setCustomers(data.customers);
-        }
-      } catch {}
-    };
-
-    const customersPollInterval = setInterval(pollCustomers, 10000);
-
-    // 2. Live Products Listener
-    const unsubProducts = onSnapshot(
-      collection(db, "products"),
-      (snapshot) => {
-        const prodList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
-        setProducts(prodList);
-      },
-      (err) => console.warn("Realtime products listener error:", err)
-    );
-
-    // 3. Live Users / Customers Listener
-    const unsubUsers = onSnapshot(
-      collection(db, "users"),
-      (snapshot) => {
-        const userList = snapshot.docs.map((d) => ({ id: d.id, isGuest: false, ...d.data() }));
-        setCustomers((prev) => {
-          const map = new Map<string, any>();
-          prev.forEach((c) => map.set(c.id || c.email, c));
-          userList.forEach((u: any) => map.set(u.id || u.email, u));
-          return Array.from(map.values());
-        });
-      },
-      (err) => console.warn("Realtime users listener error:", err)
-    );
-
-    // 4. Live Categories
-    const unsubCategories = onSnapshot(
-      collection(db, "categories"),
-      (snapshot) => {
-        const rawCatList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Category));
-        const validCats = rawCatList.filter((c) => {
-          if ((c as any).isDeleted === true || c.status === "deleted") return false;
-          const cName = (c.name || "").toLowerCase();
-          const cSlug = (c.slug || "").toLowerCase();
-          if (KNOWN_BRAND_NAMES.some((b) => b.toLowerCase() === cName || b.toLowerCase() === cSlug)) return false;
-          return true;
-        });
-
-        if (validCats.length > 0) {
-          setCategories(deduplicateCategories(validCats));
-        } else {
-          setCategories(deduplicateCategories(fallbackCategories));
-        }
-      },
-      (err) => console.warn("Realtime categories listener error:", err)
-    );
-
-    // 5. Live WhatsApp Campaigns
-    const unsubWA = onSnapshot(
-      collection(db, "whatsapp_campaigns"),
-      (snapshot) => {
-        const waList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as WhatsAppCampaign));
-        waList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        setWhatsappCampaigns(waList);
-      },
-      (err) => console.warn("Realtime WhatsApp campaigns listener error:", err)
-    );
-
-    // 6. Live Coupons
-    const unsubCoupons = onSnapshot(
-      collection(db, "coupons"),
-      (snapshot) => {
-        const coupList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Coupon));
-        setCoupons(coupList);
-      },
-      (err) => console.warn("Realtime coupons listener error:", err)
-    );
-
-    // 7. Live Reviews
-    const unsubReviews = onSnapshot(
-      collection(db, "reviews"),
-      (snapshot) => {
-        const revList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Review));
-        revList.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-        setReviews(revList);
-      },
-      (err) => console.warn("Realtime reviews listener error:", err)
-    );
-
-    // 8. Live Gallery
-    const unsubGallery = onSnapshot(
-      collection(db, "gallery"),
-      (snapshot) => {
-        const galList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as GalleryImage));
-        setGalleryImages(galList);
-      },
-      (err) => console.warn("Realtime gallery listener error:", err)
-    );
-
-    return () => {
-      window.removeEventListener("admin-orders-updated", handleAdminOrdersUpdate);
-      clearInterval(ordersPollInterval);
-      clearInterval(customersPollInterval);
-      unsubProducts();
-      unsubUsers();
-      unsubCategories();
-      unsubWA();
-      unsubCoupons();
-      unsubReviews();
-      unsubGallery();
-    };
-  }, []);
+    void loadTabData(activeTab);
+  }, [activeTab]);
 
   // Compute 100% Real Overview KPI Metrics (No Fake Fallbacks)
   const metrics = useMemo(() => {
@@ -1569,13 +1355,27 @@ function DashboardContent() {
           TAB 3: ORDERS TAB
       ════════════════════════════════════════════════════════════════════ */}
       {activeTab === "orders" && (
-        <OrdersTab
-          orders={orders}
-          onUpdateStatus={handleUpdateOrderStatus}
-          onDeleteOrder={handleDeleteOrder}
-          onBulkDeleteOrders={handleBulkDeleteOrders}
-          onRefresh={refreshData}
-        />
+        <div className="space-y-4">
+          <OrdersTab
+            orders={orders}
+            onUpdateStatus={handleUpdateOrderStatus}
+            onDeleteOrder={handleDeleteOrder}
+            onBulkDeleteOrders={handleBulkDeleteOrders}
+            onRefresh={refreshData}
+          />
+          {ordersNextPageToken && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={handleLoadMoreOrders}
+                disabled={loadingMoreOrders}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-all shadow-xs"
+              >
+                {loadingMoreOrders ? "Loading more orders…" : "Load next 50 orders"}
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ════════════════════════════════════════════════════════════════════

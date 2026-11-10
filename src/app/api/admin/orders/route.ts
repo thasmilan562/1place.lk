@@ -18,21 +18,28 @@ export async function GET(request: Request) {
   if (!verifyAdminRequest(request)) return unauthorized();
 
   try {
+    const { searchParams } = new URL(request.url);
+    const rawLimit = Number(searchParams.get("limit") || 50);
+    const pageSize = Number.isFinite(rawLimit) ? Math.max(1, Math.min(100, Math.floor(rawLimit))) : 50;
+    const pageToken = searchParams.get("pageToken")?.trim() || undefined;
+
     // Vercel function filesystems are ephemeral. Only Firestore is a durable
     // order source in production; keep the JSON store as a local-dev fallback.
-    const localOrders = process.env.NODE_ENV === "production" ? [] : getLocalOrders();
+    const localOrders =
+      process.env.NODE_ENV === "production" || pageToken ? [] : getLocalOrders().slice(0, pageSize);
 
-    // Read from the configured production Firestore. A failed read must not
-    // masquerade as a successful empty order list.
+    // Read a bounded page from the configured production Firestore.
     let firestoreOrders: Array<Record<string, any> & { id: string; docId?: string }>;
+    let nextPageToken: string | undefined;
     try {
-      const snapshot = await Promise.race([
-        getAdminDb().collection("orders").get(),
+      const page = await Promise.race([
+        getAdminDb().collection("orders").listPage(pageSize, pageToken),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Firestore orders query timed out.")), 8000)
         ),
       ]);
-      firestoreOrders = snapshot.docs.map((document) => {
+      nextPageToken = page.nextPageToken;
+      firestoreOrders = page.docs.map((document) => {
         const data = document.data() || {};
         const orderId = (typeof data.id === "string" && data.id.trim()) ? data.id.trim() : document.id;
         return { ...data, id: orderId, docId: document.id };
@@ -80,7 +87,15 @@ export async function GET(request: Request) {
     const orders = Array.from(orderMap.values());
     orders.sort((a, b) => new Date(String(b.createdAt || 0)).getTime() - new Date(String(a.createdAt || 0)).getTime());
 
-    return NextResponse.json({ success: true, orders }, { headers: noStore });
+    return NextResponse.json(
+      {
+        success: true,
+        orders,
+        nextPageToken: nextPageToken || null,
+        hasMore: Boolean(nextPageToken),
+      },
+      { headers: noStore }
+    );
   } catch (error: any) {
     console.error("[Admin Orders API] Read error:", error);
     if (process.env.NODE_ENV === "production") {
@@ -178,23 +193,17 @@ export async function DELETE(request: Request) {
       deleteLocalOrder(id);
     }
 
-    // 2. Best-effort delete from Firestore with 2500ms timeout
+    // 2. Best-effort batched delete from Firestore with 2500ms timeout (no redundant subcollection scans)
     try {
       await Promise.race([
         (async () => {
           const db = getAdminDb();
-          const subcollections = ["items", "payments", "statusHistory", "notes", "tracking", "history", "audit"];
-          for (const id of cleanIds) {
-            const order = db.collection("orders").doc(id);
-            for (const name of subcollections) {
-              const snapshot = await order.collection(name).get();
-              for (let offset = 0; offset < snapshot.docs.length; offset += 450) {
-                const batch = db.batch();
-                snapshot.docs.slice(offset, offset + 450).forEach((document) => batch.delete(document.ref));
-                await batch.commit();
-              }
+          for (let offset = 0; offset < cleanIds.length; offset += 450) {
+            const batch = db.batch();
+            for (const id of cleanIds.slice(offset, offset + 450)) {
+              batch.delete(db.collection("orders").doc(id));
             }
-            await order.delete();
+            await batch.commit();
           }
         })(),
         new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore delete timeout")), 2500)),

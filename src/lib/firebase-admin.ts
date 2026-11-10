@@ -351,22 +351,39 @@ interface WhereFilterSpec {
   value: unknown;
 }
 
+interface OrderBySpec {
+  field: string;
+  direction: "asc" | "desc";
+}
+
+function formatFirestoreError(op: string, status: number, errText: string, projectId: string): Error {
+  if (status === 429 || errText.includes("RESOURCE_EXHAUSTED")) {
+    return new Error(
+      `Firestore quota exceeded (HTTP 429 RESOURCE_EXHAUSTED) on project "${projectId}" during ${op}.`
+    );
+  }
+  return new Error(`Firestore ${op} failed (HTTP ${status}): ${errText.slice(0, 200)}`);
+}
+
 export class AdminQuery {
   protected readonly _firestore: AdminFirestore;
   protected readonly _collectionPath: string;
   protected readonly _filters: WhereFilterSpec[];
   protected readonly _limitCount?: number;
+  protected readonly _orderBy: OrderBySpec[];
 
   constructor(
     firestore: AdminFirestore,
     collectionPath: string,
     filters: WhereFilterSpec[] = [],
-    limitCount?: number
+    limitCount?: number,
+    orderBy: OrderBySpec[] = []
   ) {
     this._firestore = firestore;
     this._collectionPath = collectionPath.replace(/^\/+|\/+$/g, "");
     this._filters = filters;
     this._limitCount = limitCount;
+    this._orderBy = orderBy;
   }
 
   where(field: string, op: string, value: unknown): AdminQuery {
@@ -374,19 +391,41 @@ export class AdminQuery {
       this._firestore,
       this._collectionPath,
       [...this._filters, { field, op, value }],
-      this._limitCount
+      this._limitCount,
+      this._orderBy
+    );
+  }
+
+  orderBy(field: string, direction: "asc" | "desc" = "asc"): AdminQuery {
+    return new AdminQuery(
+      this._firestore,
+      this._collectionPath,
+      this._filters,
+      this._limitCount,
+      [...this._orderBy, { field, direction }]
     );
   }
 
   limit(count: number): AdminQuery {
-    return new AdminQuery(this._firestore, this._collectionPath, this._filters, count);
+    return new AdminQuery(
+      this._firestore,
+      this._collectionPath,
+      this._filters,
+      count,
+      this._orderBy
+    );
   }
 
   async get(): Promise<AdminQuerySnapshot> {
-    if (this._filters.length === 0 && this._limitCount === undefined) {
-      return this._firestore._listCollection(this._collectionPath);
+    if (this._filters.length === 0 && this._orderBy.length === 0) {
+      return this._firestore._listCollection(this._collectionPath, this._limitCount);
     }
-    return this._firestore._runStructuredQuery(this._collectionPath, this._filters, this._limitCount);
+    return this._firestore._runStructuredQuery(
+      this._collectionPath,
+      this._filters,
+      this._limitCount,
+      this._orderBy
+    );
   }
 }
 
@@ -405,6 +444,13 @@ export class AdminCollectionRef extends AdminQuery {
     const resolvedId =
       docId && docId.trim() ? docId.trim() : crypto.randomBytes(10).toString("hex");
     return new AdminDocRef(this._firestore, `${this.path}/${resolvedId}`);
+  }
+
+  async listPage(
+    pageSize = 50,
+    pageToken?: string
+  ): Promise<{ docs: AdminDocSnapshot[]; nextPageToken?: string }> {
+    return this._firestore._listCollectionPage(this.path, pageSize, pageToken);
   }
 }
 
@@ -527,7 +573,7 @@ export class AdminFirestore {
     }
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      throw new Error(`Firestore GET "${docPath}" failed (HTTP ${response.status}): ${errText.slice(0, 200)}`);
+      throw formatFirestoreError(`GET "${docPath}"`, response.status, errText, this._sa.project_id);
     }
     return (await response.json()) as FirestoreRestDocument;
   }
@@ -543,7 +589,7 @@ export class AdminFirestore {
 
     if (!response.ok && response.status !== 404) {
       const errText = await response.text().catch(() => "");
-      throw new Error(`Firestore DELETE "${docPath}" failed (HTTP ${response.status}): ${errText.slice(0, 200)}`);
+      throw formatFirestoreError(`DELETE "${docPath}"`, response.status, errText, this._sa.project_id);
     }
   }
 
@@ -562,59 +608,73 @@ export class AdminFirestore {
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      throw new Error(`Firestore commit failed (HTTP ${response.status}): ${errText.slice(0, 200)}`);
+      throw formatFirestoreError("commit", response.status, errText, this._sa.project_id);
     }
   }
 
-  async _listCollection(collectionPath: string): Promise<AdminQuerySnapshot> {
+  async _listCollectionPage(
+    collectionPath: string,
+    pageSize = 50,
+    pageToken?: string
+  ): Promise<{ docs: AdminDocSnapshot[]; nextPageToken?: string }> {
     const token = await getGoogleAccessToken(this._sa);
+    const clampedSize = Math.max(1, Math.min(300, Math.floor(pageSize)));
+    const params = new URLSearchParams({ pageSize: String(clampedSize) });
+    if (pageToken) params.set("pageToken", pageToken);
+    const url = `${this._baseDocumentsUrl()}/${this._encodePathSegments(collectionPath)}?${params.toString()}`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+
+    if (response.status === 404) {
+      return { docs: [], nextPageToken: undefined };
+    }
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      throw formatFirestoreError(`list "${collectionPath}"`, response.status, errText, this._sa.project_id);
+    }
+
+    const payload = (await response.json()) as {
+      documents?: FirestoreRestDocument[];
+      nextPageToken?: string;
+    };
+
+    const docs: AdminDocSnapshot[] = [];
+    for (const rawDoc of payload.documents || []) {
+      const docId = rawDoc.name ? rawDoc.name.split("/").pop() || "" : "";
+      if (!docId) continue;
+      const ref = new AdminDocRef(this, `${collectionPath}/${docId}`);
+      docs.push(new AdminDocSnapshot(ref, true, fromFirestoreFields(rawDoc.fields)));
+    }
+
+    return { docs, nextPageToken: payload.nextPageToken };
+  }
+
+  async _listCollection(collectionPath: string, maxDocs = 200): Promise<AdminQuerySnapshot> {
     const docs: AdminDocSnapshot[] = [];
     let pageToken: string | undefined;
     let pageCount = 0;
+    const cap = Math.max(1, Math.min(300, maxDocs));
 
     do {
-      const params = new URLSearchParams({ pageSize: "300" });
-      if (pageToken) params.set("pageToken", pageToken);
-      const url = `${this._baseDocumentsUrl()}/${this._encodePathSegments(collectionPath)}?${params.toString()}`;
-      const response = await fetch(url, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store",
-      });
-
-      if (response.status === 404) {
-        break;
-      }
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "");
-        throw new Error(
-          `Firestore list "${collectionPath}" failed (HTTP ${response.status}): ${errText.slice(0, 200)}`
-        );
-      }
-
-      const payload = (await response.json()) as {
-        documents?: FirestoreRestDocument[];
-        nextPageToken?: string;
-      };
-
-      for (const rawDoc of payload.documents || []) {
-        const docId = rawDoc.name ? rawDoc.name.split("/").pop() || "" : "";
-        if (!docId) continue;
-        const ref = new AdminDocRef(this, `${collectionPath}/${docId}`);
-        docs.push(new AdminDocSnapshot(ref, true, fromFirestoreFields(rawDoc.fields)));
-      }
-
-      pageToken = payload.nextPageToken;
+      const remaining = cap - docs.length;
+      if (remaining <= 0) break;
+      const page = await this._listCollectionPage(collectionPath, Math.min(remaining, 200), pageToken);
+      docs.push(...page.docs);
+      pageToken = page.nextPageToken;
       pageCount += 1;
-    } while (pageToken && pageCount < 10);
+    } while (pageToken && docs.length < cap && pageCount < 2);
 
-    return new AdminQuerySnapshot(docs);
+    return new AdminQuerySnapshot(docs.slice(0, cap));
   }
 
   async _runStructuredQuery(
     collectionPath: string,
     filters: WhereFilterSpec[],
-    limitCount?: number
+    limitCount?: number,
+    orderBy: OrderBySpec[] = []
   ): Promise<AdminQuerySnapshot> {
     const token = await getGoogleAccessToken(this._sa);
     const segments = collectionPath.split("/").filter(Boolean);
@@ -659,6 +719,13 @@ export class AdminFirestore {
       };
     }
 
+    if (orderBy.length > 0) {
+      structuredQuery.orderBy = orderBy.map((o) => ({
+        field: { fieldPath: escapeFieldPath(o.field) },
+        direction: o.direction === "desc" ? "DESCENDING" : "ASCENDING",
+      }));
+    }
+
     if (typeof limitCount === "number") {
       structuredQuery.limit = limitCount;
     }
@@ -675,9 +742,7 @@ export class AdminFirestore {
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      throw new Error(
-        `Firestore query on "${collectionPath}" failed (HTTP ${response.status}): ${errText.slice(0, 200)}`
-      );
+      throw formatFirestoreError(`query on "${collectionPath}"`, response.status, errText, this._sa.project_id);
     }
 
     const results = (await response.json()) as Array<{ document?: FirestoreRestDocument }>;
@@ -779,3 +844,4 @@ export function getAdminDb(): AdminFirestore {
 export function getServerAdminAuth(): AdminAuth {
   return new AdminAuth(parseServiceAccount());
 }
+

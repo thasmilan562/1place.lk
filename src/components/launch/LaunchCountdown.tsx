@@ -71,7 +71,7 @@ export default function LaunchCountdown() {
       <section className="launch-screen__content" aria-labelledby="launch-title">
         <p className="launch-screen__eyebrow">A NEW WAY TO SHOP IS ALMOST HERE</p>
         <h1 id="launch-title">Something good<br />is on its way.</h1>
-        <p className="launch-screen__copy">OnePlace opens tonight at midnight. We’ll be ready when the clock turns.</p>
+        <p className="launch-screen__copy">OnePlace opens tonight at 12:11 AM. We’ll be ready when the clock turns.</p>
 
         <div className="launch-countdown" role="timer" aria-label="Countdown to launch">
           {([
@@ -87,7 +87,7 @@ export default function LaunchCountdown() {
           ))}
         </div>
 
-        <div className="launch-screen__date">11 November 2026 <span>·</span> 12:00 AM <span>·</span> Sri Lanka</div>
+        <div className="launch-screen__date">11 November 2026 <span>·</span> 12:11 AM <span>·</span> Sri Lanka</div>
       </section>
 
       <footer className="launch-screen__footer">

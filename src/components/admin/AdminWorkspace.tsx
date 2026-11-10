@@ -61,58 +61,48 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
   }, [theme]);
 
   useEffect(() => {
-    if (!authed) return;
+    if (!authed || !productOpen || categories.length > 0) return;
     getCategories().then(setCategories).catch(() => {});
+  }, [authed, productOpen, categories.length]);
+
+  useEffect(() => {
+    if (!authed) return;
     let initialized = false;
-    let stopped = false;
-    let loadingOrders = false;
     const known = new Set<string>();
 
-    const refreshOrders = async () => {
-      if (stopped || loadingOrders) return;
-      loadingOrders = true;
-      try {
-        const response = await fetch(`/api/admin/orders?_t=${Date.now()}`, { cache: "no-store" });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok || !result.success || !Array.isArray(result.orders)) {
-          throw new Error(result.error || `Orders API returned ${response.status}`);
-        }
-
-        if (stopped) return;
-        const orders = result.orders as Array<Record<string, any>>;
-        setNotificationError("");
-        setPending(
-          orders.filter((order) =>
-            ["pending", "pending cod", "processing", "payment pending"].includes(
-              String(order.status || order.orderStatus || "").toLowerCase()
-            )
-          ).length
+    const handleOrdersUpdated = (event: Event) => {
+      const orders = ((event as CustomEvent<Array<Record<string, any>>>).detail || []);
+      setNotificationError("");
+      setPending(
+        orders.filter((order) =>
+          ["pending", "pending cod", "processing", "payment pending"].includes(
+            String(order.status || order.orderStatus || "").toLowerCase()
+          )
+        ).length
+      );
+      const added = orders.filter((order) => order.id && !known.has(order.id));
+      orders.forEach((order) => {
+        if (order.id) known.add(order.id);
+      });
+      if (initialized && added.length) {
+        playOrderChime();
+        setOrderAlert(
+          `${added.length === 1 ? "A new order has" : `${added.length} new orders have`} arrived. Review in Orders.`
         );
-        const added = orders.filter((order) => order.id && !known.has(order.id));
-        orders.forEach((order) => { if (order.id) known.add(order.id); });
-        if (initialized && added.length) {
-          playOrderChime();
-          setOrderAlert(
-            `${added.length === 1 ? "A new order has" : `${added.length} new orders have`} arrived. Review in Orders.`
-          );
-        }
-        initialized = true;
-        window.dispatchEvent(new CustomEvent("admin-orders-updated", { detail: orders }));
-      } catch (error) {
-        if (!stopped) {
-          setNotificationError(error instanceof Error ? error.message : "Could not refresh the order database.");
-          console.warn("Admin order refresh check:", error);
-        }
-      } finally {
-        loadingOrders = false;
       }
+      initialized = true;
     };
 
-    void refreshOrders();
-    const intervalId = window.setInterval(() => { void refreshOrders(); }, 8000);
+    const handleOrdersError = (event: Event) => {
+      const msg = (event as CustomEvent<string>).detail;
+      if (msg) setNotificationError(msg);
+    };
+
+    window.addEventListener("admin-orders-updated", handleOrdersUpdated);
+    window.addEventListener("admin-orders-error", handleOrdersError);
     return () => {
-      stopped = true;
-      window.clearInterval(intervalId);
+      window.removeEventListener("admin-orders-updated", handleOrdersUpdated);
+      window.removeEventListener("admin-orders-error", handleOrdersError);
     };
   }, [authed]);
 

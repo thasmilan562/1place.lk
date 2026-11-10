@@ -131,10 +131,28 @@ export default function OrderHistoryPage() {
       setLoading(true);
       const fetchedMap = new Map<string, Order>();
 
-      // 1. Fetch from server API store if user is authenticated
+      // 1. Collect recent order IDs stored in browser localStorage (bounded to 10)
+      let storedIds: string[] = [];
+      try {
+        const storedRaw =
+          localStorage.getItem("oneplace_recent_orders") ||
+          localStorage.getItem("sm_recent_orders") ||
+          "[]";
+        const parsed = JSON.parse(storedRaw);
+        if (Array.isArray(parsed)) {
+          storedIds = parsed
+            .filter((id) => typeof id === "string" && id.trim())
+            .map((id) => id.trim())
+            .slice(0, 10);
+        }
+      } catch (e) {
+        console.warn("Local storage order read error:", e);
+      }
+
+      // 2. Fetch authenticated user orders via targeted Server API
       if (user) {
         try {
-          const res = await fetch(`/api/orders?userId=${user.uid}`);
+          const res = await fetch(`/api/orders?userId=${encodeURIComponent(user.uid)}`);
           const data = await res.json();
           if (Array.isArray(data?.orders)) {
             data.orders.forEach((o: Order) => {
@@ -146,38 +164,19 @@ export default function OrderHistoryPage() {
         }
       }
 
-      // 2. Fetch orders from localStorage (recent orders placed in this browser)
-      try {
-        const storedRaw = localStorage.getItem("oneplace_recent_orders") || localStorage.getItem("sm_recent_orders") || "[]";
-        const storedIds: string[] = JSON.parse(storedRaw);
-        if (Array.isArray(storedIds) && storedIds.length > 0) {
-          const promises = storedIds.slice(0, 15).map((id) => getDoc(doc(db, "orders", id)).catch(() => null));
-          const docSnaps = await Promise.all(promises);
-          docSnaps.forEach((d) => {
-            if (d && d.exists()) {
-              fetchedMap.set(d.id, { ...d.data(), id: d.id } as Order);
-            }
-          });
-        }
-      } catch (e) {
-        console.warn("Local storage order read error:", e);
-      }
-
-      // 3. Fetch logged-in user orders if authenticated
-      if (user) {
+      // 3. Fetch any recent localStorage order IDs not yet loaded via a single targeted API call
+      const missingIds = storedIds.filter((id) => !fetchedMap.has(id));
+      if (missingIds.length > 0) {
         try {
-          const q = query(
-            collection(db, "orders"),
-            where("userId", "==", user.uid)
-          );
-          const snap = await getDocs(q);
-          snap.docs.forEach((d) => {
-            fetchedMap.set(d.id, { ...d.data(), id: d.id } as Order);
-          });
-        } catch (err: any) {
-          if (err?.code !== "permission-denied") {
-            console.warn("User orders query error:", err);
+          const res = await fetch(`/api/orders?ids=${encodeURIComponent(missingIds.join(","))}`);
+          const data = await res.json();
+          if (Array.isArray(data?.orders)) {
+            data.orders.forEach((o: Order) => {
+              if (o && o.id) fetchedMap.set(o.id, o);
+            });
           }
+        } catch (e) {
+          console.warn("Recent orders lookup warning:", e);
         }
       }
 
@@ -199,48 +198,26 @@ export default function OrderHistoryPage() {
 
     try {
       const fetchedMap = new Map<string, Order>();
+      const digitsOnly = searchTerm.replace(/\D/g, "");
+      const looksLikeOrderId =
+        searchTerm.toUpperCase().startsWith("1P-") ||
+        /[a-zA-Z]/.test(searchTerm) ||
+        digitsOnly.length < 9;
 
-      // 1. Check API endpoint by phone or order ID
+      const queryUrl = looksLikeOrderId
+        ? `/api/orders?id=${encodeURIComponent(searchTerm)}`
+        : `/api/orders?phone=${encodeURIComponent(searchTerm)}`;
+
       try {
-        const res = await fetch(`/api/orders?phone=${encodeURIComponent(searchTerm)}`);
+        const res = await fetch(queryUrl);
         const data = await res.json();
         if (Array.isArray(data?.orders)) {
-          data.orders.forEach((o: Order) => fetchedMap.set(o.id, o));
-        }
-
-        const res2 = await fetch(`/api/orders?id=${encodeURIComponent(searchTerm)}`);
-        const data2 = await res2.json();
-        if (Array.isArray(data2?.orders)) {
-          data2.orders.forEach((o: Order) => fetchedMap.set(o.id, o));
+          data.orders.forEach((o: Order) => {
+            if (o && o.id) fetchedMap.set(o.id, o);
+          });
         }
       } catch (e) {
-        console.warn("API phone search warning:", e);
-      }
-
-      // 2. Check if user searched by direct Order ID in Firestore
-      try {
-        const directDoc = await getDoc(doc(db, "orders", searchTerm));
-        if (directDoc.exists()) {
-          fetchedMap.set(directDoc.id, { ...directDoc.data(), id: directDoc.id } as Order);
-        }
-      } catch (e) {
-        // Ignored
-      }
-
-      // 3. Check phone number query in Firestore
-      try {
-        const q = query(
-          collection(db, "orders"),
-          where("primaryPhone", "==", searchTerm)
-        );
-        const snap = await getDocs(q);
-        snap.docs.forEach((d) => {
-          fetchedMap.set(d.id, { ...d.data(), id: d.id } as Order);
-        });
-      } catch (err: any) {
-        if (err?.code !== "permission-denied") {
-          console.warn("Phone order lookup error:", err);
-        }
+        console.warn("API order search warning:", e);
       }
 
       const list = Array.from(fetchedMap.values());

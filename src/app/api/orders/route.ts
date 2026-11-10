@@ -33,57 +33,126 @@ function sanitize(obj: any): any {
   return cleaned;
 }
 
-// GET /api/orders - returns orders with secure filtering
+// GET /api/orders - returns orders with targeted lookup (never full collection scan)
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const phone = searchParams.get("phone")?.trim();
     const userId = searchParams.get("userId")?.trim();
     const orderId = searchParams.get("id")?.trim();
+    const idsParam = searchParams.get("ids")?.trim();
     const includeUnpaid = searchParams.get("includeUnpaid") === "true";
 
-    // 1. Read local persistent orders
-    const localList = getLocalOrders();
+    const idList = idsParam
+      ? Array.from(
+          new Set(
+            idsParam
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          )
+        ).slice(0, 10)
+      : [];
 
-    // 2. Read Firestore orders with 2-second timeout guard
+    const hasValidLookup =
+      Boolean(orderId) ||
+      idList.length > 0 ||
+      Boolean(userId && userId !== "guest") ||
+      Boolean(phone && phone.length >= 7);
+
+    // Reject unbounded requests immediately to protect Firestore read quota
+    if (!hasValidLookup) {
+      return NextResponse.json({ success: true, orders: [] });
+    }
+
+    // 1. Read local persistent orders only in non-production
+    const localList = process.env.NODE_ENV === "production" ? [] : getLocalOrders();
+
+    // 2. Targeted Firestore lookup (Admin DB first, targeted client fallback; zero full collection scans)
     let firestoreList: OrderRecord[] = [];
     try {
+      let adminDb: ReturnType<typeof getAdminDb> | null = null;
+      try {
+        adminDb = getAdminDb();
+      } catch {
+        adminDb = null;
+      }
+
       if (orderId) {
-        const directDoc = await withTimeout(getDoc(doc(db, "orders", orderId)), 1500, null);
-        if (directDoc && directDoc.exists()) {
-          firestoreList = [{ ...directDoc.data(), id: directDoc.id } as OrderRecord];
+        const candidates = Array.from(
+          new Set([
+            orderId,
+            orderId.toUpperCase(),
+            orderId.toUpperCase().startsWith("1P-") ? orderId.toUpperCase() : `1P-${orderId.toUpperCase()}`,
+          ])
+        );
+        for (const candidateId of candidates) {
+          if (adminDb) {
+            const snap = await withTimeout(adminDb.collection("orders").doc(candidateId).get(), 2500, null);
+            if (snap && snap.exists) {
+              firestoreList = [{ ...(snap.data() || {}), id: snap.id } as OrderRecord];
+              break;
+            }
+          } else {
+            const directDoc = await withTimeout(getDoc(doc(db, "orders", candidateId)), 1500, null);
+            if (directDoc && directDoc.exists()) {
+              firestoreList = [{ ...directDoc.data(), id: directDoc.id } as OrderRecord];
+              break;
+            }
+          }
+        }
+      } else if (idList.length > 0) {
+        const docs = await Promise.all(
+          idList.map((id) =>
+            adminDb
+              ? withTimeout(adminDb.collection("orders").doc(id).get(), 2500, null)
+              : withTimeout(getDoc(doc(db, "orders", id)), 1500, null)
+          )
+        );
+        for (const d of docs) {
+          if (!d) continue;
+          const exists = typeof (d as any).exists === "function" ? (d as any).exists() : Boolean((d as any).exists);
+          if (exists) {
+            firestoreList.push({ ...(d.data() || {}), id: d.id } as OrderRecord);
+          }
+        }
+      } else if (userId && userId !== "guest") {
+        if (adminDb) {
+          const snap = await withTimeout(
+            adminDb.collection("orders").where("userId", "==", userId).limit(25).get(),
+            3000,
+            null
+          );
+          if (snap) {
+            firestoreList = snap.docs.map((d) => ({ ...(d.data() || {}), id: d.id } as OrderRecord));
+          }
         } else {
-          // Fallback query matching suffix
-          const snap = await withTimeout(getDocs(query(collection(db, "orders"), limit(100))), 1500, null);
+          const q = query(collection(db, "orders"), where("userId", "==", userId), limit(25));
+          const snap = await withTimeout(getDocs(q), 1500, null);
           if (snap) {
             firestoreList = snap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
           }
         }
-      } else if (userId && userId !== "guest") {
-        const q = query(collection(db, "orders"), where("userId", "==", userId), limit(50));
-        const snap = await withTimeout(getDocs(q), 1500, null);
-        if (snap) {
-          firestoreList = snap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
-        }
       } else if (phone) {
-        const q = query(collection(db, "orders"), where("primaryPhone", "==", phone), limit(20));
-        const snap = await withTimeout(getDocs(q), 1500, null);
-        if (snap && !snap.empty) {
-          firestoreList = snap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
-        } else {
-          const generalSnap = await withTimeout(getDocs(query(collection(db, "orders"), limit(100))), 1500, null);
-          if (generalSnap) {
-            firestoreList = generalSnap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
+        if (adminDb) {
+          const snap = await withTimeout(
+            adminDb.collection("orders").where("primaryPhone", "==", phone).limit(20).get(),
+            3000,
+            null
+          );
+          if (snap) {
+            firestoreList = snap.docs.map((d) => ({ ...(d.data() || {}), id: d.id } as OrderRecord));
           }
-        }
-      } else {
-        const snap = await withTimeout(getDocs(query(collection(db, "orders"), limit(200))), 1500, null);
-        if (snap) {
-          firestoreList = snap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
+        } else {
+          const q = query(collection(db, "orders"), where("primaryPhone", "==", phone), limit(20));
+          const snap = await withTimeout(getDocs(q), 1500, null);
+          if (snap) {
+            firestoreList = snap.docs.map((d) => ({ ...d.data(), id: d.id } as OrderRecord));
+          }
         }
       }
     } catch (e) {
-      console.warn("API GET orders Firestore read error (using local store):", e);
+      console.warn("API GET orders targeted Firestore read warning:", e);
     }
 
     // Merge without duplicates
@@ -119,6 +188,9 @@ export async function GET(req: Request) {
           o.id.slice(-6).toLowerCase() === orderId.toLowerCase() ||
           o.id.slice(-8).toLowerCase() === orderId.toLowerCase()
       );
+    } else if (idList.length > 0) {
+      const idSet = new Set(idList.map((i) => i.toLowerCase()));
+      result = result.filter((o) => idSet.has(o.id.toLowerCase()));
     } else if (phone) {
       result = result.filter(
         (o) =>
@@ -136,7 +208,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: true, orders: result });
   } catch (err: any) {
     console.error("GET /api/orders error:", err);
-    return NextResponse.json({ success: false, error: err.message, orders: getLocalOrders() });
+    return NextResponse.json({ success: false, error: err.message, orders: [] });
   }
 }
 
@@ -225,8 +297,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // Zero / Invalid Price & Quantity Protection
+    // Zero / Invalid Price & Quantity Protection + Fresh Product Read (no stale cache)
     let serverSubtotal = 0;
+    const prefetchedProducts = new Map<string, Record<string, any>>();
     for (const item of items) {
       const itemPrice = Number(item.price);
       const itemQty = Number(item.quantity);
@@ -251,24 +324,6 @@ export async function POST(req: Request) {
         );
       }
 
-      // Server-side database verification with 2500ms timeout
-      if (item.productId) {
-        try {
-          const adminDb = getAdminDb();
-          const pDoc = await withTimeout(adminDb.collection("products").doc(item.productId).get(), 2500, null);
-          if (pDoc && pDoc.exists) {
-            const pData = pDoc.data() || {};
-            if (pData.status === "draft") {
-              return NextResponse.json(
-                { success: false, error: `Product "${pData.name || item.name}" is a draft and not for sale.` },
-                { status: 400 }
-              );
-            }
-          }
-        } catch (dbErr) {
-          console.warn("Could not check product doc in DB:", dbErr);
-        }
-      }
       if (isNaN(itemQty) || itemQty <= 0) {
         return NextResponse.json(
           {
@@ -277,6 +332,30 @@ export async function POST(req: Request) {
           },
           { status: 400 }
         );
+      }
+
+      // Server-side fresh database verification (deduplicated per productId within this request)
+      const pid = typeof item.productId === "string" ? item.productId.trim() : "";
+      if (pid) {
+        try {
+          let pData = prefetchedProducts.get(pid);
+          if (!pData) {
+            const adminDb = getAdminDb();
+            const pDoc = await withTimeout(adminDb.collection("products").doc(pid).get(), 2500, null);
+            if (pDoc && pDoc.exists) {
+              pData = pDoc.data() || {};
+              prefetchedProducts.set(pid, pData);
+            }
+          }
+          if (pData && pData.status === "draft") {
+            return NextResponse.json(
+              { success: false, error: `Product "${pData.name || item.name}" is a draft and not for sale.` },
+              { status: 400 }
+            );
+          }
+        } catch (dbErr) {
+          console.warn("Could not check product doc in DB:", dbErr);
+        }
       }
       serverSubtotal += itemPrice * itemQty;
     }
@@ -440,12 +519,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Automatically deduct inventory for confirmed COD orders
+    // 3. Deduct inventory synchronously before returning response for confirmed COD orders
+    // Reuses the fresh product snapshot read during this checkout request (zero stale cache, zero duplicate reads)
     try {
       if (isCod && orderPayload.items && orderPayload.items.length > 0) {
-        withTimeout(deductProductStock(orderPayload.items), 2000, null).catch((stockErr) => {
-          console.warn("[Inventory Deduction Warning]:", stockErr);
-        });
+        await withTimeout(
+          deductProductStock(orderPayload.items, { prefetchedProducts }),
+          2500,
+          undefined
+        );
       }
     } catch (stockErr) {
       console.warn("[Inventory Deduction Warning]:", stockErr);
