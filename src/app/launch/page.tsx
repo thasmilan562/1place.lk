@@ -3,7 +3,7 @@ import LaunchCountdown from "@/components/launch/LaunchCountdown";
 import "./launch.css";
 
 export const metadata: Metadata = {
-  title: "OnePlace opens at 12:11 AM",
+  title: "OnePlace opens at 11:00 PM",
   robots: { index: false, follow: false },
 };
 
