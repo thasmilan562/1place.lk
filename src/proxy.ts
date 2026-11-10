@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isValidLaunchPreviewToken } from "@/lib/launch-access";
+import { LAUNCH_PREVIEW_COOKIE, SITE_LAUNCH_AT } from "@/lib/launch-config";
 
 async function isValidAdminSession(token?: string | null): Promise<boolean> {
   if (!token || !token.includes(".")) return false;
@@ -39,6 +41,22 @@ async function isValidAdminSession(token?: string | null): Promise<boolean> {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  const launchAccessRoutes = pathname === "/launch" || pathname.startsWith("/api/launch-access");
+  const adminAuthRoutes = pathname === "/admin/login" || pathname.startsWith("/api/admin/auth");
+  const hasAdminSession = await isValidAdminSession(request.cookies.get("admin_session")?.value);
+  if (
+    Date.now() < SITE_LAUNCH_AT &&
+    !launchAccessRoutes &&
+    !adminAuthRoutes &&
+    !hasAdminSession &&
+    !(await isValidLaunchPreviewToken(request.cookies.get(LAUNCH_PREVIEW_COOKIE)?.value))
+  ) {
+    const response = NextResponse.rewrite(new URL("/launch", request.url));
+    response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
 
   // Protect Admin Dashboard Routes
   if (pathname === "/admin" || pathname.startsWith("/admin/dashboard")) {

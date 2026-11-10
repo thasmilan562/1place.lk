@@ -3,6 +3,7 @@ import { verifyAdminRequest } from "@/lib/admin-auth-server";
 import { getServerAdminAuth } from "@/lib/firebase-admin";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const headers = { "Cache-Control": "no-store" };

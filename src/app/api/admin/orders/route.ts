@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { FieldValue, getAdminDb } from "@/lib/firebase-admin";
 import { verifyAdminRequest } from "@/lib/admin-auth-server";
 import { getLocalOrders, updateLocalOrder, deleteLocalOrder } from "@/lib/orders-store";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const runtime = "nodejs";
+export const maxDuration = 30;
 
 const noStore = { "Cache-Control": "no-store, no-cache, must-revalidate" };
 
@@ -17,31 +18,40 @@ export async function GET(request: Request) {
   if (!verifyAdminRequest(request)) return unauthorized();
 
   try {
-    // 1. Read local persistent orders immediately
-    const localOrders = getLocalOrders();
+    // Vercel function filesystems are ephemeral. Only Firestore is a durable
+    // order source in production; keep the JSON store as a local-dev fallback.
+    const localOrders = process.env.NODE_ENV === "production" ? [] : getLocalOrders();
 
-    // 2. Query Firestore with an 8000ms timeout guard
-    const firestoreOrders: Array<Record<string, any> & { id: string; docId?: string }> = await Promise.race([
-      (async () => {
-        try {
-          const snapshot = await getAdminDb().collection("orders").get();
-          return snapshot.docs.map((document) => {
-            const data = document.data() || {};
-            const orderId = (typeof data.id === "string" && data.id.trim()) ? data.id.trim() : document.id;
-            return { ...data, id: orderId, docId: document.id };
-          });
-        } catch (fsErr) {
-          console.warn("[Admin Orders API] Firestore collection get failed (using local store):", fsErr);
-          return [];
-        }
-      })(),
-      new Promise<Array<Record<string, any> & { id: string }>>((resolve) =>
-        setTimeout(() => {
-          console.warn("[Admin Orders API] Firestore collection get timed out after 8000ms");
-          resolve([]);
-        }, 8000)
-      ),
-    ]);
+    // Read from the configured production Firestore. A failed read must not
+    // masquerade as a successful empty order list.
+    let firestoreOrders: Array<Record<string, any> & { id: string; docId?: string }>;
+    try {
+      const snapshot = await Promise.race([
+        getAdminDb().collection("orders").get(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Firestore orders query timed out.")), 8000)
+        ),
+      ]);
+      firestoreOrders = snapshot.docs.map((document) => {
+        const data = document.data() || {};
+        const orderId = (typeof data.id === "string" && data.id.trim()) ? data.id.trim() : document.id;
+        return { ...data, id: orderId, docId: document.id };
+      });
+    } catch (fsErr) {
+      const reason = fsErr instanceof Error ? fsErr.message : String(fsErr);
+      console.error("[Admin Orders API] Firestore read failed:", reason);
+      if (process.env.NODE_ENV === "production") {
+        return NextResponse.json(
+          {
+            success: false,
+            orders: [],
+            error: `The production order database is unavailable: ${reason}`,
+          },
+          { status: 503, headers: noStore }
+        );
+      }
+      firestoreOrders = [];
+    }
 
     // 3. Merge both sources without duplicates, favoring latest updates
     const orderMap = new Map<string, any>();
@@ -73,6 +83,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, orders }, { headers: noStore });
   } catch (error: any) {
     console.error("[Admin Orders API] Read error:", error);
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { success: false, orders: [], error: "The production order database could not be read." },
+        { status: 503, headers: noStore }
+      );
+    }
     try {
       const fallback = getLocalOrders();
       return NextResponse.json({ success: true, orders: fallback }, { headers: noStore });

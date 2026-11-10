@@ -4,9 +4,8 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Package, ArrowRight } from "lucide-react";
 import ProductCard from "@/components/products/ProductCard";
-import TodayDealSection from "@/components/home/today-deal-section";
 import VisualProductShowcase from "@/components/home/visual-product-showcase";
-import { Product, Category, TodayDealSettings, VisualShowcaseSettings, VisualShowcaseSlide } from "@/lib/types";
+import { Product, Category, VisualShowcaseSettings, VisualShowcaseSlide } from "@/lib/types";
 import { collection, doc, onSnapshot, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { normalizeProduct, deduplicateProductsBySlug } from "@/lib/firestore-client";
@@ -15,13 +14,11 @@ import { DEFAULT_SHOWCASE_SETTINGS } from "@/lib/data";
 interface ShopAllProductsSectionProps {
   initialProducts?: Product[];
   categories?: Category[];
-  todayDealSettings?: TodayDealSettings | null;
   showcaseSettings?: VisualShowcaseSettings | null;
 }
 
 export default function ShopAllProductsSection({
   initialProducts = [],
-  todayDealSettings,
   showcaseSettings,
 }: ShopAllProductsSectionProps) {
   const [productsList, setProductsList] = useState<Product[]>(() =>
@@ -146,12 +143,11 @@ export default function ShopAllProductsSection({
     return lineMap;
   }, [liveShowcaseSettings, showcaseSettings]);
 
-  // ── 5. Plan Interleaved Segments (Products + Banners + Today's Deal) ──
+  // ── 5. Plan Interleaved Segments (Products + Showcase Banners) ──
   // Lines where elements should be inserted
   const segments = useMemo(() => {
     type Insertion =
-      | { type: "showcase"; line: number; slides: VisualShowcaseSlide[] }
-      | { type: "today_deal"; line: number };
+      | { type: "showcase"; line: number; slides: VisualShowcaseSlide[] };
 
     const insertions: Insertion[] = [];
 
@@ -163,14 +159,6 @@ export default function ShopAllProductsSection({
         slides,
       });
     });
-
-    // Add Today's Deal banner at line 4 by default (or clean 4 rows on any screen)
-    if (todayDealSettings) {
-      insertions.push({
-        type: "today_deal",
-        line: 4,
-      });
-    }
 
     // Sort insertions by product line ascending
     insertions.sort((a, b) => a.line - b.line);
@@ -185,14 +173,14 @@ export default function ShopAllProductsSection({
 
     insertions.forEach((ins) => {
       const cutIndex = ins.line * colsCount;
-      if (cutIndex > lastIndex && lastIndex < displayedProducts.length) {
+      if (cutIndex > lastIndex) {
         const slice = displayedProducts.slice(lastIndex, cutIndex);
         result.push({
           products: slice,
           insertionAfter: ins,
         });
-        lastIndex = cutIndex;
-      } else if (cutIndex <= lastIndex && lastIndex < displayedProducts.length) {
+        lastIndex = Math.min(cutIndex, displayedProducts.length);
+      } else {
         // If multiple insertions at the exact same line, attach insertion with empty products
         result.push({
           products: [],
@@ -216,7 +204,7 @@ export default function ShopAllProductsSection({
     }
 
     return result;
-  }, [displayedProducts, colsCount, showcaseBannersByLine, todayDealSettings]);
+  }, [displayedProducts, colsCount, showcaseBannersByLine]);
 
   if (publishedProducts.length === 0) {
     return null;
@@ -273,12 +261,6 @@ export default function ShopAllProductsSection({
             </div>
           )}
 
-          {/* Insertion 2: Today's Deal Promotional Banner */}
-          {segment.insertionAfter?.type === "today_deal" && todayDealSettings && (
-            <div className="w-full my-8 sm:my-14">
-              <TodayDealSection settings={todayDealSettings} />
-            </div>
-          )}
         </React.Fragment>
       ))}
 

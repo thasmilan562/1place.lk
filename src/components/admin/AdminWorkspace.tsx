@@ -43,6 +43,7 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
       if (!active) return;
       if (result.authenticated) {
         connectAdminFirebase().catch((e) => {
+          setNotificationError(e instanceof Error ? e.message : "Admin database sign-in is unavailable.");
           console.warn("Firebase client admin token warning (server API continues):", e);
         });
         if (active) setAuthed(true);
@@ -99,6 +100,7 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
         window.dispatchEvent(new CustomEvent("admin-orders-updated", { detail: orders }));
       } catch (error) {
         if (!stopped) {
+          setNotificationError(error instanceof Error ? error.message : "Could not refresh the order database.");
           console.warn("Admin order refresh check:", error);
         }
       } finally {

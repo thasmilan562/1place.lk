@@ -1,0 +1,306 @@
+body:has(.launch-screen) [data-site-announcement],
+body:has(.launch-screen) [data-site-header],
+body:has(.launch-screen) .store-footer,
+body:has(.launch-screen) [data-mobile-bottom-nav],
+body:has(.launch-screen) #spin-win-floating-trigger {
+  display: none !important;
+}
+
+body:has(.launch-screen) main:not(.launch-screen) {
+  padding: 0 !important;
+}
+
+.launch-screen {
+  --launch-ink: #1d1d1f;
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: clamp(24px, 5vw, 56px) clamp(20px, 6vw, 80px) 24px;
+  color: var(--launch-ink);
+  background: linear-gradient(145deg, #fff 8%, #fbfaf9 53%, #f7f4f1 100%);
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.launch-screen::before,
+.launch-screen::after {
+  position: absolute;
+  z-index: -1;
+  display: block;
+  content: "";
+  pointer-events: none;
+}
+
+.launch-screen::before {
+  top: 16%;
+  left: 50%;
+  width: min(78vw, 760px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(227 215 203 / 42%), rgb(248 245 241 / 18%) 43%, transparent 70%);
+  filter: blur(10px);
+  transform: translateX(-50%);
+  animation: launch-ambient 12s ease-in-out infinite alternate;
+}
+
+.launch-screen::after {
+  top: 50%;
+  left: 50%;
+  width: min(58vw, 560px);
+  aspect-ratio: 1;
+  border: 1px solid rgb(133 112 94 / 8%);
+  border-radius: 50%;
+  box-shadow: 0 0 0 34px rgb(133 112 94 / 2%), 0 0 0 78px rgb(133 112 94 / 1.5%);
+  transform: translate(-50%, -50%);
+  animation: launch-orbit 28s linear infinite;
+}
+
+.launch-screen__top {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+}
+
+.launch-screen__brand {
+  display: inline-flex;
+  align-items: baseline;
+  position: relative;
+  padding-bottom: 8px;
+  color: #161616;
+  font-size: 23px;
+  font-weight: 850;
+  letter-spacing: -1.5px;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.launch-screen__brand small {
+  position: absolute;
+  bottom: 0;
+  left: 2px;
+  font-size: 4.5px;
+  font-weight: 600;
+  letter-spacing: 1.3px;
+}
+
+.launch-screen__content {
+  position: relative;
+  width: min(100%, 760px);
+  margin: 0 auto;
+  padding: 64px 0 80px;
+  text-align: center;
+  animation: launch-rise 900ms cubic-bezier(.2,.72,.2,1) both;
+}
+
+.launch-screen__eyebrow {
+  margin: 0 0 20px;
+  color: #7c6c61;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: .24em;
+  animation: launch-rise 700ms 100ms cubic-bezier(.2,.72,.2,1) both;
+}
+
+.launch-screen__content h1 {
+  margin: 0;
+  color: var(--launch-ink);
+  font-size: clamp(45px, 8.2vw, 88px);
+  font-weight: 620;
+  letter-spacing: -.075em;
+  line-height: .99;
+  text-wrap: balance;
+  animation: launch-rise 800ms 180ms cubic-bezier(.2,.72,.2,1) both;
+}
+
+.launch-screen__copy {
+  max-width: 420px;
+  margin: 24px auto 0;
+  color: #6e6e73;
+  font-size: 15px;
+  line-height: 1.7;
+  text-wrap: pretty;
+  animation: launch-rise 800ms 260ms cubic-bezier(.2,.72,.2,1) both;
+}
+
+.launch-countdown {
+  display: flex;
+  justify-content: center;
+  gap: clamp(9px, 2vw, 18px);
+  margin: 44px auto 0;
+  perspective: 700px;
+}
+
+.launch-countdown__unit {
+  display: flex;
+  width: clamp(68px, 14vw, 118px);
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 16px 8px 14px;
+  overflow: hidden;
+  border: 1px solid rgb(224 218 211 / 82%);
+  border-radius: 19px;
+  background: rgb(255 255 255 / 70%);
+  box-shadow: 0 12px 36px rgb(45 35 25 / 5%), inset 0 1px rgb(255 255 255 / 95%);
+  backdrop-filter: blur(18px);
+  animation: launch-card-in 800ms cubic-bezier(.2,.72,.2,1) both;
+  transition: transform 250ms ease, box-shadow 250ms ease, border-color 250ms ease;
+}
+
+.launch-countdown__unit:nth-child(1) { animation-delay: 300ms; }
+.launch-countdown__unit:nth-child(2) { animation-delay: 390ms; }
+.launch-countdown__unit:nth-child(3) { animation-delay: 480ms; }
+.launch-countdown__unit:nth-child(4) { animation-delay: 570ms; }
+
+.launch-countdown__unit:hover {
+  transform: translateY(-4px);
+  border-color: #d8c9bb;
+  box-shadow: 0 18px 42px rgb(45 35 25 / 9%), inset 0 1px rgb(255 255 255 / 95%);
+}
+
+.launch-countdown__number {
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(28px, 5.8vw, 46px);
+  font-weight: 560;
+  letter-spacing: -.065em;
+  line-height: 1;
+  animation: launch-digit 420ms cubic-bezier(.2,.8,.25,1) both;
+  transform-origin: 50% 75%;
+}
+
+.launch-countdown__label {
+  color: #8a8581;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.launch-screen__date {
+  margin-top: 20px;
+  color: #8b8580;
+  font-size: 11px;
+  letter-spacing: .05em;
+}
+
+.launch-screen__date span { padding: 0 7px; color: #c3b9b1; }
+
+.launch-screen__footer {
+  display: flex;
+  min-height: 42px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  animation: launch-rise 700ms 600ms cubic-bezier(.2,.72,.2,1) both;
+}
+
+.launch-screen__access {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  color: #8a8581;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.launch-screen__access:hover { color: #4e0f23; }
+.launch-screen__access:focus-visible,
+.launch-preview__row button:focus-visible { outline: 3px solid rgb(100 21 47 / 28%); outline-offset: 3px; }
+.launch-screen__footer-note { color: #aaa5a0; font-size: 10px; }
+
+.launch-preview {
+  width: min(100%, 280px);
+}
+
+.launch-preview > label {
+  display: block;
+  margin-bottom: 7px;
+  color: #736b66;
+  font-size: 11px;
+}
+
+.launch-preview__row {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid #e4dfdb;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.launch-preview__row input {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  border: 0;
+  outline: 0;
+  color: #1d1d1f;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+}
+
+.launch-preview__row button {
+  display: grid;
+  width: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border: 0;
+  color: #fff;
+  background: #64152f;
+  cursor: pointer;
+}
+
+.launch-preview__row button:disabled { opacity: .7; }
+.launch-preview__error { margin: 6px 0 0; color: #ad2942; font-size: 11px; }
+
+@media (max-width: 560px) {
+  .launch-screen { padding: 22px 20px 18px; }
+  .launch-screen__content { padding: 25px 0 40px; }
+  .launch-screen__eyebrow { margin-bottom: 16px; font-size: 9px; letter-spacing: .18em; }
+  .launch-screen__content h1 { font-size: clamp(44px, 13vw, 60px); }
+  .launch-screen__copy { max-width: 310px; margin-top: 17px; font-size: 14px; }
+  .launch-countdown { gap: 7px; margin-top: 32px; }
+  .launch-countdown__unit { width: calc((100vw - 68px) / 4); max-width: 84px; padding: 13px 3px 11px; border-radius: 14px; }
+  .launch-countdown__number { font-size: clamp(25px, 8vw, 34px); }
+  .launch-countdown__label { font-size: 8px; letter-spacing: .06em; }
+  .launch-screen__date { font-size: 10px; }
+  .launch-screen__footer { align-items: flex-end; }
+  .launch-screen__footer-note { font-size: 9px; text-align: right; }
+}
+
+@keyframes launch-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes launch-card-in {
+  from { opacity: 0; transform: translateY(20px) rotateX(5deg); }
+  to { opacity: 1; transform: translateY(0) rotateX(0); }
+}
+
+@keyframes launch-digit {
+  from { opacity: .45; transform: translateY(7px) rotateX(-22deg); filter: blur(2px); }
+  to { opacity: 1; transform: translateY(0) rotateX(0); filter: blur(0); }
+}
+
+@keyframes launch-ambient {
+  from { opacity: .7; transform: translateX(-50%) scale(.94); }
+  to { opacity: 1; transform: translateX(-50%) scale(1.08); }
+}
+
+@keyframes launch-orbit {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-screen *, .launch-screen *::before, .launch-screen *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

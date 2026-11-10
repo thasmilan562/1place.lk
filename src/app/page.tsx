@@ -22,7 +22,6 @@ import {
   getFeaturedCollections,
   getNewArrivalsSettings,
   getGalleryAnimationSettings,
-  getTodayDealSettings,
 } from "@/lib/firestore-client";
 import { siteSettings } from "@/lib/data";
 import { GalleryImage } from "@/lib/types";
@@ -66,7 +65,6 @@ export default async function HomePage() {
     featuredCollectionsSettings,
     newArrivalsSettings,
     galleryAnimationSettings,
-    todayDealSettings,
   ] = await Promise.all([
     getCategories().catch(() => []),
     getBrands().catch(() => []),
@@ -80,7 +78,6 @@ export default async function HomePage() {
     getFeaturedCollections().catch(() => null),
     getNewArrivalsSettings().catch(() => null),
     getGalleryAnimationSettings().catch(() => null),
-    getTodayDealSettings().catch(() => null),
   ]);
 
   return (
@@ -109,7 +106,6 @@ export default async function HomePage() {
       <ShopAllProductsSection
         initialProducts={products}
         categories={categories}
-        todayDealSettings={todayDealSettings}
         showcaseSettings={showcaseSettings}
       />
 
