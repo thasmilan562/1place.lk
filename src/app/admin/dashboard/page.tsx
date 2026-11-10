@@ -417,45 +417,20 @@ function DashboardContent() {
         console.warn("Error fetching gallery images:", galErr);
       }
 
-      // Users / Customers (Merge registered users and guest checkout profiles)
-      let userList: any[] = [];
+      // Users / Customers (Fetch via authenticated admin API with fallback)
       try {
-        const userSnap = await getDocs(collection(db, "users"));
-        userList = userSnap.docs.map((d) => ({ id: d.id, isGuest: false, ...d.data() }));
+        const custRes = await fetch(`/api/admin/customers?_t=${Date.now()}`, { cache: "no-store" });
+        const custData = await custRes.json().catch(() => ({}));
+        if (custRes.ok && custData.success && Array.isArray(custData.customers)) {
+          setCustomers(custData.customers);
+        } else {
+          const userSnap = await getDocs(collection(db, "users"));
+          const userList = userSnap.docs.map((d) => ({ id: d.id, isGuest: false, ...d.data() }));
+          if (userList.length > 0) setCustomers(userList);
+        }
       } catch (userErr) {
         console.warn("Could not fetch users directly from client (server-side only):", userErr);
       }
-
-      let guestList: any[] = [];
-      try {
-        const guestSnap = await getDocs(collection(db, "guest_profiles"));
-        guestList = guestSnap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            isGuest: true,
-            displayName: data.name || data.fullName || data.customerName || "Guest Customer",
-            email: data.email || "guest@1place.lk",
-            phoneNumber: data.phone || data.phoneNumber || "",
-            createdAt: data.createdAt || data.updatedAt || "",
-            ...data,
-          };
-        });
-      } catch (err) {
-        console.warn("Error fetching guest profiles collection:", err);
-      }
-
-      const customerMap = new Map<string, any>();
-      guestList.forEach((g) => {
-        const key = g.email || g.id;
-        customerMap.set(key, g);
-      });
-      userList.forEach((u: any) => {
-        const key = u.email || u.id;
-        customerMap.set(key, u);
-      });
-
-      setCustomers(Array.from(customerMap.values()));
 
       // Visual Showcase Settings
       try {
@@ -551,6 +526,19 @@ function DashboardContent() {
 
     const ordersPollInterval = setInterval(pollOrders, 10000);
 
+    // Periodic customer sync interval (every 10 seconds)
+    const pollCustomers = async () => {
+      try {
+        const res = await fetch(`/api/admin/customers?_t=${Date.now()}`, { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success && Array.isArray(data.customers)) {
+          setCustomers(data.customers);
+        }
+      } catch {}
+    };
+
+    const customersPollInterval = setInterval(pollCustomers, 10000);
+
     // 2. Live Products Listener
     const unsubProducts = onSnapshot(
       collection(db, "products"),
@@ -643,6 +631,7 @@ function DashboardContent() {
     return () => {
       window.removeEventListener("admin-orders-updated", handleAdminOrdersUpdate);
       clearInterval(ordersPollInterval);
+      clearInterval(customersPollInterval);
       unsubProducts();
       unsubUsers();
       unsubCategories();
@@ -1089,19 +1078,19 @@ function DashboardContent() {
 
   const handleDeleteCustomer = async (id: string) => {
     if (!confirm("Are you sure you want to delete this customer record?")) return;
-    const target = customers.find((c) => c.id === id);
     try {
-      if (id) {
-        if (target?.isGuest) {
-          await deleteDoc(doc(db, "guest_profiles", id));
-        } else {
-          await deleteDoc(doc(db, "users", id));
-        }
+      const res = await fetch(`/api/admin/customers?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setCustomers((prev) => prev.filter((c) => c.id !== id && c.email !== id));
+      } else {
+        throw new Error(data.error || "Failed to delete customer");
       }
-      setCustomers(customers.filter((c) => c.id !== id));
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error deleting customer:", e);
-      alert("Failed to delete customer");
+      alert(e.message || "Failed to delete customer");
     }
   };
 
