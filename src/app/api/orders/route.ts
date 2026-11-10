@@ -13,6 +13,19 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Pro
   ]).catch(() => fallback);
 }
 
+function sanitize(obj: any): any {
+  if (obj === undefined) return null;
+  if (obj === null || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map((item) => sanitize(item));
+  const cleaned: Record<string, any> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (val !== undefined) {
+      cleaned[key] = sanitize(val);
+    }
+  }
+  return cleaned;
+}
+
 // GET /api/orders - returns orders with secure filtering
 export async function GET(req: Request) {
   try {
@@ -231,23 +244,16 @@ export async function POST(req: Request) {
         );
       }
 
-      // Server-side database verification with 1200ms timeout
+      // Server-side database verification with 2500ms timeout
       if (item.productId) {
         try {
-          const pDoc = await withTimeout(getDoc(doc(db, "products", item.productId)), 1200, null);
-          if (pDoc && pDoc.exists()) {
-            const pData = pDoc.data();
+          const adminDb = getAdminDb();
+          const pDoc = await withTimeout(adminDb.collection("products").doc(item.productId).get(), 2500, null);
+          if (pDoc && pDoc.exists) {
+            const pData = pDoc.data() || {};
             if (pData.status === "draft") {
               return NextResponse.json(
                 { success: false, error: `Product "${pData.name || item.name}" is a draft and not for sale.` },
-                { status: 400 }
-              );
-            }
-            const dbBasePrice = Number(pData.price) || 0;
-            const hasCombos = Array.isArray(pData.variant_combos) && pData.variant_combos.length > 0;
-            if (dbBasePrice <= 0 && !hasCombos) {
-              return NextResponse.json(
-                { success: false, error: `Product "${pData.name || item.name}" does not have an active price assigned.` },
                 { status: 400 }
               );
             }
@@ -365,11 +371,12 @@ export async function POST(req: Request) {
 
     // 2. Persist to Firestore with timeout guard
     try {
+      const cleanPayload = sanitize(orderPayload);
       try {
         const adminDb = getAdminDb();
-        await withTimeout(adminDb.collection("orders").doc(orderPayload.id).set(orderPayload, { merge: true }), 2000, null);
+        await withTimeout(adminDb.collection("orders").doc(orderPayload.id).set(cleanPayload, { merge: true }), 5000, null);
       } catch {
-        await withTimeout(setDoc(doc(db, "orders", orderPayload.id), orderPayload, { merge: true }), 1500, null);
+        await withTimeout(setDoc(doc(db, "orders", orderPayload.id), cleanPayload, { merge: true }), 2500, null);
       }
 
       // 2b. Mark promotional spin rewards as redeemed

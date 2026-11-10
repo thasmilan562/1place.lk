@@ -20,12 +20,16 @@ export async function GET(request: Request) {
     // 1. Read local persistent orders immediately
     const localOrders = getLocalOrders();
 
-    // 2. Query Firestore with a 2000ms timeout guard
-    const firestoreOrders: Array<Record<string, any> & { id: string }> = await Promise.race([
+    // 2. Query Firestore with an 8000ms timeout guard
+    const firestoreOrders: Array<Record<string, any> & { id: string; docId?: string }> = await Promise.race([
       (async () => {
         try {
           const snapshot = await getAdminDb().collection("orders").get();
-          return snapshot.docs.map((document) => ({ id: document.id, ...document.data() }));
+          return snapshot.docs.map((document) => {
+            const data = document.data() || {};
+            const orderId = (typeof data.id === "string" && data.id.trim()) ? data.id.trim() : document.id;
+            return { ...data, id: orderId, docId: document.id };
+          });
         } catch (fsErr) {
           console.warn("[Admin Orders API] Firestore collection get failed (using local store):", fsErr);
           return [];
@@ -33,9 +37,9 @@ export async function GET(request: Request) {
       })(),
       new Promise<Array<Record<string, any> & { id: string }>>((resolve) =>
         setTimeout(() => {
-          console.warn("[Admin Orders API] Firestore collection get timed out after 2000ms");
+          console.warn("[Admin Orders API] Firestore collection get timed out after 8000ms");
           resolve([]);
-        }, 2000)
+        }, 8000)
       ),
     ]);
 
@@ -48,13 +52,13 @@ export async function GET(request: Request) {
 
     firestoreOrders.forEach((fOrder) => {
       if (fOrder?.id) {
-        const existing = orderMap.get(fOrder.id);
+        const existing = orderMap.get(fOrder.id) || (fOrder.docId ? orderMap.get(fOrder.docId) : null);
         if (!existing) {
           orderMap.set(fOrder.id, fOrder);
         } else {
           const localTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
           const firestoreTime = new Date(fOrder.updatedAt || fOrder.createdAt || 0).getTime();
-          if (firestoreTime > localTime) {
+          if (firestoreTime >= localTime) {
             orderMap.set(fOrder.id, { ...existing, ...fOrder });
           } else {
             orderMap.set(fOrder.id, { ...fOrder, ...existing });
@@ -124,12 +128,12 @@ export async function PATCH(request: Request) {
               if (Array.isArray(change.updates.statusHistory) && change.updates.statusHistory.length) {
                 safeUpdates.statusHistory = FieldValue.arrayUnion(...change.updates.statusHistory);
               }
-              if (Object.keys(safeUpdates).length) batch.update(db.collection("orders").doc(change.id.trim()), safeUpdates);
+              if (Object.keys(safeUpdates).length) batch.set(db.collection("orders").doc(change.id.trim()), safeUpdates, { merge: true });
             }
             await batch.commit();
           }
         })(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore batch commit timeout")), 2000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore batch commit timeout")), 5000)),
       ]);
     } catch (fsError) {
       console.warn("[Admin Orders API] Firestore batch update warning (persisted locally):", fsError);
