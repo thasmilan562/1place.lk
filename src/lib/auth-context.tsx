@@ -32,7 +32,7 @@ interface AuthContextType {
   sendPhoneSignInCode: (phoneNumber: string, containerId: string) => Promise<ConfirmationResult>;
   confirmPhoneSignInCode: (confirmation: ConfirmationResult, code: string) => Promise<void>;
   signInWithPhonePassword: (phoneNumber: string, password: string) => Promise<void>;
-  signUpWithPhone: (name: string, phoneNumber: string, password: string, confirmation: ConfirmationResult, code: string) => Promise<void>;
+  signUpWithPhone: (name: string, phoneNumber: string, password: string, confirmation?: ConfirmationResult, code?: string) => Promise<void>;
   resetPhonePassword: (phoneNumber: string, confirmation: ConfirmationResult, code: string, newPassword: string) => Promise<void>;
   signUp: (name: string, email: string, password: string, phone?: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -171,25 +171,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.setItem(STORAGE_KEYS.USER_LOGGED_IN, "true");
   }, []);
 
-  const signUpWithPhone = useCallback(async (name: string, phoneNumber: string, password: string, confirmation: ConfirmationResult, code: string) => {
-    const phoneCredential = await confirmation.confirm(code.trim());
-    phoneRecaptchaVerifier?.clear();
-    phoneRecaptchaVerifier = null;
+  const signUpWithPhone = useCallback(async (name: string, phoneNumber: string, password: string, confirmation?: ConfirmationResult, code?: string) => {
+    if (confirmation && code) {
+      const phoneCredential = await confirmation.confirm(code.trim());
+      phoneRecaptchaVerifier?.clear();
+      phoneRecaptchaVerifier = null;
+      const alias = getPhoneLoginAlias(phoneNumber);
+      const linked = await linkWithCredential(phoneCredential.user, EmailAuthProvider.credential(alias, password));
+      await updateProfile(linked.user, { displayName: name.trim() || "Valued Customer" });
+      sessionStorage.setItem(STORAGE_KEYS.USER_LOGGED_IN, "true");
+      localStorage.setItem(STORAGE_KEYS.SAVED_PHONE, phoneNumber);
+      try {
+        await setDoc(doc(db, "users", linked.user.uid), {
+          uid: linked.user.uid,
+          displayName: name.trim() || "Valued Customer",
+          email: "",
+          phone: phoneNumber,
+          phoneLoginAlias: alias,
+          phoneVerified: true,
+          role: "customer",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (dbErr) {
+        console.warn("Could not write phone customer profile to Firestore:", dbErr);
+      }
+      return;
+    }
+
     const alias = getPhoneLoginAlias(phoneNumber);
-    const linked = await linkWithCredential(phoneCredential.user, EmailAuthProvider.credential(alias, password));
-    await updateProfile(linked.user, { displayName: name.trim() });
+    const credential = await createUserWithEmailAndPassword(auth, alias, password);
+    await updateProfile(credential.user, { displayName: name.trim() || "Valued Customer" });
     sessionStorage.setItem(STORAGE_KEYS.USER_LOGGED_IN, "true");
     localStorage.setItem(STORAGE_KEYS.SAVED_PHONE, phoneNumber);
-    await setDoc(doc(db, "users", linked.user.uid), {
-      uid: linked.user.uid,
-      displayName: name.trim(),
-      email: "",
-      phone: phoneNumber,
-      phoneLoginAlias: alias,
-      role: "customer",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
+    try {
+      await setDoc(doc(db, "users", credential.user.uid), {
+        uid: credential.user.uid,
+        displayName: name.trim() || "Valued Customer",
+        email: "",
+        phone: phoneNumber,
+        phoneLoginAlias: alias,
+        phoneVerified: false,
+        role: "customer",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+    } catch (dbErr) {
+      console.warn("Could not write phone customer profile to Firestore:", dbErr);
+    }
   }, []);
 
   const resetPhonePassword = useCallback(async (phoneNumber: string, confirmation: ConfirmationResult, code: string, newPassword: string) => {
@@ -206,7 +235,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await updatePassword(verified.user, newPassword);
     } else {
       const alias = getPhoneLoginAlias(phoneNumber);
-      await linkWithCredential(verified.user, EmailAuthProvider.credential(alias, newPassword));
+      try {
+        await linkWithCredential(verified.user, EmailAuthProvider.credential(alias, newPassword));
+      } catch (error: any) {
+        if (error?.code === "auth/email-already-in-use") {
+          await firebaseSignOut(auth);
+          throw new Error("This phone account was created without number verification. Please contact support to reset its password.");
+        }
+        throw error;
+      }
     }
     sessionStorage.setItem(STORAGE_KEYS.USER_LOGGED_IN, "true");
   }, []);

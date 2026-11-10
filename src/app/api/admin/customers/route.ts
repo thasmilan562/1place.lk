@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAdminDb, getServerAdminAuth } from "@/lib/firebase-admin";
 import { verifyAdminRequest } from "@/lib/admin-auth-server";
-import { getLocalCustomers, saveLocalCustomers, deleteLocalCustomer, CustomerRecord } from "@/lib/customers-store";
-import { getLocalOrders } from "@/lib/orders-store";
+import { getLocalCustomers, deleteLocalCustomer, CustomerRecord } from "@/lib/customers-store";
+import { getLocalOrders, OrderRecord } from "@/lib/orders-store";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -99,9 +99,40 @@ export async function GET(request: Request) {
       console.warn("[Admin Customers API] Error loading Auth users:", authErr);
     }
 
-    // 4. Merge Customers from Orders
+    // 4. Merge Customers from local and Firestore orders. Orders submitted on
+    // production/serverless instances are stored in Firestore, so the local
+    // JSON cache alone is not a complete source for guest customer details.
     try {
-      const orders = getLocalOrders();
+      const localOrders = getLocalOrders();
+      const firestoreOrders = await Promise.race([
+        (async () => {
+          try {
+            const snap = await getAdminDb().collection("orders").get();
+            return snap.docs.map((d): OrderRecord => {
+              const data = d.data() || {};
+              return { ...data, id: (typeof data.id === "string" && data.id.trim()) ? data.id.trim() : d.id };
+            });
+          } catch (error) {
+            console.warn("[Admin Customers API] Firestore orders get warning:", error);
+            return [];
+          }
+        })(),
+        new Promise<OrderRecord[]>((resolve) => setTimeout(() => resolve([]), 8000)),
+      ]);
+      const ordersById = new Map<string, OrderRecord>();
+      [...localOrders, ...firestoreOrders].forEach((order) => {
+        if (!order?.id) return;
+        const existing = ordersById.get(order.id);
+        if (!existing) {
+          ordersById.set(order.id, order);
+          return;
+        }
+        const existingTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+        const orderTime = new Date(order.updatedAt || order.createdAt || 0).getTime();
+        ordersById.set(order.id, orderTime >= existingTime ? { ...existing, ...order } : { ...order, ...existing });
+      });
+
+      const orders = Array.from(ordersById.values());
       orders.forEach((ord) => {
         const email = (ord.email || ord.customerEmail || ord.deliveryAddress?.email || "").toLowerCase().trim();
         const phone = ord.phone || ord.primaryPhone || ord.phoneNumber || ord.deliveryAddress?.phone || "";
@@ -152,11 +183,6 @@ export async function GET(request: Request) {
       return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
     });
 
-    // Save to local cache in background
-    try {
-      saveLocalCustomers(mergedList);
-    } catch {}
-
     return NextResponse.json({ success: true, customers: mergedList }, { headers: noStore });
   } catch (error) {
     console.error("[Admin Customers API] Internal Error:", error);
@@ -206,3 +232,4 @@ export async function DELETE(request: Request) {
     );
   }
 }
+

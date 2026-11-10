@@ -11,6 +11,21 @@ import { getCategories } from "@/lib/firestore-client";
 import { deduplicateCategories } from "@/lib/category-utils";
 
 interface Props { categories?: Category[]; products?: Product[] }
+function getGeneratedCategoryArt(category: Category): string | undefined {
+  const key = `${category.name} ${category.slug}`.toLowerCase();
+  if (/hot\s*wheel|hotwheel/.test(key)) return "/images/category-icons/hot-wheel.webp";
+  if (/gift.*flower|flower.*gift|bouquet|flower/.test(key)) return "/images/category-icons/gift-flowers.webp";
+  if (/gift/.test(key)) return "/images/category-icons/gift-items.webp";
+  if (/laptop|macbook|computer/.test(key)) return "/images/category-icons/laptops.webp";
+  if (/beauty|skincare|skin-care|cosmetic/.test(key)) return "/images/category-icons/beauty.webp";
+  if (/sport|fitness|gym/.test(key)) return "/images/category-icons/sports-fitness.webp";
+  if (/toy|game/.test(key)) return "/images/category-icons/toys-games.webp";
+  if (/home|living|furniture/.test(key)) return "/images/category-icons/home-living.webp";
+  if (/fashion|clothing|apparel/.test(key)) return "/images/category-icons/fashion.webp";
+  if (/electronic|smartphone|mobile|phone|tablet|accessor/.test(key)) return "/images/category-icons/electronics.webp";
+  return undefined;
+}
+
 function CategoryCollection({ categories: initialCategories, products = [] }: Props) {
   const [categories, setCategories] = useState<Category[]>(initialCategories || []);
   const pathname = usePathname();
@@ -34,7 +49,7 @@ function CategoryCollection({ categories: initialCategories, products = [] }: Pr
           product.category_name?.trim().toLowerCase() === categoryName ||
           product.categoryName?.trim().toLowerCase() === categoryName
         );
-        const imageUrl = category.image_url || category.iconUrl || categoryProduct?.images?.[0] || categoryProduct?.image_url || categoryProduct?.image || categoryProduct?.cover_image;
+        const imageUrl = getGeneratedCategoryArt(category) || category.image_url || category.iconUrl || categoryProduct?.images?.[0] || categoryProduct?.image_url || categoryProduct?.image || categoryProduct?.cover_image;
         return <Link key={category.id || category.slug} href={`/category/${category.slug}`} className="category-collection__card" aria-current={pathname === `/category/${category.slug}` || selected === category.slug ? "page" : undefined}>
           <div className="category-collection__image">
             {imageUrl ? <img src={imageUrl} alt="" loading="lazy" /> : <CategoryIcon category={category} className="h-7 w-7" />}

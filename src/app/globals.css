@@ -4,6 +4,11 @@
 
 /* ── Responsive Navbar Height Variable (ResizeObserver overrides dynamically) ── */
 :root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  --font-inter: var(--font-sans);
+  --font-outfit: var(--font-sans);
+  --font-manrope: var(--font-sans);
+  --font-playfair: var(--font-sans);
   --navbar-height: 120px;
   --ticker-height: 0px;
   --mobile-nav-height: 60px;
@@ -90,7 +95,7 @@ body {
 
 @media (max-width: 640px) {
   :root {
-    --navbar-height: 66px;
+    --navbar-height: 100px;
   }
 }
 
@@ -334,11 +339,11 @@ nextjs-portal,
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
 
-  --font-sans: var(--font-outfit), "Outfit", "Inter", system-ui, -apple-system, sans-serif;
-  --font-inter: var(--font-inter), "Inter", sans-serif;
-  --font-outfit: var(--font-outfit), "Outfit", sans-serif;
-  --font-manrope: var(--font-manrope), "Manrope", sans-serif;
-  --font-playfair: "Playfair Display", serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+  --font-inter: var(--font-sans);
+  --font-outfit: var(--font-sans);
+  --font-manrope: var(--font-sans);
+  --font-playfair: var(--font-sans);
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
@@ -474,7 +479,7 @@ html {
 body {
   background: var(--color-background);
   color: var(--color-foreground);
-  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   overflow-x: hidden;
 }
 

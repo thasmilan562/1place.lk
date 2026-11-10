@@ -78,7 +78,7 @@ import HeroModal from "@/components/admin/HeroModal";
 import OrdersTab from "@/components/admin/tabs/OrdersTab";
 import ProductsTab from "@/components/admin/tabs/CatalogProductsTab";
 import HeroTab from "@/components/admin/tabs/HeroTab";
-import HomeOffersEditor from "@/components/admin/HomeOffersEditor";
+import TodayDealTab from "@/components/admin/tabs/TodayDealTab";
 
 
 import CouponsTab from "@/components/admin/tabs/CouponsTab";
@@ -97,6 +97,7 @@ type Tab =
   | "categories"
   | "users"
   | "hero"
+  | "today-deal"
   | "coupons"
   | "inventory"
   | "payments"
@@ -1601,7 +1602,7 @@ function DashboardContent() {
           TAB 5B: HOMEPAGE HERO SLIDER TAB
       ════════════════════════════════════════════════════════════════════ */}
       {activeTab === "hero" && (
-        <div><HomeOffersEditor />
+        <div>
           <HeroTab
             slides={heroSlides}
             onAdd={() => {
@@ -1616,6 +1617,10 @@ function DashboardContent() {
             onToggleStatus={handleToggleHeroSlideStatus}
           />
         </div>
+      )}
+
+      {activeTab === "today-deal" && (
+        <TodayDealTab initialSettings={todayDealSettings} onRefresh={refreshData} />
       )}
 
       {/* ════════════════════════════════════════════════════════════════════

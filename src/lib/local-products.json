@@ -1,14 +1,1 @@
-[
-  {
-    "name": "Admin Storage Test - Sample Wireless Earbuds",
-    "slug": "admin-storage-test-wireless-earbuds-20261109",
-    "price": 12500,
-    "status": "draft",
-    "stock_status": "in_stock",
-    "stock_count": 3,
-    "description": "Draft sample used to verify admin product storage.",
-    "id": "prod-1794239047599-gv9t3",
-    "created_at": "2026-11-09T15:44:07.599Z",
-    "updatedAt": "2026-11-09T15:44:09.295Z"
-  }
-]
+[]

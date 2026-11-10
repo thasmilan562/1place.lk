@@ -1,11 +1,12 @@
 import HeroSection from "@/components/home/premium-hero";
 import CircularCategories from "@/components/home/circular-categories";
-import HomeOfferBanners from "@/components/home/HomeOfferBanners";
 import NewArrivalsSection from "@/components/home/new-arrivals-section";
 import GallerySection from "@/components/home/gallery-section";
 import CampaignPlacement from "@/components/ui/CampaignPlacement";
 import HomeScrollReset from "@/components/home/HomeScrollReset";
 import ShopAllProductsSection from "@/components/home/shop-all-products-section";
+import OnePlaceFinds from "@/components/home/oneplace-finds";
+import StorePromises from "@/components/home/store-promises";
 
 import VisualProductShowcase from "@/components/home/visual-product-showcase";
 import {
@@ -24,7 +25,6 @@ import {
   getTodayDealSettings,
 } from "@/lib/firestore-client";
 import { siteSettings } from "@/lib/data";
-import { getLocalHomeOffers } from "@/lib/home-offers-store";
 import { GalleryImage } from "@/lib/types";
 import { Metadata } from "next";
 
@@ -95,7 +95,12 @@ export default async function HomePage() {
 
       {/* 2. Circular Category Navigation Strip */}
       <CircularCategories categories={categories} products={products} />
-      <HomeOfferBanners products={products} fallbackEndsAt={todayDealSettings?.endsAt || ""} initialSettings={getLocalHomeOffers()} />
+
+      {/* 2.5. Curated product edit adds a visual discovery moment to the storefront */}
+      <OnePlaceFinds products={products} />
+
+      {/* 2.75. A quiet service-details interlude before the full catalogue */}
+      <StorePromises />
 
       {/* Visual Showcase: Below Categories */}
       <VisualProductShowcase settings={showcaseSettings} placement="below_category" />

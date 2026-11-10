@@ -738,7 +738,7 @@ export default function ProductDetailClient({
   return (
     <div className="premium-product-detail bg-white min-h-screen text-black pb-32 sm:pb-36 w-full max-w-full overflow-x-hidden">
       {/* ── 1. Top Breadcrumbs with Functional Back Button ── */}
-      <div className="border-b border-[#EAEAEA] bg-white">
+      <div className="hidden border-b border-[#EAEAEA] bg-white sm:block">
         <div className="max-w-7xl mx-auto px-4 lg:px-6 py-2.5 sm:py-3.5">
           <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 font-medium overflow-x-auto no-scrollbar">
             <button
@@ -782,32 +782,6 @@ export default function ProductDetailClient({
         
         {/* ── Mobile Product Title Header (Shown only on screens < 1024px above Gallery) ── */}
         <div className="lg:hidden mb-4">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[10px] font-bold transition-all shadow-2xs shrink-0 active:scale-95 cursor-pointer"
-                title="Go back"
-              >
-                <ArrowLeft className="w-3 h-3" />
-                <span>Back</span>
-              </button>
-              <span className="inline-block px-2.5 py-0.5 rounded-full bg-neutral-100 text-[10px] font-bold text-neutral-700 uppercase tracking-widest">
-                {product.category_name || "Smartphones"}
-              </span>
-              {detectedBrand && detectedBrand !== "Other" && (
-                <Link
-                  href={`/products?brand=${encodeURIComponent(detectedBrand)}`}
-                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-black text-white text-[10px] font-bold transition-all shadow-xs shrink-0 active:scale-95"
-                >
-                  <span>See all {detectedBrand} products</span>
-                  <ArrowRight className="w-2.5 h-2.5" />
-                </Link>
-              )}
-            </div>
-          </div>
-
           {/* Mobile Product Title (Styled heading, avoids duplicate H1) */}
           <p className="text-xl sm:text-2xl font-extrabold text-black tracking-tight mb-2 leading-tight">
             {product.name}
@@ -1229,7 +1203,7 @@ export default function ProductDetailClient({
               </div>
 
               {/* ── Primary Action Buttons (Add to Bag, Buy Now, Wishlist) ── */}
-              <div className="flex flex-col sm:flex-row items-stretch gap-2.5 sm:gap-3 mb-8 w-full min-w-0 max-w-full">
+              <div className="hidden lg:flex flex-col sm:flex-row items-stretch gap-2.5 sm:gap-3 mb-8 w-full min-w-0 max-w-full">
                 {/* 1. Add to Bag */}
                 <button
                   type="button"

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, LayoutGrid, Heart, User, ShoppingBag } from "lucide-react";
+import { Home, Heart, User, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWishlist } from "@/lib/wishlist-context";
 import { useAuth } from "@/lib/auth-context";
@@ -25,7 +25,6 @@ export default function MobileNav() {
 
   const isHome = pathname === "/";
   const isShopAll = pathname === "/products" || pathname.startsWith("/products?");
-  const isCategories = pathname.startsWith("/categories") || pathname.startsWith("/category/");
   const isWishlist = pathname.startsWith("/wishlist");
   const isAccount =
     pathname.startsWith("/account") ||
@@ -39,7 +38,7 @@ export default function MobileNav() {
       aria-label="Mobile Navigation"
       className="fixed bottom-0 left-0 right-0 z-[70] lg:hidden bg-white/95 backdrop-blur-md border-t border-[#E8E8E8] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] safe-bottom select-none font-sans"
     >
-      <div className="grid grid-cols-5 items-center h-15 px-1 max-w-lg mx-auto">
+      <div className="grid grid-cols-4 items-center h-15 px-1 max-w-lg mx-auto">
         {/* 1. Home */}
         <Link
           href="/"
@@ -74,25 +73,7 @@ export default function MobileNav() {
           <span>Shop All</span>
         </Link>
 
-        {/* 3. Categories */}
-        <button
-          type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent("open-categories-menu"))}
-          className={cn(
-            "flex flex-col items-center justify-center gap-1 text-[11px] transition-all relative py-1.5 min-h-[48px]",
-            isCategories ? "text-[#68122F] font-bold" : "text-[#666666] hover:text-[#111111] font-medium"
-          )}
-        >
-          <LayoutGrid
-            className={cn(
-              "w-5 h-5 transition-transform",
-              isCategories ? "text-[#68122F] stroke-[2.4]" : "text-[#666666] stroke-[1.8]"
-            )}
-          />
-          <span>Categories</span>
-        </button>
-
-        {/* 4. Wishlist */}
+        {/* 3. Wishlist */}
         <Link
           href="/wishlist"
           className={cn(
@@ -116,7 +97,7 @@ export default function MobileNav() {
           <span>Wishlist</span>
         </Link>
 
-        {/* 5. Account */}
+        {/* 4. Account */}
         {user ? (
           <Link
             href="/orders"

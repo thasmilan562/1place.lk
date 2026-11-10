@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Outfit, Manrope } from "next/font/google";
 import "./globals.css";
 import "./premium-storefront.css";
 import "./account.css";
@@ -21,26 +20,6 @@ import DisableNumberScroll from "@/components/providers/DisableNumberScroll";
 import BrowseHistoryTracker from "@/components/navigation/BrowseHistoryTracker";
 import Script from "next/script";
 import { BUSINESS_INFO } from "@/lib/business-info";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const outfit = Outfit({
-  subsets: ["latin"],
-  variable: "--font-outfit",
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
-  display: "swap",
-});
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-manrope",
-  weight: ["400", "500", "600", "700", "800"],
-  display: "swap",
-});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -191,7 +170,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`h-full antialiased ${inter.variable} ${outfit.variable} ${manrope.variable}`}
+      className="h-full antialiased"
     >
       <head>
         <script

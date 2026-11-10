@@ -119,13 +119,13 @@ export default function SmoothScrollProvider({ children }: { children: React.Rea
     }
 
     const instance = new Lenis({
-      duration: 1.15,
+      duration: 1.3,
       smoothWheel: true,
       wheelMultiplier: 0.8,
       touchMultiplier: 1,
       infinite: false,
       syncTouch: false,
-      easing: (t) => 1 - Math.pow(1 - t, 3.5),
+      easing: (t) => 1 - Math.pow(1 - t, 4),
       prevent: (node) => {
         return (
           node.hasAttribute("data-lenis-prevent") ||
@@ -191,8 +191,8 @@ export default function SmoothScrollProvider({ children }: { children: React.Rea
           if (lenisRef.current) {
             lenisRef.current.scrollTo(targetElement as HTMLElement, {
               offset: targetOffset,
-              duration: 1.15,
-              easing: (t) => 1 - Math.pow(1 - t, 3.5),
+              duration: 1.3,
+              easing: (t) => 1 - Math.pow(1 - t, 4),
             });
           } else {
             const elementRect = targetElement.getBoundingClientRect();

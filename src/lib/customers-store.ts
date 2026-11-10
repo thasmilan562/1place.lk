@@ -54,3 +54,4 @@ export function deleteLocalCustomer(id: string): boolean {
     return false;
   }
 }
+

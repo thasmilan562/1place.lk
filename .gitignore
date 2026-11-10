@@ -38,4 +38,5 @@ yarn-error.log*
 .vercel_team_backup/
 .env*
 scratch/
+work/
 *.tsbuildinfo

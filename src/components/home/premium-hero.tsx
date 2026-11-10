@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
+import { ArrowRight, ChevronRight } from "lucide-react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DEFAULT_HERO_SLIDES } from "@/lib/data";
@@ -34,8 +34,7 @@ export default function PremiumHero({ initialSlides }: { initialSlides?: HeroSli
   });
   const [isLoading, setIsLoading] = useState<boolean>(() => !(initialSlides && initialSlides.length > 0));
   const [index, setIndex] = useState(0);
-  // Rotation is opt-in so customers can read the campaign at their own pace.
-  const [playing, setPlaying] = useState(false);
+  const [playing] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [imageErrors, setImageErrors] = useState({ key: "", desktop: false, mobile: false });
   const touchX = useRef<number | null>(null);
@@ -123,7 +122,7 @@ export default function PremiumHero({ initialSlides }: { initialSlides?: HeroSli
     );
   }
   if (!slide) return null;
-  const move = (amount: number) => { setPlaying(false); setIndex((safeIndex + amount + slides.length) % slides.length); };
+  const move = (amount: number) => setIndex((safeIndex + amount + slides.length) % slides.length);
   const fullImage = true;
   const line1 = formatCase(slide.heading_line_1 || slide.heading || "Discover your next favourite.", slide.heading_line_1_casing);
   const line2 = formatCase(slide.heading_line_2 || "", slide.heading_line_2_casing);
@@ -182,15 +181,6 @@ export default function PremiumHero({ initialSlides }: { initialSlides?: HeroSli
           {mobileImage && !mobileImageError ? <Image key={`${slide.id}-mobile-${mobileImage}`} src={mobileImage} alt={slide.alt || line1} fill priority sizes="100vw" unoptimized onError={() => setImageErrors((current) => ({ key: imageKey, desktop: current.key === imageKey && current.desktop, mobile: true }))} className="premium-hero__mobile-image" style={{ objectFit: "cover", objectPosition: slide.mobile_image_position || "center" }} /> : <div className="premium-hero__image-fallback premium-hero__mobile-fallback">ONEPLACE<span>Find something you love.</span></div>}
           {fullImage && (slide.overlay_opacity ?? 0) > 0 && <div className="premium-hero__scrim" style={{ backgroundColor: slide.overlay_color || "#000", opacity: (slide.overlay_opacity ?? 0) / 100 }} />}
         </div>
-      </div>
-      <div className="premium-hero__toolbar">
-        <p>Thoughtfully picked. Ready to discover.</p>
-        {slides.length > 1 && <div className="premium-hero__controls">
-          <div className="premium-hero__dots" aria-label="Choose a collection">{slides.map((item, position) => <button key={item.id} type="button" aria-label={`Go to slide ${position + 1}`} aria-pressed={position === safeIndex} onClick={() => { setPlaying(false); setIndex(position); }}><span /></button>)}</div>
-          <button type="button" aria-label="Previous Slide" onClick={() => move(-1)}><ChevronLeft size={18} /></button>
-          <button type="button" aria-label="Next Slide" onClick={() => move(1)}><ChevronRight size={18} /></button>
-          {!reducedMotion && <button type="button" aria-label={playing ? "Pause slideshow" : "Play slideshow"} onClick={() => setPlaying(!playing)}>{playing ? <Pause size={15} /> : <Play size={15} />}</button>}
-        </div>}
       </div>
     </section>
   );

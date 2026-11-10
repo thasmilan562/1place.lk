@@ -3,9 +3,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { ArrowRight, Clock } from "lucide-react";
+import { doc, onSnapshot } from "firebase/firestore";
 import { TodayDealSettings } from "@/lib/types";
 import { DEFAULT_TODAY_DEAL_SETTINGS } from "@/lib/data";
 import { getTodayDealSettings } from "@/lib/firestore-client";
+import { db } from "@/lib/firebase";
 import ScrollReveal from "@/components/ui/ScrollReveal";
 import { normalizeImageUrl } from "@/lib/utils";
 
@@ -64,6 +66,41 @@ export default function TodayDealSection({
       setLiveSettings((prev) => ({ ...prev, ...settings }));
     }
   }, [settings]);
+
+  // Subscribe to the published settings so edits from Admin appear immediately
+  // on an already-open storefront. The legacy document remains supported for
+  // stores that have not migrated to settings/today_deal yet.
+  useEffect(() => {
+    if (isLivePreview) return;
+    let primaryExists = false;
+    const applySettings = (data?: Partial<TodayDealSettings>) => {
+      if (!data) return;
+      setLiveSettings((previous) => ({ ...previous, ...data } as TodayDealSettings));
+    };
+    const primaryUnsubscribe = onSnapshot(
+      doc(db, "settings", "today_deal"),
+      (snapshot) => {
+        primaryExists = snapshot.exists();
+        if (primaryExists) {
+          applySettings(snapshot.data());
+        } else {
+          getTodayDealSettings().then((fresh) => { if (fresh) applySettings(fresh); }).catch(() => {});
+        }
+      },
+      (error) => console.warn("Today's Deal live update listener error:", error)
+    );
+    const legacyUnsubscribe = onSnapshot(
+      doc(db, "siteSettings", "todayDeal"),
+      (snapshot) => {
+        if (!primaryExists && snapshot.exists()) applySettings(snapshot.data());
+      },
+      (error) => console.warn("Legacy Today's Deal listener error:", error)
+    );
+    return () => {
+      primaryUnsubscribe();
+      legacyUnsubscribe();
+    };
+  }, [isLivePreview]);
 
   // Only fetch from Firestore client-side if settings prop was not already provided by server
   useEffect(() => {
@@ -253,7 +290,7 @@ export default function TodayDealSection({
     <section
       id="todays-deal-section"
       aria-label="Today's Deal Promotional Showcase"
-      className={`w-full py-8 sm:py-12 lg:py-14 select-none relative overflow-hidden ${isLivePreview ? "" : "hidden md:block"} ${className}`}
+      className={`today-deal-section w-full py-8 sm:py-12 lg:py-14 select-none relative overflow-hidden ${className}`}
     >
       {/* ── 100% Sharp 90-Degree Square Background Banner Behind Both Cards ── */}
       {hasBgBanner && (
@@ -277,7 +314,7 @@ export default function TodayDealSection({
       )}
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-stretch">
+        <div className="today-deal-section__grid grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-stretch">
 
           {/* ── Left Card: 100% Sharp 90-Degree Square Corners (0px Radius) ── */}
           <div
@@ -285,7 +322,7 @@ export default function TodayDealSection({
               backgroundColor: cardBgColor,
               borderRadius: 0,
             }}
-            className={`border border-neutral-200/90 shadow-sm p-6 sm:p-10 lg:p-12 flex flex-col justify-between transition-all duration-300 rounded-none w-full min-h-[480px] sm:min-h-[520px] md:min-h-[560px] lg:min-h-[580px] h-full ${isBoxOnRight ? "md:order-2" : "md:order-1"
+            className={`today-deal-section__copy border border-neutral-200/90 shadow-sm p-6 sm:p-10 lg:p-12 flex flex-col justify-between transition-all duration-300 rounded-none w-full min-h-[480px] sm:min-h-[520px] md:min-h-[560px] lg:min-h-[580px] h-full ${isBoxOnRight ? "md:order-2" : "md:order-1"
               }`}
           >
             <div className={`flex flex-col ${contentAlignClass}`}>
@@ -373,7 +410,7 @@ export default function TodayDealSection({
             </div>
 
             {/* 5. Bottom Section: Divider & Offer Status with LIVE TICKING CLOCK */}
-            <div className={`pt-6 sm:pt-8 flex flex-col ${contentAlignClass} w-full`}>
+              <div className={`today-deal-section__status pt-6 sm:pt-8 flex flex-col ${contentAlignClass} w-full`}>
               <div className="w-full h-[1px] bg-neutral-200/80 mb-4 sm:mb-5" />
 
               <div className={`flex flex-col ${contentAlignClass} w-full`}>
@@ -424,7 +461,7 @@ export default function TodayDealSection({
               backgroundColor: deal.bannerBgColor || cardBgColor,
               borderRadius: 0,
             }}
-            className={`border border-neutral-200/90 shadow-sm ${cardPaddingClass} flex items-center justify-center relative overflow-hidden group transition-all duration-300 w-full rounded-none min-h-[480px] sm:min-h-[520px] md:min-h-[560px] lg:min-h-[580px] h-full ${isBoxOnRight ? "md:order-1" : "md:order-2"
+            className={`today-deal-section__image border border-neutral-200/90 shadow-sm ${cardPaddingClass} flex items-center justify-center relative overflow-hidden group transition-all duration-300 w-full rounded-none min-h-[480px] sm:min-h-[520px] md:min-h-[560px] lg:min-h-[580px] h-full ${isBoxOnRight ? "md:order-1" : "md:order-2"
               }`}
           >
             <Link

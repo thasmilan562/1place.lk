@@ -28,14 +28,16 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatPrice, normalizeImageUrl } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { useCart } from "@/lib/cart-context";
 import { useWishlist } from "@/lib/wishlist-context";
 import AuthModal from "@/components/auth/AuthModal";
 import CartDrawer from "@/components/cart/PremiumCartDrawer";
 import { categories as fallbackCategories } from "@/lib/data";
-import { getCategories } from "@/lib/firestore-client";
-import { Category } from "@/lib/types";
+import { getCategories, getProducts } from "@/lib/firestore-client";
+import { Category, Product } from "@/lib/types";
+import { executeIntelligentSearch } from "@/lib/search/search-engine";
 import { KNOWN_BRAND_NAMES } from "@/lib/migration-audit";
 import UserAvatar from "@/components/ui/UserAvatar";
 import BrandLogo from "@/components/ui/BrandLogo";
@@ -57,16 +59,78 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const [searchInput, setSearchInput] = useState("");
+  const [searchCatalog, setSearchCatalog] = useState<Product[]>([]);
+  const [searchCatalogLoaded, setSearchCatalogLoaded] = useState(false);
+  const [searchSuggestionsOpen, setSearchSuggestionsOpen] = useState(false);
+  const [debouncedSearchInput, setDebouncedSearchInput] = useState("");
   const { user, profile, gender, signOut } = useAuth();
   const { itemCount, total } = useCart();
   const { wishlist } = useWishlist();
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchInput(searchInput.trim()), 140);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  const searchMatches = useMemo(() => {
+    if (debouncedSearchInput.length < 2 || searchCatalog.length === 0) return [];
+    return executeIntelligentSearch(debouncedSearchInput, searchCatalog, [], []).products.slice(0, 5);
+  }, [debouncedSearchInput, searchCatalog]);
+
+  const loadSearchCatalog = () => {
+    setSearchSuggestionsOpen(true);
+    if (searchCatalogLoaded) return;
+    setSearchCatalogLoaded(true);
+    getProducts()
+      .then((items) => setSearchCatalog(items.filter((product) => product.status !== "deleted" && product.status !== "inactive" && product.status !== "draft")))
+      .catch((error) => {
+        console.error("Could not load product search catalog:", error);
+        setSearchCatalogLoaded(false);
+      });
+  };
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchInput.trim()) {
+      setSearchSuggestionsOpen(false);
       router.push(`/products?search=${encodeURIComponent(searchInput.trim())}`);
     }
   };
+
+  const renderSearchSuggestions = () => searchSuggestionsOpen && searchInput.trim().length >= 2 ? (
+    <div className="absolute left-0 right-0 top-full z-[75] mt-2 overflow-hidden rounded-2xl border border-neutral-200 bg-white text-left shadow-[0_18px_48px_rgba(0,0,0,.16)]" role="listbox" aria-label="Matching products">
+      {searchMatches.length > 0 ? searchMatches.map((product) => (
+        <button
+          key={product.id || product.slug}
+          type="button"
+          role="option"
+          aria-selected="false"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            setSearchSuggestionsOpen(false);
+            router.push(`/products/${product.slug}`);
+          }}
+          className="flex w-full items-center gap-3 border-b border-neutral-100 px-3 py-2.5 text-left last:border-0 hover:bg-neutral-50"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#f5f5f7] p-1">
+            {(product.primary_image || product.cover_image || product.image_url || product.image || product.images?.[0]) && <img src={normalizeImageUrl(product.primary_image || product.cover_image || product.image_url || product.image || product.images?.[0] || "")} alt="" className="h-full w-full object-contain" />}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-neutral-900">{product.name}</span>
+            <span className="mt-0.5 block text-xs text-neutral-500">{product.brand_name || product.brandName || product.category_name || "OnePlace product"}</span>
+          </span>
+          <span className="shrink-0 text-sm font-semibold text-neutral-900">{formatPrice(product.sale_price && product.sale_price > 0 && product.sale_price < product.price ? product.sale_price : product.price)}</span>
+        </button>
+      )) : searchCatalogLoaded ? (
+        <p className="px-4 py-4 text-sm text-neutral-500">No matching products. Press Enter to search all products.</p>
+      ) : (
+        <p className="px-4 py-4 text-sm text-neutral-500">Finding matching products…</p>
+      )}
+      <button type="submit" className="flex w-full items-center justify-between bg-neutral-50 px-4 py-3 text-xs font-semibold text-neutral-600 hover:bg-neutral-100">
+        <span>See all results for “{searchInput.trim()}”</span><ArrowRight className="h-4 w-4" />
+      </button>
+    </div>
+  ) : null;
 
   // Dynamic navbar height observer to guarantee zero layout shift
   const baseNavbarHeightRef = useRef<number>(0);
@@ -250,7 +314,10 @@ export default function Header() {
                   type="text"
                   aria-label="Search products"
                   value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
+                    onChange={(e) => { setSearchInput(e.target.value); setSearchSuggestionsOpen(true); }}
+                    onFocus={loadSearchCatalog}
+                    onBlur={() => window.setTimeout(() => setSearchSuggestionsOpen(false), 120)}
+                    onKeyDown={(e) => { if (e.key === "Escape") setSearchSuggestionsOpen(false); }}
                   placeholder="Search for products, brands and categories..."
                   className={cn(
                     "flex-1 h-full px-4 text-[#111111] bg-transparent outline-none placeholder:text-neutral-400 font-normal transition-all duration-200",
@@ -268,6 +335,7 @@ export default function Header() {
                   <Search className={cn("transition-all duration-200", isScrolled ? "w-3.5 h-3.5 stroke-[2.5]" : "w-4 h-4 stroke-[2.5]")} />
                 </button>
               </div>
+              {renderSearchSuggestions()}
             </form>
 
             {/* Header Right Actions: Account/Sign In, Sign Up, Wishlist, Cart */}
@@ -419,11 +487,15 @@ export default function Header() {
                 type="text"
                 aria-label="Search products"
                 value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                onChange={(e) => { setSearchInput(e.target.value); setSearchSuggestionsOpen(true); }}
+                onFocus={loadSearchCatalog}
+                onBlur={() => window.setTimeout(() => setSearchSuggestionsOpen(false), 120)}
+                onKeyDown={(e) => { if (e.key === "Escape") setSearchSuggestionsOpen(false); }}
                 placeholder="Search for products, brands and categories..."
                 className="w-full h-10.5 pl-10 pr-4 text-xs text-[#111111] bg-transparent outline-none placeholder:text-neutral-400 font-normal"
               />
             </div>
+            {renderSearchSuggestions()}
           </form>
         </div>
 

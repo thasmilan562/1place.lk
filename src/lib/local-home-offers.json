@@ -1,14 +1,15 @@
 {
   "enabled": true,
-  "dealTitle": "Today's Deal",
-  "dealImage": "",
+  "dealTitle": "Samsung Galaxy S24 Ultra Deal",
+  "dealImage": "https://ik.imagekit.io/vpcphm6jz/White%20and%20turquoise%20luxury%20toy%20car.png?updatedAt=1794247692090",
   "dealLink": "/products",
-  "ctaTitle": "Your next favourite. Awaits.",
-  "ctaText": "Discover the collection",
+  "ctaTitle": "Unleash Ultimate Power.",
+  "ctaText": "Grab the Deal",
   "ctaImage": "",
-  "ctaLink": "/products",
-  "endsAt": "",
-  "dealBadge": "LIMITED TIME DEAL",
-  "dealDescription": "Limited-time savings on selected favourites.",
-  "dealBackgroundColor": "#118a22"
+  "ctaLink": "/products?category=smartphones",
+  "endsAt": "2026-11-20T23:59",
+  "dealBadge": "HOT FLASH DEAL",
+  "dealDescription": "Get the best price in Sri Lanka with official 1PLACE warranty.",
+  "dealBackgroundColor": "#0f766e",
+  "updatedAt": "2026-11-10T14:51:17.550Z"
 }

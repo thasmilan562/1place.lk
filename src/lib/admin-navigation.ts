@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, ShoppingBag, Boxes, Users, FolderOpen, Tag, Image, PanelBottom, Ticket, Gift, CreditCard, Settings } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, Boxes, Users, FolderOpen, Tag, Image, PanelBottom, Ticket, Gift, CreditCard, Settings, Flame } from "lucide-react";
 
 export const ADMIN_NAVIGATION = [
   { id: "overview", label: "Overview", group: "Store", icon: LayoutDashboard },
@@ -11,6 +11,7 @@ export const ADMIN_NAVIGATION = [
   { id: "hero", label: "Homepage", group: "Website", icon: Image },
   { id: "footer", label: "Footer", group: "Website", icon: PanelBottom },
   { id: "coupons", label: "Discount codes", group: "Promotions", icon: Ticket },
+  { id: "today-deal", label: "Today’s Deal", group: "Promotions", icon: Flame },
   { id: "spin-win", label: "Spin & win", group: "Promotions", icon: Gift },
   { id: "payments", label: "Payments", group: "Settings", icon: CreditCard },
   { id: "settings", label: "Store settings", group: "Settings", icon: Settings },

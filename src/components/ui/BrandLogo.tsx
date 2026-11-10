@@ -43,7 +43,7 @@ export default function BrandLogo({
   switch (variant) {
     case "header":
       // Crisp horizontal logo in navigation bar
-      imageClasses = cn(imageClasses, "h-7 sm:h-8 lg:h-9 max-w-[190px] sm:max-w-[210px] lg:max-w-[230px]");
+      imageClasses = cn(imageClasses, "h-7 sm:h-8 lg:h-9 max-w-[190px] sm:max-w-[210px] lg:max-w-[230px] opacity-70");
       break;
 
     case "footer":
@@ -63,7 +63,7 @@ export default function BrandLogo({
 
     case "mobile":
       // Fitted for narrow mobile drawers without overlapping controls
-      imageClasses = cn(imageClasses, "h-7 sm:h-8 max-w-[160px]");
+      imageClasses = cn(imageClasses, "h-7 sm:h-8 max-w-[160px] opacity-70");
       break;
 
     case "auth":

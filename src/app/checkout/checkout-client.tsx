@@ -522,7 +522,7 @@ export default function CheckoutClient() {
         });
         const data = await res.json();
         if (data.orderId) generatedOrderId = data.orderId;
-        if (!res.ok && !data.success) {
+        if (!res.ok || !data.success) {
           throw new Error(data.error || "Order creation failed");
         }
       } catch (saveErr) {
@@ -535,7 +535,8 @@ export default function CheckoutClient() {
           });
           if (docRef.id) generatedOrderId = docRef.id;
         } catch (dbErr) {
-          console.warn("Firestore client write error (proceeding with order ID):", dbErr);
+          console.error("Firestore client write error:", dbErr);
+          throw new Error("We couldn't save your order. Please check your connection and try checkout again.");
         }
       }
 
@@ -666,7 +667,7 @@ export default function CheckoutClient() {
       }
     } catch (err: any) {
       console.error("Checkout order submission error:", err);
-      alert("Could not process order. Please check your network connection and try again.");
+      alert(err?.message || "Could not process order. Please check your network connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -718,93 +719,70 @@ export default function CheckoutClient() {
       <CheckoutProgress currentStep={currentProgressStep} />
 
       {/* ── Mobile Collapsible Order Summary Accordion (< 1024px) ── */}
-      <div className="lg:hidden bg-white border-b border-neutral-200/90 shadow-2xs">
+      <div className="lg:hidden mx-4 mb-3 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_3px_14px_rgba(0,0,0,.04)]">
         <button
           type="button"
           onClick={() => setMobileSummaryOpen(!mobileSummaryOpen)}
-          className="w-full px-4 py-3.5 flex items-center justify-between text-xs font-bold text-neutral-900 cursor-pointer"
+          aria-expanded={mobileSummaryOpen}
+          aria-controls="mobile-order-summary-details"
+          className="flex min-h-[62px] w-full items-center justify-between gap-3 px-4 py-3 text-left text-neutral-900 transition-colors hover:bg-neutral-50"
         >
-          <div className="flex items-center gap-2">
-            <ShoppingBag className="w-4 h-4 text-neutral-800" />
-            <span>
-              {mobileSummaryOpen ? "Hide order summary" : "Show order summary"} ({itemsToUse.reduce((s, i) => s + i.quantity, 0)} items)
+          <span className="flex min-w-0 items-center gap-2.5">
+            <ShoppingBag className="h-4 w-4 shrink-0 text-neutral-600" />
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold tracking-[-0.015em]">Order summary</span>
+              <span className="mt-0.5 block text-[11px] text-neutral-500">
+                {itemsToUse.reduce((s, i) => s + i.quantity, 0)} {itemsToUse.reduce((s, i) => s + i.quantity, 0) === 1 ? "item" : "items"}
+              </span>
             </span>
-            {mobileSummaryOpen ? (
-              <ChevronUp className="w-3.5 h-3.5 text-neutral-500" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5 text-neutral-500" />
-            )}
-          </div>
-          <span className="font-black text-sm text-neutral-950">
+            {mobileSummaryOpen ? <ChevronUp className="h-4 w-4 shrink-0 text-neutral-500" /> : <ChevronDown className="h-4 w-4 shrink-0 text-neutral-500" />}
+          </span>
+          <span className="shrink-0 text-sm font-bold tabular-nums text-neutral-950">
             {formatPrice(finalTotal)}
           </span>
         </button>
 
         {mobileSummaryOpen && (
-          <div className="px-4 pb-5 pt-1 border-t border-neutral-100 space-y-4 bg-neutral-50/50">
+          <div id="mobile-order-summary-details" className="space-y-4 border-t border-neutral-100 bg-neutral-50/60 px-4 pb-4 pt-3">
             {/* Products List */}
-            <div className="space-y-3 pt-2 max-h-60 overflow-y-auto">
+            <div className="max-h-60 space-y-3 overflow-y-auto">
               {itemsToUse.map((item) => (
-                <div
-                  key={item.productId + (item.variantId || "")}
-                  className="flex items-center justify-between gap-3 text-xs"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-12 h-12 rounded-lg bg-white border border-neutral-200/80 p-1 flex items-center justify-center shrink-0">
-                      <img
-                        src={item.image || "/placeholder-phone.webp"}
-                        alt={item.name}
-                        className="w-full h-full object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/placeholder-phone.webp";
-                        }}
-                      />
+                <div key={item.productId + (item.variantId || "")} className="flex items-center justify-between gap-3 text-xs">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200/80 bg-white p-1.5">
+                      <img src={item.image || "/placeholder-phone.webp"} alt={item.name} className="h-full w-full object-contain" onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder-phone.webp"; }} />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-bold text-neutral-900 truncate">{item.name}</p>
-                      <p className="text-[11px] text-neutral-500">Qty: {item.quantity}</p>
+                      <p className="truncate font-medium text-neutral-900">{item.name}</p>
+                      <p className="mt-0.5 text-[11px] text-neutral-500">Qty {item.quantity}</p>
                     </div>
                   </div>
-                  <span className="font-black text-neutral-900 shrink-0">
-                    {formatPrice(item.price * item.quantity)}
-                  </span>
+                  <span className="shrink-0 font-semibold tabular-nums text-neutral-900">{formatPrice(item.price * item.quantity)}</span>
                 </div>
               ))}
             </div>
 
             {/* Price breakdown */}
-            <div className="pt-3 border-t border-neutral-200/80 space-y-1.5 text-xs text-neutral-600">
+            <div className="space-y-2 border-t border-neutral-200/80 pt-3 text-xs text-neutral-600">
               <div className="flex justify-between">
                 <span>Subtotal</span>
-                <span className="font-semibold text-neutral-900">{formatPrice(subtotal)}</span>
+                <span className="font-medium text-neutral-900">{formatPrice(subtotal)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Delivery</span>
-                <span className="font-semibold text-neutral-900">
-                  {deliveryFee === 0 ? "FREE" : formatPrice(deliveryFee)}
-                </span>
+                <span className="font-medium text-neutral-900">{deliveryFee === 0 ? "FREE" : formatPrice(deliveryFee)}</span>
               </div>
-              {paymentMethod === "cod" && (
-                <div className="flex justify-between">
-                  <span>COD Fee</span>
-                  <span className="font-semibold text-neutral-900">+{formatPrice(codFeeAmount)}</span>
-                </div>
+              {paymentMethod === "cod" && codFee > 0 && (
+                <div className="flex justify-between"><span>COD Fee</span><span className="font-medium text-neutral-900">+{formatPrice(codFee)}</span></div>
               )}
               {paymentMethod === "card" && cardFee > 0 && (
-                <div className="flex justify-between text-neutral-600">
-                  <span>PayHere Fee (2%)</span>
-                  <span className="font-semibold text-neutral-900">+{formatPrice(cardFee)}</span>
-                </div>
+                <div className="flex justify-between text-neutral-600"><span>PayHere Fee (2%)</span><span className="font-medium text-neutral-900">+{formatPrice(cardFee)}</span></div>
               )}
               {couponDiscount > 0 && (
-                <div className="flex justify-between text-emerald-700 font-semibold">
-                  <span>Coupon ({appliedCoupon})</span>
-                  <span>-{formatPrice(couponDiscount)}</span>
-                </div>
+                <div className="flex justify-between font-semibold text-emerald-700"><span>Coupon ({appliedCoupon})</span><span>-{formatPrice(couponDiscount)}</span></div>
               )}
-              <div className="pt-2 border-t border-neutral-200 flex justify-between font-black text-sm text-neutral-950">
-                <span>Total</span>
-                <span>{formatPrice(finalTotal)}</span>
+              <div className="flex justify-between border-t border-neutral-200 pt-2 text-sm font-bold text-neutral-950">
+                <span>Total</span><span>{formatPrice(finalTotal)}</span>
               </div>
             </div>
           </div>
@@ -982,7 +960,7 @@ export default function CheckoutClient() {
               </div>
 
               {/* ── Section 3: Delivery Method ── */}
-              <div className="bg-white p-6 sm:p-8 rounded-[24px] border border-neutral-200/90 shadow-2xs space-y-5">
+              <div className="bg-white p-4 sm:p-8 rounded-[24px] border border-neutral-200/90 shadow-2xs space-y-4 sm:space-y-5">
                 <div className="flex items-center gap-3 border-b border-neutral-100 pb-4">
                   <span className="w-7 h-7 rounded-full bg-black text-white flex items-center justify-center text-xs font-bold">
                     2
@@ -992,11 +970,7 @@ export default function CheckoutClient() {
                   </h2>
                 </div>
 
-                <DeliveryMethodCard
-                  selected={deliveryOption}
-                  onChange={setDeliveryOption}
-                  deliveryFee={standardDeliveryFee}
-                />
+                <DeliveryMethodCard deliveryFee={standardDeliveryFee} />
               </div>
 
               {/* ── Section 4: Delivery Address (Only when Courier Delivery is selected) ── */}
@@ -1418,11 +1392,11 @@ export default function CheckoutClient() {
                     </span>
                   </div>
 
-                  {paymentMethod === "cod" && (
+                  {paymentMethod === "cod" && codFee > 0 && (
                     <div className="flex justify-between text-neutral-600">
                       <span>COD Handling Fee</span>
                       <span className="font-semibold text-neutral-900">
-                        +{formatPrice(codFeeAmount)}
+                        +{formatPrice(codFee)}
                       </span>
                     </div>
                   )}

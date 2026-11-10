@@ -15,9 +15,7 @@ import {
   Lock,
   ArrowLeft,
   ShieldCheck,
-  Smartphone,
 } from "lucide-react";
-import type { ConfirmationResult } from "firebase/auth";
 import { useAuth } from "@/lib/auth-context";
 import { useCart } from "@/lib/cart-context";
 import { auth } from "@/lib/firebase";
@@ -32,7 +30,7 @@ import { motion, AnimatePresence } from "framer-motion";
 function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signIn, signUp, signInWithGoogle, signInWithApple, sendPhoneSignInCode, signInWithPhonePassword, signUpWithPhone, resetPhonePassword, user } = useAuth();
+  const { signIn, signUp, signInWithGoogle, signInWithApple, user } = useAuth();
   const { addToCart } = useCart();
 
   const redirectParam = searchParams.get("redirect");
@@ -41,9 +39,7 @@ function LoginFormContent() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
@@ -51,10 +47,6 @@ function LoginFormContent() {
   const [success, setSuccess] = useState("");
   const [googleAuthEnabled, setGoogleAuthEnabled] = useState<boolean>(true);
   const [appleAuthEnabled, setAppleAuthEnabled] = useState<boolean>(true);
-  const [otp, setOtp] = useState("");
-  const [phoneConfirmation, setPhoneConfirmation] = useState<ConfirmationResult | null>(null);
-  const [phoneRecovery, setPhoneRecovery] = useState(false);
-  const signInMethod: "email" | "phone" = email.trim().includes("@") ? "email" : "phone";
 
   // Load cached Auth Settings
   useEffect(() => {
@@ -85,13 +77,9 @@ function LoginFormContent() {
     setName("");
     setEmail("");
     setPassword("");
-    setConfirm("");
     setError("");
     setSuccess("");
     setShowPassword(false);
-    setOtp("");
-    setPhoneConfirmation(null);
-    setPhoneRecovery(false);
   };
 
   const handleTab = (t: "signin" | "signup") => {
@@ -122,100 +110,37 @@ function LoginFormContent() {
     setSuccess("");
 
     if (tab === "signup") {
-      if (!name.trim()) return setError("Please enter your full name.");
-      if (password !== confirm) return setError("Passwords do not match.");
       if (password.length < 6) return setError("Password must be at least 6 characters.");
     }
-    if (signInMethod === "phone" && !normalizeSriLankanPhone(email)) return setError("Enter a valid Sri Lankan mobile number, such as 077 123 4567.");
-    if (tab === "signup" && signInMethod === "phone" && !phoneConfirmation) return setError("Verify your mobile number before creating your account.");
-    if (phoneRecovery && (!phoneConfirmation || !/^\d{6}$/.test(otp.trim()))) return setError("Enter the 6-digit code sent to your mobile number.");
-
     setLoading(true);
     try {
       if (tab === "signin") {
-        if (signInMethod === "phone") {
-          const normalizedPhone = normalizeSriLankanPhone(email)!;
-          if (phoneRecovery) {
-            await resetPhonePassword(normalizedPhone, phoneConfirmation!, otp, password);
-          } else {
-            await signInWithPhonePassword(normalizedPhone, password);
-          }
-        } else {
-          await signIn(email, password);
-        }
+        await signIn(email.trim(), password);
         setSuccess("Signed in successfully!");
         setTimeout(() => handlePostAuthRedirect(), 400);
       } else {
-        if (signInMethod === "phone") {
-          await signUpWithPhone(name, normalizeSriLankanPhone(email)!, password, phoneConfirmation!, otp);
-        } else {
-          await signUp(name, email, password);
-        }
+        await signUp(name.trim() || "Valued Customer", email.trim(), password);
         setSuccess("Account created successfully!");
         setTimeout(() => handlePostAuthRedirect(), 400);
       }
     } catch (err: any) {
       const code = err?.code || "";
-      if (code === "auth/invalid-verification-code") {
-        setError("That verification code is incorrect. Check the SMS and try again.");
-      } else if (code === "auth/code-expired") {
-        setError("That code has expired. Request a new verification code.");
-        setPhoneConfirmation(null);
-      } else if (code === "auth/too-many-requests") {
-        setError("Too many attempts. Wait a little and try again.");
-      } else if (code === "auth/operation-not-allowed") {
-        setError("Mobile sign-in is not enabled in Firebase yet.");
+      if (code === "auth/operation-not-allowed") {
+        setError("Email and password sign-in is not enabled in Firebase yet.");
       } else if (
         code === "auth/user-not-found" ||
         code === "auth/wrong-password" ||
         code === "auth/invalid-credential"
       ) {
-        setError(signInMethod === "phone" ? "Invalid mobile number or password. Please try again." : "Invalid email or password. Please try again.");
+        setError("Invalid email or password. Please try again.");
       } else if (code === "auth/email-already-in-use" || code === "auth/provider-already-linked") {
-        setError(signInMethod === "phone" ? "This mobile number already has an account. Sign in or use Forgot Password." : "This email is already registered. Please sign in.");
+        setError("This email is already registered. Please sign in.");
       } else if (code === "auth/invalid-email") {
         setError("Please enter a valid email address.");
       } else if (code === "auth/weak-password") {
         setError("Password should be at least 6 characters.");
       } else {
         setError(err?.message || "Authentication failed. Please try again.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const normalizeSriLankanPhone = (value: string) => {
-    const digits = value.replace(/\D/g, "");
-    const localDigits = digits.startsWith("94") ? digits.slice(2) : digits;
-    const nationalDigits = localDigits.startsWith("0") ? localDigits.slice(1) : localDigits;
-    if (!/^\d{9}$/.test(nationalDigits)) return null;
-    return `+94${nationalDigits}`;
-  };
-
-  const handleSendPhoneCode = async () => {
-    setError("");
-    setSuccess("");
-    const normalizedPhone = normalizeSriLankanPhone(email);
-    if (!normalizedPhone) {
-      setError("Enter a valid Sri Lankan mobile number, such as 077 123 4567.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const confirmation = await sendPhoneSignInCode(normalizedPhone, "phone-sign-in-recaptcha");
-      setPhoneConfirmation(confirmation);
-      setEmail(normalizedPhone);
-      setSuccess(`Verification code sent to ${normalizedPhone}.`);
-    } catch (err: any) {
-      if (err?.code === "auth/invalid-phone-number") {
-        setError("Enter a valid mobile number.");
-      } else if (err?.code === "auth/too-many-requests") {
-        setError("Too many attempts. Wait a little and try again.");
-      } else if (err?.code === "auth/operation-not-allowed") {
-        setError("Mobile sign-in is not enabled in Firebase yet.");
-      } else {
-        setError(err?.message || "Could not send the verification code. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -269,30 +194,6 @@ function LoginFormContent() {
   };
 
   const handleForgotPassword = async () => {
-    if (signInMethod === "phone") {
-      const normalizedPhone = normalizeSriLankanPhone(email);
-      if (!normalizedPhone) {
-        setError("Enter your mobile number first to reset your password.");
-        return;
-      }
-      setError("");
-      setSuccess("");
-      setResetLoading(true);
-      try {
-        const confirmation = await sendPhoneSignInCode(normalizedPhone, "phone-sign-in-recaptcha");
-        setEmail(normalizedPhone);
-        setPhoneConfirmation(confirmation);
-        setPhoneRecovery(true);
-        setPassword("");
-        setOtp("");
-        setSuccess("Verification code sent. Enter the code and choose a new password.");
-      } catch (err: any) {
-        setError(err?.message || "Could not send a verification code. Please try again.");
-      } finally {
-        setResetLoading(false);
-      }
-      return;
-    }
     if (!email.trim()) {
       setError("Please enter your email address first, then click Forgot Password.");
       return;
@@ -317,7 +218,7 @@ function LoginFormContent() {
   };
 
   return (
-    <div className="account-page premium-login min-h-screen w-full bg-[#EAEAEA] sm:bg-[#ECECEC] flex flex-col justify-between items-center selection:bg-[#64152F] selection:text-white font-sans px-3 py-4 sm:px-6 sm:py-8">
+    <div className="account-page account-page--login premium-login min-h-screen w-full bg-[#EAEAEA] sm:bg-[#ECECEC] flex flex-col justify-between items-center selection:bg-[#64152F] selection:text-white font-sans px-3 py-4 sm:px-6 sm:py-8">
       {/* ── Top Bar with Back Link ── */}
       <div className="account-topbar w-full flex items-center justify-between py-2 px-2 shrink-0">
         <Link
@@ -344,12 +245,12 @@ function LoginFormContent() {
             {/* Heading and Subtitle */}
             <div className="account-heading">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 tracking-tight">
-                {tab === "signin" ? "Sign in to ONEPLACE." : "Your account. Your place."}
+                {tab === "signin" ? "Sign in to ONEPLACE." : "Create your account."}
               </h1>
               <p className="text-xs sm:text-sm text-neutral-500 font-medium mt-1">
                 {tab === "signin"
                   ? "Your favourites, orders and everyday discoveries. All together."
-                  : "Create an account for a simpler shopping experience."}
+                  : "Enter your details once to create your account."}
               </p>
             </div>
 
@@ -447,7 +348,7 @@ function LoginFormContent() {
               {tab === "signup" && (
                 <div className="space-y-1.5">
                   <label htmlFor="customer-name" className="block text-xs font-bold text-neutral-800">
-                    Full Name
+                    Name (optional)
                   </label>
                   <div className="relative">
                     <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
@@ -457,43 +358,33 @@ function LoginFormContent() {
                       autoComplete="name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="Enter your full name"
-                      required
+                      placeholder="How should we call you?"
                       className="w-full h-11 pl-10 pr-4 bg-white border border-neutral-200 focus:border-[#64152F] rounded-xl text-sm font-medium text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-[#64152F]/10 transition-all"
                     />
                   </div>
                 </div>
               )}
 
-              {/* Email or mobile number */}
+              {/* Email address */}
               <div className="space-y-1.5">
-                <label htmlFor="customer-identifier" className="block text-xs font-bold text-neutral-800">Email or Mobile Number</label>
+                <label htmlFor="customer-identifier" className="block text-xs font-bold text-neutral-800">Email Address</label>
                 <div className="relative">
-                  {signInMethod === "email" ? <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" /> : <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />}
-                  <input type="text" id="customer-identifier" autoComplete={signInMethod === "email" ? "username" : "tel"} inputMode={signInMethod === "email" ? "email" : "tel"} value={email} onChange={(e) => { setEmail(e.target.value); setPhoneConfirmation(null); setOtp(""); setPhoneRecovery(false); }} placeholder="name@example.com or 077 123 4567" required className="w-full h-11 pl-10 pr-4 bg-white border border-neutral-200 focus:border-[#64152F] rounded-xl text-sm font-medium text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-[#64152F]/10 transition-all" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                  <input type="email" id="customer-identifier" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" required className="w-full h-11 pl-10 pr-4 bg-white border border-neutral-200 focus:border-[#64152F] rounded-xl text-sm font-medium text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-[#64152F]/10 transition-all" />
                 </div>
               </div>
-              {signInMethod === "phone" && <div id="phone-sign-in-recaptcha" />}
-              {signInMethod === "phone" && (tab === "signup" || phoneRecovery) && <>
-                {phoneConfirmation && <div className="space-y-1.5">
-                  <label htmlFor="customer-phone-otp" className="block text-xs font-bold text-neutral-800">SMS Verification Code</label>
-                  <input type="text" id="customer-phone-otp" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="Enter 6-digit code" required className="w-full h-11 px-4 bg-white border border-neutral-200 focus:border-[#64152F] rounded-xl text-sm font-medium tracking-[0.25em] text-neutral-900 placeholder:text-neutral-400 placeholder:tracking-normal outline-none focus:ring-2 focus:ring-[#64152F]/10 transition-all" />
-                  {tab === "signup" && <button type="button" onClick={() => { setPhoneConfirmation(null); setOtp(""); setSuccess(""); }} className="text-xs font-semibold text-[#64152F] hover:underline">Change number / resend code</button>}
-                </div>}
-                {!phoneConfirmation && <button type="button" onClick={phoneRecovery ? handleForgotPassword : handleSendPhoneCode} disabled={loading || resetLoading} className="w-full h-11 rounded-xl border border-neutral-200 bg-white text-neutral-800 text-sm font-bold hover:border-neutral-400 disabled:opacity-60">{loading || resetLoading ? "Sending code…" : phoneRecovery ? "Resend verification code" : "Verify mobile number"}</button>}
-              </>}
 
               {/* Password */}
               <div className="space-y-1.5">
                 <label htmlFor="customer-password" className="block text-xs font-bold text-neutral-800">
-                  {phoneRecovery ? "New Password" : "Password"}
+                  Password
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                   <input
                     type={showPassword ? "text" : "password"}
                     id="customer-password"
-                    autoComplete={tab === "signup" || phoneRecovery ? "new-password" : "current-password"}
+                    autoComplete={tab === "signup" ? "new-password" : "current-password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
@@ -511,33 +402,8 @@ function LoginFormContent() {
                 </div>
               </div>
 
-              {/* Confirm Password (Sign Up mode) */}
-              {tab === "signup" && (
-                <div className="space-y-1.5">
-                  <label htmlFor="customer-confirm" className="block text-xs font-bold text-neutral-800">
-                    Confirm Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                    <input
-                      type={showConfirmPassword ? "text" : "password"}
-                      id="customer-confirm"
-                      autoComplete="new-password"
-                      value={confirm}
-                      onChange={(e) => setConfirm(e.target.value)}
-                      placeholder="Confirm your password"
-                      required
-                      className="w-full h-11 pl-10 pr-11 bg-white border border-neutral-200 focus:border-[#64152F] rounded-xl text-sm font-medium text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-[#64152F]/10 transition-all"
-                    />
-                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 flex items-center justify-center">
-                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* Options Row: Remember Me & Forgot Password */}
-              {(tab === "signin" || (tab === "signup" && signInMethod === "email")) && <div className="flex items-center justify-between pt-1 mb-2">
+              <div className="flex items-center justify-between pt-1 mb-2">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -548,7 +414,7 @@ function LoginFormContent() {
                   <span className="text-xs font-semibold text-neutral-700">Remember me</span>
                 </label>
 
-                {tab === "signin" && !phoneRecovery && (
+                {tab === "signin" && (
                   <button
                     type="button"
                     onClick={handleForgotPassword}
@@ -558,13 +424,13 @@ function LoginFormContent() {
                     {resetLoading ? "Sending..." : "Forgot Password?"}
                   </button>
                 )}
-              </div>}
+              </div>
 
               {/* Primary CTA Button */}
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={loading || (tab === "signup" && signInMethod === "phone" && !phoneConfirmation) || (phoneRecovery && !phoneConfirmation)}
+                  disabled={loading}
                   className="w-full h-12 bg-[#64152F] hover:bg-[#4E0F23] text-white rounded-xl font-bold text-sm shadow-md shadow-[#64152F]/20 transition-all active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 group cursor-pointer"
                 >
                   {loading ? (
@@ -574,7 +440,7 @@ function LoginFormContent() {
                     </>
                   ) : (
                     <>
-                      <span>{phoneRecovery ? "Reset Password" : tab === "signin" ? "Sign In" : "Create Account"}</span>
+                      <span>{tab === "signin" ? "Sign In" : "Create Account"}</span>
                       <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                     </>
                   )}

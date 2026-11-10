@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowRight, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
@@ -14,7 +13,6 @@ import { useDialogFocus } from "@/lib/use-dialog-focus";
 export default function PremiumCartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { cart, itemCount, total, updateQuantity, removeFromCart, canCheckout } = useCart();
   const { user } = useAuth();
-  const router = useRouter();
   const dialogRef = useDialogFocus(isOpen, onClose);
 
   useEffect(() => {
@@ -27,12 +25,10 @@ export default function PremiumCartDrawer({ isOpen, onClose }: { isOpen: boolean
   }, [isOpen]);
 
   if (!isOpen) return null;
-  const checkout = () => {
-    if (!canCheckout) return;
+  const prepareCheckout = () => {
     // Replace stale selections from an earlier Buy Now before entering checkout.
     setSelectedCheckoutItems(cart);
     onClose();
-    router.push(user ? "/checkout" : "/login?redirect=%2Fcheckout");
   };
 
   return (
@@ -68,7 +64,13 @@ export default function PremiumCartDrawer({ isOpen, onClose }: { isOpen: boolean
           <div className="premium-cart__summary"><div><span>Subtotal</span><strong>{formatPrice(total)}</strong></div>
             <p>Delivery and available payment options are confirmed at checkout.</p>
             {!canCheckout && <p role="status">Add a regular priced product to check out with your gift.</p>}
-            <button type="button" className="premium-button" disabled={!canCheckout} onClick={checkout}>Continue to checkout <ArrowRight size={17} /></button>
+            {canCheckout ? (
+              <Link href={user ? "/checkout" : "/login?redirect=%2Fcheckout"} className="premium-button" onClick={prepareCheckout}>
+                Continue to checkout <ArrowRight size={17} />
+              </Link>
+            ) : (
+              <button type="button" className="premium-button" disabled>Continue to checkout <ArrowRight size={17} /></button>
+            )}
             <Link href="/cart" onClick={onClose} className="premium-cart__view">View and edit bag</Link>
           </div>
         </>}

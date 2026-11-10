@@ -13,6 +13,13 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Pro
   ]).catch(() => fallback);
 }
 
+async function withRequiredTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}
+
 function sanitize(obj: any): any {
   if (obj === undefined) return null;
   if (obj === null || typeof obj !== "object") return obj;
@@ -369,14 +376,31 @@ export async function POST(req: Request) {
     // 1. Save full order to local persistent JSON store first so order is NEVER dropped or lost
     saveLocalOrder(orderPayload);
 
-    // 2. Persist to Firestore with timeout guard
+    // 2. Persist to Firestore. Do not report success if the durable write
+    // fails: checkout will then try its browser-side Firestore fallback.
     try {
       const cleanPayload = sanitize(orderPayload);
       try {
         const adminDb = getAdminDb();
-        await withTimeout(adminDb.collection("orders").doc(orderPayload.id).set(cleanPayload, { merge: true }), 5000, null);
-      } catch {
-        await withTimeout(setDoc(doc(db, "orders", orderPayload.id), cleanPayload, { merge: true }), 2500, null);
+        await withRequiredTimeout(
+          adminDb.collection("orders").doc(orderPayload.id).set(cleanPayload, { merge: true }),
+          5000,
+          "Order database write timed out."
+        );
+      } catch (adminWriteError) {
+        try {
+          await withRequiredTimeout(
+            setDoc(doc(db, "orders", orderPayload.id), cleanPayload, { merge: true }),
+            2500,
+            "Order database fallback timed out."
+          );
+        } catch (clientWriteError) {
+          console.error("[Orders API] Durable order save failed:", adminWriteError, clientWriteError);
+          return NextResponse.json(
+            { success: false, error: "We couldn't save your order yet. Please retry checkout." },
+            { status: 503 }
+          );
+        }
       }
 
       // 2b. Mark promotional spin rewards as redeemed
@@ -409,7 +433,11 @@ export async function POST(req: Request) {
         ).catch(() => {});
       }
     } catch (fsErr) {
-      console.warn("Firestore save warning (order safely kept in local store):", fsErr);
+      console.error("[Orders API] Durable order save failed:", fsErr);
+      return NextResponse.json(
+        { success: false, error: "We couldn't save your order yet. Please retry checkout." },
+        { status: 503 }
+      );
     }
 
     // 3. Automatically deduct inventory for confirmed COD orders
