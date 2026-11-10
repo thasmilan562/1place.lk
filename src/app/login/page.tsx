@@ -457,17 +457,26 @@ function LoginFormContent() {
                 </button>
               </div>
 
-              {/* Mobile Bottom Switcher */}
-              <p className="account-switch text-center text-xs text-neutral-500 pt-3">
-                {tab === "signin" ? "Don't have an account? " : "Already have an account? "}
+              {tab === "signin" ? (
                 <button
                   type="button"
-                  onClick={() => handleTab(tab === "signin" ? "signup" : "signin")}
-                  className="text-[#64152F] font-bold underline cursor-pointer"
+                  onClick={() => handleTab("signup")}
+                  className="w-full min-h-11 rounded-xl border border-neutral-200 bg-white text-sm font-semibold text-neutral-800 hover:border-neutral-400 transition-colors"
                 >
-                  {tab === "signin" ? "Sign up" : "Sign in"}
+                  Create Account
                 </button>
-              </p>
+              ) : (
+                <p className="account-switch text-center text-xs text-neutral-500 pt-3">
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => handleTab("signin")}
+                    className="text-[#64152F] font-bold underline cursor-pointer"
+                  >
+                    Sign in
+                  </button>
+                </p>
+              )}
             </form>
 
             {/* Bottom Security Reassurance */}

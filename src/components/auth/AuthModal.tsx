@@ -510,6 +510,16 @@ export default function AuthModal({ isOpen, onClose, initialTab = "signin" }: Au
                 </button>
               </div>
 
+              {tab === "signin" && (
+                <button
+                  type="button"
+                  onClick={() => handleTab("signup")}
+                  className="w-full h-11 rounded-xl border border-neutral-200 bg-white text-neutral-800 text-sm font-semibold hover:border-neutral-400 transition-colors"
+                >
+                  Create Account
+                </button>
+              )}
+
               {/* Bottom Security Badge */}
               <div className="flex items-center justify-center gap-2 pt-2 text-xs text-neutral-500 font-medium">
                 <ShieldCheck className="w-4 h-4 text-[#64152F]" />
