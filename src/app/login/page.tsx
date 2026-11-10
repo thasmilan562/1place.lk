@@ -369,8 +369,18 @@ function LoginFormContent() {
               <div className="space-y-1.5">
                 <label htmlFor="customer-identifier" className="block text-xs font-bold text-neutral-800">Email Address</label>
                 <div className="relative">
+                  <input
+                    type="email"
+                    id="customer-identifier"
+                    autoComplete="email"
+                    inputMode="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    required
+                    className="w-full h-11 pl-10 pr-4 bg-white border border-neutral-200 focus:border-[#64152F] rounded-xl text-sm font-medium text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-[#64152F]/10 transition-all"
+                  />
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                  <input type="email" id="customer-identifier" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" required className="w-full h-11 pl-10 pr-4 bg-white border border-neutral-200 focus:border-[#64152F] rounded-xl text-sm font-medium text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-[#64152F]/10 transition-all" />
                 </div>
               </div>
 
