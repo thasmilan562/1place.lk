@@ -7,7 +7,6 @@ import { Product, NewArrivalsSettings } from "@/lib/types";
 import { getProducts, getNewArrivalsSettings } from "@/lib/firestore-client";
 import { DEFAULT_NEW_ARRIVALS_SETTINGS } from "@/lib/data";
 import { formatPrice, announceToScreenReader, normalizeImageUrl } from "@/lib/utils";
-import { useCart } from "@/lib/cart-context";
 import { useWishlist } from "@/lib/wishlist-context";
 import { usePurchaseGuard } from "@/lib/use-purchase-guard";
 import QuickViewModal from "@/components/ui/QuickViewModal";
@@ -30,7 +29,6 @@ export default function NewArrivalsSection({
 
   const { handleAuthenticatedPurchase } = usePurchaseGuard();
   const { isInWishlist, toggleWishlist } = useWishlist();
-  const { addToCart } = useCart();
 
   // Load products if initialProducts not supplied
   useEffect(() => {
@@ -112,13 +110,6 @@ export default function NewArrivalsSection({
       action: "add-to-cart",
       product,
       onSuccess: () => {
-        addToCart({
-          productId: product.id,
-          name: product.name,
-          price: product.price,
-          image: product.images?.[0] || "/placeholder-phone.webp",
-          quantity: 1,
-        });
         setAddedMap((prev) => ({ ...prev, [product.id]: true }));
         announceToScreenReader(`${product.name} added to bag.`);
         setTimeout(() => {

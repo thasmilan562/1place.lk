@@ -262,6 +262,7 @@ export default function SpinWinModal() {
         productName: "10% Off First Order Discount",
         productImage: "/assets/promo/gift-box.png",
         discountPercent: 10,
+        couponCode: "1PLACE10",
         status: "issued",
         issuedAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -289,9 +290,9 @@ export default function SpinWinModal() {
 
     // Automatically integrate 10% discount coupon into checkout
     try {
-      localStorage.setItem("sm_active_coupon", "SPIN10");
-      localStorage.setItem("oneplace_active_coupon", "SPIN10");
-      window.dispatchEvent(new CustomEvent("coupon-applied", { detail: { code: "SPIN10", discountPercent: 10 } }));
+      localStorage.setItem("sm_active_coupon", "1PLACE10");
+      localStorage.setItem("oneplace_active_coupon", "1PLACE10");
+      window.dispatchEvent(new CustomEvent("coupon-applied", { detail: { code: "1PLACE10", discountPercent: 10 } }));
     } catch {}
   };
 
@@ -484,7 +485,7 @@ export default function SpinWinModal() {
                             ✓ Coupon Code Auto-Applied
                           </span>
                           <h4 className="text-base sm:text-lg font-black text-[#1D1D1F] tracking-tight">
-                            PROMO CODE: <span className="font-mono text-[#68122F] bg-rose-50 px-2 py-0.5 rounded border border-rose-200">SPIN10</span>
+                            PROMO CODE: <span className="font-mono text-[#68122F] bg-rose-50 px-2 py-0.5 rounded border border-rose-200">1PLACE10</span>
                           </h4>
                           <p className="text-xs font-semibold text-emerald-700 mt-1">
                             10% off your entire order at checkout!
@@ -496,7 +497,7 @@ export default function SpinWinModal() {
                       <div className="p-3 rounded-xl bg-white border border-[#E5E5E7] text-[11px] sm:text-xs text-[#6E6E73] text-left flex items-start gap-2.5">
                         <HelpCircle className="w-4 h-4 text-[#68122F] shrink-0 mt-0.5" />
                         <p>
-                          <strong className="text-[#1D1D1F]">Redemption:</strong> Coupon code <code className="font-bold text-[#68122F]">SPIN10</code> has been saved to your session. It will be deducted automatically from your cart total!
+                          <strong className="text-[#1D1D1F]">Redemption:</strong> Coupon code <code className="font-bold text-[#68122F]">1PLACE10</code> has been saved to your session. It will be deducted automatically from your cart total!
                         </p>
                       </div>
 

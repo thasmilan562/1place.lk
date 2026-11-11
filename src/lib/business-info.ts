@@ -12,19 +12,19 @@ export const BUSINESS_INFO = {
     "Sri Lanka's Premier Online Store for 100% Genuine Smartphones, Electronics, Premium Audio, Computing & Lifestyle Accessories with Islandwide Express Delivery.",
 
   // Contact Phone Numbers
-  phonePrimary: "011 234 5678",
-  phonePrimaryIntl: "+94112345678",
-  phoneMobile: "077 123 4567",
-  phoneMobileIntl: "+94771234567",
-  phoneHotline: "011 234 5678",
-  phoneHotlineIntl: "+94112345678",
-  whatsappNumber: "94771234567",
-  whatsappDisplay: "+94 77 123 4567",
+  phonePrimary: "076 242 6798",
+  phonePrimaryIntl: "+94762426798",
+  phoneMobile: "076 242 6798",
+  phoneMobileIntl: "+94762426798",
+  phoneHotline: "076 242 6798",
+  phoneHotlineIntl: "+94762426798",
+  whatsappNumber: "94762426798",
+  whatsappDisplay: "+94 76 242 6798",
 
   // Email Addresses
-  email: "support@1place.lk",
+  email: "1place.lk@gmail.com",
   ordersEmail: "orders@1place.lk",
-  contactEmail: "info@1place.lk",
+  contactEmail: "1place.lk@gmail.com",
 
   // Official Domains
   domain: "1place.lk",
@@ -70,14 +70,14 @@ export const BUSINESS_INFO = {
   // Aliases for compatibility
   website: "https://www.1place.lk",
   whatsapp: {
-    number: "94771234567",
-    display: "+94 77 123 4567",
-    url: "https://wa.me/94771234567",
+    number: "94762426798",
+    display: "+94 76 242 6798",
+    url: "https://wa.me/94762426798",
   },
-  whatsappUrl: "https://wa.me/94771234567",
+  whatsappUrl: "https://wa.me/94762426798",
   city: "Colombo",
   googleMapsUrl: "https://maps.google.com/?q=Colombo+Sri+Lanka",
-  emailPrimary: "support@1place.lk",
+  emailPrimary: "1place.lk@gmail.com",
 } as const;
 
 export type BusinessInfo = typeof BUSINESS_INFO;

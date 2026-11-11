@@ -296,7 +296,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
 
   return (
     <div className="space-y-8 pb-16 font-sans">
-      
+
       {/* ── TOP HEADER & SAVE ACTION ── */}
       <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isLight ? "bg-white border-[#E2E8F0] shadow-xs" : "bg-[#0E141D] border-white/[0.08]"} border rounded-2xl p-6`}>
         <div className="flex items-center gap-3.5">
@@ -310,15 +310,14 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
               </h1>
               {/* Campaign Status Badge */}
               <span
-                className={`px-3 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
-                  !settings.enabled
+                className={`px-3 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${!settings.enabled
                     ? isLight ? "bg-slate-100 text-slate-600 border-slate-200" : "bg-neutral-500/20 text-neutral-400 border-neutral-500/30"
                     : campaignStatus === "live"
-                    ? isLight ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                    : campaignStatus === "scheduled"
-                    ? isLight ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                    : isLight ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-red-500/20 text-red-400 border-red-500/30"
-                }`}
+                      ? isLight ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                      : campaignStatus === "scheduled"
+                        ? isLight ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                        : isLight ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-red-500/20 text-red-400 border-red-500/30"
+                  }`}
               >
                 ● {!settings.enabled ? "OFF (Disabled)" : campaignStatus}
               </span>
@@ -334,20 +333,18 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
           <button
             type="button"
             onClick={() => setSettings((prev) => ({ ...prev, enabled: !prev.enabled }))}
-            className={`px-4 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-2 border cursor-pointer ${
-              settings.enabled
+            className={`px-4 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-2 border cursor-pointer ${settings.enabled
                 ? isLight
                   ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
                   : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30"
                 : isLight
                   ? "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
                   : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700"
-            }`}
+              }`}
           >
             <span
-              className={`w-2 h-2 rounded-full ${
-                settings.enabled ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
-              }`}
+              className={`w-2 h-2 rounded-full ${settings.enabled ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
+                }`}
             />
             {settings.enabled ? "Banner: ON" : "Banner: OFF"}
           </button>
@@ -355,11 +352,10 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
           <button
             type="button"
             onClick={handleResetDefaults}
-            className={`px-4 py-2.5 rounded-xl font-medium text-xs transition-all flex items-center gap-1.5 cursor-pointer border ${
-              isLight
+            className={`px-4 py-2.5 rounded-xl font-medium text-xs transition-all flex items-center gap-1.5 cursor-pointer border ${isLight
                 ? "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-xs"
                 : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border-white/10"
-            }`}
+              }`}
           >
             <RotateCcw className="w-3.5 h-3.5" /> Defaults
           </button>
@@ -404,27 +400,24 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
             <button
               type="button"
               onClick={() => setPreviewDevice("desktop")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                previewDevice === "desktop" ? "bg-[#2563EB] text-white shadow-xs" : isLight ? "text-slate-600 hover:text-slate-900" : "text-white/60 hover:text-white"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${previewDevice === "desktop" ? "bg-[#2563EB] text-white shadow-xs" : isLight ? "text-slate-600 hover:text-slate-900" : "text-white/60 hover:text-white"
+                }`}
             >
               <Monitor className="w-3.5 h-3.5" /> Desktop
             </button>
             <button
               type="button"
               onClick={() => setPreviewDevice("tablet")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                previewDevice === "tablet" ? "bg-[#2563EB] text-white shadow-xs" : isLight ? "text-slate-600 hover:text-slate-900" : "text-white/60 hover:text-white"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${previewDevice === "tablet" ? "bg-[#2563EB] text-white shadow-xs" : isLight ? "text-slate-600 hover:text-slate-900" : "text-white/60 hover:text-white"
+                }`}
             >
               <Tablet className="w-3.5 h-3.5" /> Tablet
             </button>
             <button
               type="button"
               onClick={() => setPreviewDevice("mobile")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                previewDevice === "mobile" ? "bg-[#2563EB] text-white shadow-xs" : isLight ? "text-slate-600 hover:text-slate-900" : "text-white/60 hover:text-white"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${previewDevice === "mobile" ? "bg-[#2563EB] text-white shadow-xs" : isLight ? "text-slate-600 hover:text-slate-900" : "text-white/60 hover:text-white"
+                }`}
             >
               <Smartphone className="w-3.5 h-3.5" /> Mobile
             </button>
@@ -446,50 +439,46 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
 
       {/* ── SETTINGS CONFIGURATION PANELS ── */}
       <div className={`${isLight ? "bg-white border-[#E2E8F0] shadow-xs" : "bg-[#0E141D] border-white/[0.08]"} border rounded-2xl p-6 space-y-6`}>
-        
+
         {/* Navigation Tabs for Configuration */}
         <div className={`flex items-center gap-2 border-b pb-4 overflow-x-auto custom-scrollbar ${isLight ? "border-slate-200" : "border-white/10"}`}>
           <button
             type="button"
             onClick={() => setActiveTabGroup("content")}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${
-              activeTabGroup === "content"
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${activeTabGroup === "content"
                 ? isLight ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-white/15 text-white border border-white/20"
                 : isLight ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100" : "text-white/50 hover:text-white"
-            }`}
+              }`}
           >
             📝 Content &amp; Headlines
           </button>
           <button
             type="button"
             onClick={() => setActiveTabGroup("media")}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${
-              activeTabGroup === "media"
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${activeTabGroup === "media"
                 ? isLight ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-white/15 text-white border border-white/20"
                 : isLight ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100" : "text-white/50 hover:text-white"
-            }`}
+              }`}
           >
             🖼️ Banner Images &amp; Focal Points
           </button>
           <button
             type="button"
             onClick={() => setActiveTabGroup("appearance")}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${
-              activeTabGroup === "appearance"
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${activeTabGroup === "appearance"
                 ? isLight ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-white/15 text-white border border-white/20"
                 : isLight ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100" : "text-white/50 hover:text-white"
-            }`}
+              }`}
           >
             🎨 Overlay Box, Colors &amp; Layout
           </button>
           <button
             type="button"
             onClick={() => setActiveTabGroup("countdown")}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${
-              activeTabGroup === "countdown"
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${activeTabGroup === "countdown"
                 ? isLight ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-white/15 text-white border border-white/20"
                 : isLight ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100" : "text-white/50 hover:text-white"
-            }`}
+              }`}
           >
             ⏰ Countdown Timer &amp; Scheduling
           </button>
@@ -498,7 +487,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
         {/* ── GROUP A & B: CONTENT & HEADLINES ── */}
         {activeTabGroup === "content" && (
           <div className="space-y-6 animate-in fade-in-50 duration-200">
-            
+
             {/* Visibility & Enable Switch */}
             <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between gap-4">
               <div>
@@ -619,7 +608,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
         {/* ── GROUP C: BANNER IMAGES & BACKGROUND MODES ── */}
         {activeTabGroup === "media" && (
           <div className="space-y-6 animate-in fade-in-50 duration-200">
-            
+
             {/* ── BANNER SIZE / ASPECT RATIO SELECTOR ── */}
             <div className="p-5 bg-white/5 border border-white/10 rounded-2xl space-y-3">
               <div className="flex items-center justify-between">
@@ -650,11 +639,10 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                       key={preset.id}
                       type="button"
                       onClick={() => setSettings({ ...settings, bannerSizeRatio: preset.id as any })}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-                        isSelected
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${isSelected
                           ? "bg-red-600/20 border-red-500 text-white shadow-md ring-1 ring-red-500"
                           : "bg-black/30 border-white/10 text-white/60 hover:bg-white/5 hover:text-white"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-extrabold text-xs text-white">{preset.label}</span>
@@ -688,11 +676,10 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                 <button
                   type="button"
                   onClick={() => setSettings({ ...settings, bannerMode: "full_image" })}
-                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
-                    (settings.bannerMode || "full_image") === "full_image"
+                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${(settings.bannerMode || "full_image") === "full_image"
                       ? "bg-blue-600/15 border-blue-500 text-white shadow-lg"
                       : "bg-black/30 border-white/10 text-white/50 hover:border-white/20"
-                  }`}
+                    }`}
                 >
                   <div className="font-extrabold text-xs text-white flex items-center justify-between">
                     <span>1. Full-Width Background Photo</span>
@@ -708,11 +695,10 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                 <button
                   type="button"
                   onClick={() => setSettings({ ...settings, bannerMode: "custom_bg_with_square_image" })}
-                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
-                    settings.bannerMode === "custom_bg_with_square_image"
+                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${settings.bannerMode === "custom_bg_with_square_image"
                       ? "bg-red-600/15 border-red-500 text-white shadow-lg"
                       : "bg-black/30 border-white/10 text-white/50 hover:border-white/20"
-                  }`}
+                    }`}
                 >
                   <div className="font-extrabold text-xs text-white flex items-center justify-between">
                     <span>2. Background Color + Square Product Asset</span>
@@ -939,11 +925,10 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                           key={pos}
                           type="button"
                           onClick={() => setSettings({ ...settings, desktopFocalPosition: pos })}
-                          className={`py-2 rounded-xl font-bold uppercase text-[11px] transition-all capitalize cursor-pointer ${
-                            settings.desktopFocalPosition === pos
+                          className={`py-2 rounded-xl font-bold uppercase text-[11px] transition-all capitalize cursor-pointer ${settings.desktopFocalPosition === pos
                               ? "bg-blue-600 text-white shadow-md"
                               : "bg-white/5 text-white/50 hover:text-white"
-                          }`}
+                            }`}
                         >
                           {pos}
                         </button>
@@ -1024,11 +1009,10 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                           key={pos}
                           type="button"
                           onClick={() => setSettings({ ...settings, mobileFocalPosition: pos })}
-                          className={`py-2 rounded-xl font-bold uppercase text-[11px] transition-all capitalize cursor-pointer ${
-                            settings.mobileFocalPosition === pos
+                          className={`py-2 rounded-xl font-bold uppercase text-[11px] transition-all capitalize cursor-pointer ${settings.mobileFocalPosition === pos
                               ? "bg-emerald-600 text-white shadow-md"
                               : "bg-white/5 text-white/50 hover:text-white"
-                          }`}
+                            }`}
                         >
                           {pos}
                         </button>
@@ -1043,7 +1027,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
             {settings.bannerMode === "custom_bg_with_square_image" && (
               <div className="space-y-6 animate-in fade-in-50 duration-200">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-xs">
-                  
+
                   {/* Background Color / Gradient Setup */}
                   <div className="p-5 bg-white/5 border border-white/10 rounded-2xl space-y-4">
                     <h4 className="font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
@@ -1055,22 +1039,20 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                       <button
                         type="button"
                         onClick={() => setSettings({ ...settings, bannerBgType: "solid" })}
-                        className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                          (settings.bannerBgType || "solid") === "solid"
+                        className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${(settings.bannerBgType || "solid") === "solid"
                             ? "bg-white text-black shadow"
                             : "text-white/60 hover:text-white"
-                        }`}
+                          }`}
                       >
                         Solid Color
                       </button>
                       <button
                         type="button"
                         onClick={() => setSettings({ ...settings, bannerBgType: "gradient" })}
-                        className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                          settings.bannerBgType === "gradient"
+                        className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${settings.bannerBgType === "gradient"
                             ? "bg-white text-black shadow"
                             : "text-white/60 hover:text-white"
-                        }`}
+                          }`}
                       >
                         Linear Gradient
                       </button>
@@ -1254,11 +1236,10 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                             key={pos}
                             type="button"
                             onClick={() => setSettings({ ...settings, squareImagePosition: pos })}
-                            className={`py-2 rounded-xl font-bold uppercase text-[11px] transition-all capitalize cursor-pointer ${
-                              (settings.squareImagePosition || "right") === pos
+                            className={`py-2 rounded-xl font-bold uppercase text-[11px] transition-all capitalize cursor-pointer ${(settings.squareImagePosition || "right") === pos
                                 ? "bg-emerald-600 text-white shadow-md"
                                 : "bg-white/5 text-white/50 hover:text-white"
-                            }`}
+                              }`}
                           >
                             {pos}
                           </button>
@@ -1330,11 +1311,10 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                       key={mode.id}
                       type="button"
                       onClick={() => setSettings({ ...settings, imageFit: mode.id as any })}
-                      className={`p-3 rounded-xl text-left font-bold transition-all cursor-pointer border ${
-                        (settings.imageFit || "cover") === mode.id
+                      className={`p-3 rounded-xl text-left font-bold transition-all cursor-pointer border ${(settings.imageFit || "cover") === mode.id
                           ? "bg-purple-600 text-white border-purple-400 shadow-md"
                           : "bg-white/5 text-white/60 hover:text-white border-white/10 hover:border-white/20"
-                      }`}
+                        }`}
                     >
                       <div className="text-xs">{mode.label}</div>
                       <div className="text-[10px] font-normal opacity-70 mt-0.5">{mode.desc}</div>
@@ -1359,11 +1339,10 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                       key={pad.id}
                       type="button"
                       onClick={() => setSettings({ ...settings, cardPadding: pad.id as any })}
-                      className={`py-2.5 px-3 rounded-xl font-bold text-center text-xs transition-all cursor-pointer border ${
-                        (settings.cardPadding || "none") === pad.id
+                      className={`py-2.5 px-3 rounded-xl font-bold text-center text-xs transition-all cursor-pointer border ${(settings.cardPadding || "none") === pad.id
                           ? "bg-purple-600 text-white border-purple-400 shadow-md"
                           : "bg-white/5 text-white/60 hover:text-white border-white/10 hover:border-white/20"
-                      }`}
+                        }`}
                     >
                       <div>{pad.label}</div>
                     </button>
@@ -1465,7 +1444,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
         {/* ── GROUP D: OVERLAY BOX, COLORS & LAYOUT ── */}
         {activeTabGroup === "appearance" && (
           <div className="space-y-6 animate-in fade-in-50 duration-200">
-            
+
             {/* Color Pickers Matrix */}
             <div className="p-5 bg-white/5 border border-white/10 rounded-2xl space-y-4">
               <h4 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
@@ -1473,7 +1452,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
               </h4>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 text-xs">
-                
+
                 {/* Box Background */}
                 <div>
                   <label className="block text-white/60 font-bold mb-1">Box Background</label>
@@ -1631,7 +1610,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
 
             {/* Box Positioning & Sliders */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-xs">
-              
+
               {/* Horizontal Position */}
               <div>
                 <label className="block text-white/60 font-bold uppercase tracking-wider mb-2">
@@ -1643,9 +1622,8 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                       key={pos}
                       type="button"
                       onClick={() => setSettings({ ...settings, boxPosition: pos })}
-                      className={`py-2.5 rounded-xl font-bold uppercase text-[11px] transition-all capitalize ${
-                        settings.boxPosition === pos ? "bg-red-600 text-white shadow-md" : "bg-white/5 text-white/50 hover:text-white"
-                      }`}
+                      className={`py-2.5 rounded-xl font-bold uppercase text-[11px] transition-all capitalize ${settings.boxPosition === pos ? "bg-red-600 text-white shadow-md" : "bg-white/5 text-white/50 hover:text-white"
+                        }`}
                     >
                       {pos}
                     </button>
@@ -1664,9 +1642,8 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                       key={align}
                       type="button"
                       onClick={() => setSettings({ ...settings, verticalAlignment: align })}
-                      className={`py-2.5 rounded-xl font-bold uppercase text-[11px] transition-all capitalize ${
-                        settings.verticalAlignment === align ? "bg-red-600 text-white shadow-md" : "bg-white/5 text-white/50 hover:text-white"
-                      }`}
+                      className={`py-2.5 rounded-xl font-bold uppercase text-[11px] transition-all capitalize ${settings.verticalAlignment === align ? "bg-red-600 text-white shadow-md" : "bg-white/5 text-white/50 hover:text-white"
+                        }`}
                     >
                       {align}
                     </button>
@@ -1683,18 +1660,16 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                   <button
                     type="button"
                     onClick={() => setSettings({ ...settings, mobileLayout: "stacked" })}
-                    className={`py-2.5 rounded-xl font-bold uppercase text-[11px] transition-all ${
-                      settings.mobileLayout === "stacked" ? "bg-red-600 text-white shadow-md" : "bg-white/5 text-white/50 hover:text-white"
-                    }`}
+                    className={`py-2.5 rounded-xl font-bold uppercase text-[11px] transition-all ${settings.mobileLayout === "stacked" ? "bg-red-600 text-white shadow-md" : "bg-white/5 text-white/50 hover:text-white"
+                      }`}
                   >
                     Stacked (Clean)
                   </button>
                   <button
                     type="button"
                     onClick={() => setSettings({ ...settings, mobileLayout: "overlay" })}
-                    className={`py-2.5 rounded-xl font-bold uppercase text-[11px] transition-all ${
-                      settings.mobileLayout === "overlay" ? "bg-red-600 text-white shadow-md" : "bg-white/5 text-white/50 hover:text-white"
-                    }`}
+                    className={`py-2.5 rounded-xl font-bold uppercase text-[11px] transition-all ${settings.mobileLayout === "overlay" ? "bg-red-600 text-white shadow-md" : "bg-white/5 text-white/50 hover:text-white"
+                      }`}
                   >
                     Overlay
                   </button>
@@ -1788,7 +1763,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
         {/* ── GROUP E: COUNTDOWN TIMER & EXPIRY ── */}
         {activeTabGroup === "countdown" && (
           <div className="space-y-6 animate-in fade-in-50 duration-200 text-xs">
-            
+
             {/* Enable Countdown Switch */}
             <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between gap-4">
               <div>
@@ -1921,11 +1896,10 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                     key={item.id}
                     type="button"
                     onClick={() => setSettings({ ...settings, expiryAction: item.id as any })}
-                    className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                      settings.expiryAction === item.id
+                    className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${settings.expiryAction === item.id
                         ? "bg-red-600/20 border-red-500 text-white"
                         : "bg-white/5 border-white/10 text-white/60 hover:text-white"
-                    }`}
+                      }`}
                   >
                     <span className="font-extrabold text-white text-xs">{item.label}</span>
                     <span className="text-[10px] text-white/40 mt-1">{item.desc}</span>

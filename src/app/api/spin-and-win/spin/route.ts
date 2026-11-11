@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
       originalPrice: 0,
       image: "/assets/promo/gift-box.png",
       slug: "spin-win-10-discount",
-      couponCode: "SPIN10",
+      couponCode: "1PLACE10",
       discountPercent: 10,
     };
 
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
       productName: "10% Off First Order Discount",
       productImage: "/assets/promo/gift-box.png",
       discountPercent: 10,
-      couponCode: "SPIN10",
+      couponCode: "1PLACE10",
       status: "issued",
       issuedAt: now.toISOString(),
       expiresAt,

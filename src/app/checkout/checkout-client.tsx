@@ -124,7 +124,6 @@ export default function CheckoutClient() {
   const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
 
   // Dynamic COD & Delivery fee
-  const [codFeeAmount, setCodFeeAmount] = useState<number>(250);
   const [standardDeliveryFee, setStandardDeliveryFee] = useState<number>(450);
 
   // Load initial user details
@@ -172,7 +171,6 @@ export default function CheckoutClient() {
         const snap = await getDoc(doc(db, "settings", "store"));
         if (snap.exists()) {
           const data = snap.data();
-          if (data.cod_fee !== undefined) setCodFeeAmount(Number(data.cod_fee));
           if (data.delivery_charge !== undefined) setStandardDeliveryFee(Number(data.delivery_charge));
         }
       } catch (e) {
@@ -263,7 +261,7 @@ export default function CheckoutClient() {
     new Date(shippingReward.expiresAt).getTime() > Date.now()
   );
   const deliveryFee = deliveryOption === "pickup" || isShippingRewardApplied ? 0 : standardDeliveryFee;
-  const codFee = (paymentMethod === "cod" && deliveryOption !== "pickup") ? codFeeAmount : 0;
+  const codFee = 0;
   const baseOrderTotal = Math.max(0, subtotal + deliveryFee - couponDiscount);
   // PayHere card payment surcharge: 2%
   const cardFee = paymentMethod === "card" ? Math.round(baseOrderTotal * 0.02) : 0;
@@ -772,9 +770,6 @@ export default function CheckoutClient() {
                 <span>Delivery</span>
                 <span className="font-medium text-neutral-900">{deliveryFee === 0 ? "FREE" : formatPrice(deliveryFee)}</span>
               </div>
-              {paymentMethod === "cod" && codFee > 0 && (
-                <div className="flex justify-between"><span>COD Fee</span><span className="font-medium text-neutral-900">+{formatPrice(codFee)}</span></div>
-              )}
               {paymentMethod === "card" && cardFee > 0 && (
                 <div className="flex justify-between text-neutral-600"><span>PayHere Fee (2%)</span><span className="font-medium text-neutral-900">+{formatPrice(cardFee)}</span></div>
               )}
@@ -1194,7 +1189,6 @@ export default function CheckoutClient() {
                     setPaymentMethod(m);
                     markTouched("paymentMethod");
                   }}
-                  codFee={codFeeAmount}
                   cardFee={cardFee > 0 ? cardFee : Math.round(baseOrderTotal * 0.02)}
                   isCodAllowed={isCodAllowed}
                   isCardAllowed={isCardAllowed}
@@ -1392,14 +1386,6 @@ export default function CheckoutClient() {
                     </span>
                   </div>
 
-                  {paymentMethod === "cod" && codFee > 0 && (
-                    <div className="flex justify-between text-neutral-600">
-                      <span>COD Handling Fee</span>
-                      <span className="font-semibold text-neutral-900">
-                        +{formatPrice(codFee)}
-                      </span>
-                    </div>
-                  )}
 
                   {paymentMethod === "card" && cardFee > 0 && (
                     <div className="flex justify-between text-neutral-600">

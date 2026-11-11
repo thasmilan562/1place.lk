@@ -9,7 +9,6 @@ export type PaymentMethod = "card" | "cod";
 interface PaymentMethodCardProps {
   selected: PaymentMethod | null;
   onChange: (method: PaymentMethod) => void;
-  codFee: number;
   cardFee?: number;
   isCodAllowed?: boolean;
   isCardAllowed?: boolean;
@@ -19,7 +18,6 @@ interface PaymentMethodCardProps {
 export default function PaymentMethodCard({
   selected,
   onChange,
-  codFee,
   cardFee = 0,
   isCodAllowed = true,
   isCardAllowed = true,
@@ -180,15 +178,6 @@ export default function PaymentMethodCard({
             </div>
           </div>
 
-          {/* COD Fee / Handling */}
-          <div className="text-right shrink-0">
-            <span className="text-xs sm:text-sm font-semibold text-neutral-600 block">
-              Handling Fee:
-            </span>
-            <span className="text-xs sm:text-sm font-extrabold text-neutral-950">
-              {isPickup || codFee === 0 ? "FREE" : `+${formatPrice(codFee)}`}
-            </span>
-          </div>
         </div>
 
         {!isPickup && !isCodAllowed && (

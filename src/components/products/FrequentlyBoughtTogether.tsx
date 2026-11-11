@@ -7,7 +7,7 @@ import { Product } from "@/lib/types";
 import { getFrequentlyBoughtTogetherBundle } from "@/lib/recommendation-engine";
 import { formatPrice, announceToScreenReader } from "@/lib/utils";
 import { useCart } from "@/lib/cart-context";
-import { usePurchaseGuard } from "@/lib/use-purchase-guard";
+import { getAvailableStock, usePurchaseGuard } from "@/lib/use-purchase-guard";
 
 interface FrequentlyBoughtTogetherProps {
   currentProduct: Product;
@@ -78,6 +78,12 @@ export default function FrequentlyBoughtTogether({
         price: prod.price,
         image: prod.images?.[0] || "/placeholder-phone.webp",
         quantity: 1,
+        maxStock: getAvailableStock(prod, {
+          action: "add-to-cart",
+          product: prod,
+          color: prod.colors?.[0],
+          storage: prod.storage_options?.[0],
+        }),
       });
     });
 

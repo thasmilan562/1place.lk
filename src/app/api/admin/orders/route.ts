@@ -121,6 +121,8 @@ const editableFields = new Set([
   "internalNotes",
   "cancellationReason",
   "updatedAt",
+  "notificationRead",
+  "notificationReadAt",
 ]);
 
 export async function PATCH(request: Request) {

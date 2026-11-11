@@ -11,6 +11,7 @@ import { FooterSettings } from "@/lib/types";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import BrandLogo from "@/components/ui/BrandLogo";
+import { BUSINESS_INFO } from "@/lib/business-info";
 
 /* ─── Social Media SVG Icons ─── */
 function FacebookIcon({ className = "w-4 h-4" }: { className?: string }) {
@@ -77,6 +78,7 @@ function MinimalFooter() {
             </div>
           </div>
           <nav aria-label="Explore the store"><h2>Explore</h2>{shopLinks.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}</nav>
+          <nav aria-label="Customer support"><h2>Customer support</h2><a href={`tel:${BUSINESS_INFO.phonePrimaryIntl}`}>{BUSINESS_INFO.phonePrimary}</a><a href={`mailto:${BUSINESS_INFO.email}`}>{BUSINESS_INFO.email}</a></nav>
         </div>
         <div className="store-footer__bottom">
           <p>{settings.copyright_text || `© ${new Date().getFullYear()} 1place.lk. All rights reserved.`}</p>

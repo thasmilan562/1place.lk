@@ -29,6 +29,17 @@ export async function POST(req: Request) {
 
     const orderSubtotal = Math.max(0, Number(subtotal) || 0);
 
+    if (cleanCode === "1PLACE10") {
+      const discountAmount = Math.min(orderSubtotal, Math.round(orderSubtotal * 0.1));
+      return NextResponse.json({
+        valid: true,
+        code: cleanCode,
+        discountAmount,
+        discountType: "percentage",
+        message: "Promo code '1PLACE10' applied — 10% off your order.",
+      });
+    }
+
     // 1. First check dedicated 'coupons' collection with in-memory caching
     try {
       const allCoupons = await cachedFetch("coupons:all", async () => {

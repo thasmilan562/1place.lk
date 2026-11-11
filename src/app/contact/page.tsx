@@ -31,7 +31,13 @@ export const metadata: Metadata = {
 };
 
 export default async function ContactPage() {
-  const settings = (await getSiteSettings().catch(() => defaultSettings)) || defaultSettings;
+  const storedSettings = (await getSiteSettings().catch(() => defaultSettings)) || defaultSettings;
+  const settings = {
+    ...storedSettings,
+    phone: BUSINESS_INFO.phonePrimary,
+    whatsapp: BUSINESS_INFO.whatsappNumber,
+    email: BUSINESS_INFO.email,
+  };
 
   const localBusinessJsonLd = {
     "@context": "https://schema.org",

@@ -380,6 +380,14 @@ export default function OrdersTab({
     setEditingTracking(order.trackingNumber || "");
     setEditingNotes(order.internalNotes || "");
     setIsDrawerOpen(true);
+    fetch("/api/admin/orders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: order.id,
+        updates: { notificationRead: true, notificationReadAt: new Date().toISOString() },
+      }),
+    }).catch((error) => console.warn("Could not mark viewed order as read:", error));
   };
 
   const handleCloseDrawer = () => {

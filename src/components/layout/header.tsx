@@ -34,8 +34,7 @@ import { useCart } from "@/lib/cart-context";
 import { useWishlist } from "@/lib/wishlist-context";
 import AuthModal from "@/components/auth/AuthModal";
 import CartDrawer from "@/components/cart/PremiumCartDrawer";
-import { categories as fallbackCategories } from "@/lib/data";
-import { getCategories, getProducts } from "@/lib/firestore-client";
+import { getAdminCategories, getProducts } from "@/lib/firestore-client";
 import { Category, Product } from "@/lib/types";
 import { executeIntelligentSearch } from "@/lib/search/search-engine";
 import { KNOWN_BRAND_NAMES } from "@/lib/migration-audit";
@@ -52,7 +51,7 @@ export default function Header() {
   const [authTab, setAuthTab] = useState<"signin" | "signup">("signin");
   const [cartOpen, setCartOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [catList, setCatList] = useState<Category[]>(fallbackCategories);
+  const [catList, setCatList] = useState<Category[]>([]);
 
   const categoriesRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
@@ -159,12 +158,9 @@ export default function Header() {
   useEffect(() => {
     async function loadCats() {
       try {
-        const dbCats = await getCategories();
-        if (dbCats && dbCats.length > 0) {
-          setCatList(dbCats);
-        }
+        setCatList(await getAdminCategories(true));
       } catch (e) {
-        console.warn("Using fallback categories in Header:", e);
+        console.warn("Could not load admin categories in Header:", e);
       }
     }
     loadCats();
@@ -229,11 +225,10 @@ export default function Header() {
   const uniqueNavCategories = useMemo(() => {
     const seenSlugs = new Set<string>();
     const brandLowerList = KNOWN_BRAND_NAMES.map((b) => b.toLowerCase());
-    const all = [...catList, ...fallbackCategories];
     const unique: Category[] = [];
 
-    all.forEach((c) => {
-      if (!c || !c.name) return;
+    catList.forEach((c) => {
+      if (!c || !c.name || c.status === "inactive" || c.status === "deleted" || c.isDeleted === true || c.show_in_menu === false || c.parent_id) return;
       const cleanName = c.name.toLowerCase().trim();
       const cleanSlug = (c.slug || "").toLowerCase().trim();
       if (brandLowerList.includes(cleanName)) return;

@@ -10,7 +10,7 @@ import StorePromises from "@/components/home/store-promises";
 
 import VisualProductShowcase from "@/components/home/visual-product-showcase";
 import {
-  getCategories,
+  getAdminCategories,
   getBrands,
   getProducts,
   getReviews,
@@ -66,7 +66,7 @@ export default async function HomePage() {
     newArrivalsSettings,
     galleryAnimationSettings,
   ] = await Promise.all([
-    getCategories().catch(() => []),
+    getAdminCategories(true).catch(() => []),
     getBrands().catch(() => []),
     getProducts().catch(() => []),
     getReviews().catch(() => []),

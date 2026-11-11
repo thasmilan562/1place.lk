@@ -215,12 +215,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
           return updated;
         }
         const newQty = existing.quantity + (item.quantity || 1);
-        const finalQty = existing.maxStock ? Math.min(newQty, existing.maxStock) : newQty;
-        updated[existingIdx] = { ...existing, quantity: finalQty };
+        const maxStock = typeof existing.maxStock === "number" && typeof item.maxStock === "number"
+          ? Math.min(existing.maxStock, item.maxStock)
+          : item.maxStock ?? existing.maxStock;
+        const finalQty = typeof maxStock === "number" ? Math.min(newQty, maxStock) : newQty;
+        updated[existingIdx] = { ...existing, maxStock, quantity: finalQty };
         return updated;
       }
 
-      return [...prev, { ...item, quantity: item.quantity || 1 }];
+      const requestedQty = item.quantity || 1;
+      const quantity = typeof item.maxStock === "number" ? Math.min(requestedQty, item.maxStock) : requestedQty;
+      if (quantity <= 0) return prev;
+      return [...prev, { ...item, quantity }];
     });
   }, []);
 
@@ -265,7 +271,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           if (i.isFreeGift) {
             return { ...i, quantity: 1 };
           }
-          const finalQty = i.maxStock ? Math.min(quantity, i.maxStock) : quantity;
+          const finalQty = typeof i.maxStock === "number" ? Math.min(quantity, i.maxStock) : quantity;
           return { ...i, quantity: finalQty };
         })
       );

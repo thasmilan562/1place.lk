@@ -334,6 +334,12 @@ export class AdminDocRef {
     await batch.commit();
   }
 
+  async create(data: Record<string, any>): Promise<void> {
+    const write = buildWriteOperation(this.firestore._fullDocName(this.path), data);
+    write.currentDocument = { exists: false };
+    await this.firestore._commitWrites([write]);
+  }
+
   async update(data: Record<string, any>): Promise<void> {
     const batch = this.firestore.batch();
     batch.update(this, data);

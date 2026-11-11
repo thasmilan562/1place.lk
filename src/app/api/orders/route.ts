@@ -300,6 +300,8 @@ export async function POST(req: Request) {
     // Zero / Invalid Price & Quantity Protection + Fresh Product Read (no stale cache)
     let serverSubtotal = 0;
     const prefetchedProducts = new Map<string, Record<string, any>>();
+    const stockDemand = new Map<string, number>();
+    const stockLimits = new Map<string, number>();
     for (const item of items) {
       const itemPrice = Number(item.price);
       const itemQty = Number(item.quantity);
@@ -324,7 +326,7 @@ export async function POST(req: Request) {
         );
       }
 
-      if (isNaN(itemQty) || itemQty <= 0) {
+      if (!Number.isInteger(itemQty) || itemQty <= 0) {
         return NextResponse.json(
           {
             success: false,
@@ -334,30 +336,92 @@ export async function POST(req: Request) {
         );
       }
 
-      // Server-side fresh database verification (deduplicated per productId within this request)
+      // Fresh server-side catalog and inventory verification (deduplicated per product).
       const pid = typeof item.productId === "string" ? item.productId.trim() : "";
-      if (pid) {
+      if (!pid) {
+        return NextResponse.json(
+          { success: false, error: `We couldn't verify stock for "${item.name || "this product"}". Please reload your bag.` },
+          { status: 409 }
+        );
+      }
+
+      let pData = prefetchedProducts.get(pid);
+      if (!pData) {
         try {
-          let pData = prefetchedProducts.get(pid);
-          if (!pData) {
-            const adminDb = getAdminDb();
-            const pDoc = await withTimeout(adminDb.collection("products").doc(pid).get(), 2500, null);
-            if (pDoc && pDoc.exists) {
-              pData = pDoc.data() || {};
-              prefetchedProducts.set(pid, pData);
-            }
-          }
-          if (pData && pData.status === "draft") {
+          const adminDb = getAdminDb();
+          const pDoc = await withRequiredTimeout(
+            adminDb.collection("products").doc(pid).get(),
+            5000,
+            "Inventory check timed out. Please try again."
+          );
+          if (!pDoc.exists) {
             return NextResponse.json(
-              { success: false, error: `Product "${pData.name || item.name}" is a draft and not for sale.` },
-              { status: 400 }
+              { success: false, error: `We couldn't verify stock for "${item.name || "this product"}". Please reload your bag.` },
+              { status: 409 }
             );
           }
+          pData = pDoc.data() || {};
+          prefetchedProducts.set(pid, pData);
         } catch (dbErr) {
-          console.warn("Could not check product doc in DB:", dbErr);
+          console.error("Could not verify product inventory:", dbErr);
+          return NextResponse.json(
+            { success: false, error: "We couldn't verify live stock right now. Please try again shortly." },
+            { status: 503 }
+          );
         }
       }
+
+      if (pData.status === "draft" || pData.status === "inactive" || pData.isDeleted === true || pData.status === "deleted") {
+        return NextResponse.json(
+          { success: false, error: `Product "${pData.name || item.name}" is not available for sale.` },
+          { status: 400 }
+        );
+      }
+
+      const combos = Array.isArray(pData.variant_combos) ? pData.variant_combos : [];
+      let stockKey = pid;
+      let availableStock: number;
+      if (combos.length > 0) {
+        const combo = combos.find((entry: any) =>
+          (item.variantId && entry.id === item.variantId) ||
+          ((!item.variantId || !entry.id) &&
+            (!item.storage || entry.storage === item.storage) &&
+            (!item.color || entry.color_name?.toLowerCase() === String(item.color).toLowerCase()))
+        );
+        if (!combo) {
+          return NextResponse.json(
+            { success: false, error: `Please choose an available option for "${pData.name || item.name}".` },
+            { status: 409 }
+          );
+        }
+        stockKey = `${pid}:${combo.id || `${combo.color_name || ""}:${combo.storage || ""}`}`;
+        availableStock = Number(combo.available_stock ?? combo.stock_quantity);
+      } else {
+        availableStock = Number(pData.stock_quantity ?? pData.stock_count);
+      }
+      if (!Number.isFinite(availableStock) || availableStock < 0) availableStock = 0;
+      stockLimits.set(stockKey, availableStock);
+      stockDemand.set(stockKey, (stockDemand.get(stockKey) || 0) + itemQty);
       serverSubtotal += itemPrice * itemQty;
+    }
+
+    for (const [stockKey, requested] of stockDemand) {
+      const available = stockLimits.get(stockKey) ?? 0;
+      if (requested > available) {
+        const productId = stockKey.split(":")[0];
+        const productName = prefetchedProducts.get(productId)?.name || "This product";
+        return NextResponse.json(
+          {
+            success: false,
+            error: available <= 0
+              ? `${productName} is out of stock. Please remove it from your bag.`
+              : `Only ${available} ${available === 1 ? "unit is" : "units are"} available for ${productName}. Please update your bag.`,
+            availableStock: available,
+            productId,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Free Shipping Reward Verification
@@ -389,7 +453,8 @@ export async function POST(req: Request) {
       (body.paymentMethod || "").toString().toLowerCase().includes("card") ||
       (body.paymentMethod || "").toString().toLowerCase().includes("online");
     const isCod = !isCard;
-    const codFee = isCod ? (typeof body.codFee === "number" ? body.codFee : 250) : 0;
+    // COD handling fees are no longer charged. Ignore stale client/admin values.
+    const codFee = 0;
     const couponDiscount = Math.max(0, Number(body.couponDiscount) || 0);
 
     const calculatedTotal = Math.max(0, serverSubtotal + deliveryFee + codFee - couponDiscount);
@@ -446,6 +511,7 @@ export async function POST(req: Request) {
       payhereStatusCode: "0",
       cardFee: 0,
       payhereFee: 0,
+      notificationRead: false,
       trackingNumber: `TRK-${randomDigits}`,
       createdAt: body.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),

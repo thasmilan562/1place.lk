@@ -29,6 +29,7 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
   const [categories, setCategories] = useState<Category[]>([]);
   const [pending, setPending] = useState(0);
   const [orderAlert, setOrderAlert] = useState("");
+  const [orderAlertIds, setOrderAlertIds] = useState<string[]>([]);
   const [notificationError, setNotificationError] = useState("");
   const mobileRef = useDialogFocus(mobileOpen, () => setMobileOpen(false));
 
@@ -75,17 +76,19 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
       setNotificationError("");
       setPending(
         orders.filter((order) =>
+          order.notificationRead !== true &&
           ["pending", "pending cod", "processing", "payment pending"].includes(
             String(order.status || order.orderStatus || "").toLowerCase()
           )
         ).length
       );
-      const added = orders.filter((order) => order.id && !known.has(order.id));
+      const added = orders.filter((order) => order.id && !known.has(order.id) && order.notificationRead !== true);
       orders.forEach((order) => {
         if (order.id) known.add(order.id);
       });
       if (initialized && added.length) {
         playOrderChime();
+        setOrderAlertIds(added.map((order) => String(order.id)));
         setOrderAlert(
           `${added.length === 1 ? "A new order has" : `${added.length} new orders have`} arrived. Review in Orders.`
         );
@@ -105,6 +108,29 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
       window.removeEventListener("admin-orders-error", handleOrdersError);
     };
   }, [authed]);
+
+  const viewNewOrders = async (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    if (orderAlertIds.length) {
+      const readAt = new Date().toISOString();
+      try {
+        const response = await fetch("/api/admin/orders", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ids: orderAlertIds,
+            updates: { notificationRead: true, notificationReadAt: readAt },
+          }),
+        });
+        if (!response.ok) throw new Error("Could not save notification read state.");
+      } catch (error) {
+        console.warn("Could not mark order notification as read:", error);
+      }
+    }
+    setOrderAlert("");
+    setOrderAlertIds([]);
+    router.push(adminTabHref("orders"));
+  };
 
   useEffect(() => {
     const openProduct = () => setProductOpen(true);
@@ -153,7 +179,7 @@ export default function AdminWorkspace({ children }: { children: React.ReactNode
         <header data-admin-header className="admin-toolbar"><div className="admin-toolbar__title"><button type="button" className="admin-mobile-only" aria-label="Open navigation" onClick={() => setMobileOpen(true)}><Menu size={20} /></button><span>{current.label}</span></div>
           <div className="admin-toolbar__actions"><button type="button" className="admin-search-button" onClick={() => setSearchOpen(true)} aria-label="Search admin"><Search size={16} /><span>Find anything</span><kbd>⌘ K</kbd></button><button type="button" aria-label={theme === "light" ? "Use dark appearance" : "Use light appearance"} onClick={toggleTheme}>{theme === "light" ? <Moon size={17} /> : <Sun size={17} />}</button><Link href={adminTabHref("orders")} aria-label={`${pending} pending orders`}><Bell size={17} />{pending > 0 && <small>{pending}</small>}</Link><button type="button" className="admin-primary" onClick={() => setProductOpen(true)}><Plus size={16} /><span>Add product</span></button></div>
         </header>
-        <main className="admin-main">{notificationError && <p className="admin-feedback" role="status">Live order updates disconnected: {notificationError}</p>}{orderAlert && <div className="admin-order-alert" role="status" aria-live="polite"><Bell size={20}/><div><strong>New order</strong><p>{orderAlert}</p><Link href={adminTabHref("orders")} onClick={() => setOrderAlert("")}>View orders</Link></div><button type="button" aria-label="Dismiss new order notification" onClick={() => setOrderAlert("")}><X size={18}/></button></div>}<div className="admin-main__content">{children}</div><footer data-admin-footer>ONEPLACE · Store workspace</footer></main>
+        <main className="admin-main">{notificationError && <p className="admin-feedback" role="status">Live order updates disconnected: {notificationError}</p>}{orderAlert && <div className="admin-order-alert" role="status" aria-live="polite"><Bell size={20}/><div><strong>New order</strong><p>{orderAlert}</p><Link href={adminTabHref("orders")} onClick={viewNewOrders}>View orders</Link></div><button type="button" aria-label="Dismiss new order notification" onClick={() => setOrderAlert("")}><X size={18}/></button></div>}<div className="admin-main__content">{children}</div><footer data-admin-footer>ONEPLACE · Store workspace</footer></main>
       </div>
       <CommandPalette isOpen={searchOpen} onClose={() => setSearchOpen(false)} onOpenAddProduct={() => setProductOpen(true)} />
       <ProductModal isOpen={productOpen} onClose={() => setProductOpen(false)} categories={categories} onSave={() => { setProductOpen(false); window.location.reload(); }} />

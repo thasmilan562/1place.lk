@@ -24,6 +24,27 @@ export interface PurchaseGuardActionOptions {
   onSuccess?: () => void;
 }
 
+export function getAvailableStock(
+  product: PurchaseGuardActionOptions["product"],
+  options: PurchaseGuardActionOptions
+): number | undefined {
+  const combos = Array.isArray((product as any).variant_combos) ? (product as any).variant_combos : [];
+  if (combos.length > 0) {
+    const combo = combos.find((entry: any) =>
+      (options.variantId && entry.id === options.variantId) ||
+      ((!options.variantId || !entry.id) &&
+        (!options.color || entry.color_name?.toLowerCase() === options.color.toLowerCase()) &&
+        (!options.storage || entry.storage === options.storage))
+    );
+    if (!combo) return 0;
+    const qty = Number(combo.available_stock ?? combo.stock_quantity);
+    return Number.isFinite(qty) ? Math.max(0, qty) : 0;
+  }
+
+  const qty = Number((product as any).stock_quantity ?? (product as any).stock_count);
+  return Number.isFinite(qty) ? Math.max(0, qty) : 0;
+}
+
 export function usePurchaseGuard() {
   const { user, loading } = useAuth();
   const { addToCart } = useCart();
@@ -62,7 +83,7 @@ export function usePurchaseGuard() {
         price: options.product.price,
         image: options.image || options.product.images?.[0] || "/placeholder-phone.webp",
         quantity: options.quantity || 1,
-        maxStock: options.maxStock,
+        maxStock: Math.min(options.maxStock ?? Number.POSITIVE_INFINITY, getAvailableStock(options.product, options) ?? 0),
         color: options.color || options.product.colors?.[0],
         storage: options.storage || options.product.storage_options?.[0],
         ram: options.ram,
@@ -73,6 +94,15 @@ export function usePurchaseGuard() {
         allow_card: options.product.allow_card !== false,
         allow_whatsapp: options.product.allow_whatsapp !== false,
       };
+
+      if ((item.maxStock ?? 0) <= 0 || item.quantity > (item.maxStock ?? 0)) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("cart-stock-limit", {
+            detail: { name: item.name, available: item.maxStock },
+          }));
+        }
+        return false;
+      }
 
       if (options.action === "buy-now") {
         setSelectedCheckoutItems([item]);
