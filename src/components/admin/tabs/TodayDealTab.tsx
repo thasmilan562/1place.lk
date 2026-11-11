@@ -61,6 +61,19 @@ function fromDateTimeLocal(localStr: string): string {
   }
 }
 
+function toHexColor(value: string | undefined, fallback: string): string {
+  if (!value) return fallback;
+  const trimmed = value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) return trimmed.toUpperCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(trimmed)) {
+    const r = trimmed[1];
+    const g = trimmed[2];
+    const b = trimmed[3];
+    return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  }
+  return fallback;
+}
+
 export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTabProps) {
   const { isLight } = useAdminTheme();
   const [settings, setSettings] = useState<TodayDealSettings>(() => {
@@ -88,29 +101,41 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
     let isMounted = true;
     async function loadSettings() {
       try {
-        const snap = await getDoc(doc(db, "settings", "today_deal"));
-        if (snap.exists() && isMounted) {
-          const data = snap.data();
-          setSettings((prev) => ({
-            ...prev,
-            ...data,
-            frameBorderRadius: data.frameBorderRadius ?? 0,
-            backgroundBannerBorderRadius: data.backgroundBannerBorderRadius ?? 0,
-            borderRadius: data.borderRadius ?? 0,
-          }));
-          return;
+        let bestData: Record<string, any> | null = null;
+        try {
+          const apiRes = await fetch(`/api/admin/home-offers?_t=${Date.now()}`, { cache: "no-store" });
+          if (apiRes.ok) {
+            const apiJson = await apiRes.json();
+            if (apiJson && typeof apiJson === "object") bestData = apiJson;
+          }
+        } catch {
+          // ignore
         }
 
-        const altSnap = await getDoc(doc(db, "siteSettings", "todayDeal"));
-        if (altSnap.exists() && isMounted) {
-          const altData = altSnap.data();
+        const snap = await getDoc(doc(db, "settings", "today_deal"));
+        if (snap.exists()) {
+          const data = snap.data();
+          const apiTime = bestData?.updatedAt ? new Date(bestData.updatedAt).getTime() : 0;
+          const docTime = data?.updatedAt ? new Date(data.updatedAt).getTime() : 0;
+          if (!bestData || docTime >= apiTime) {
+            bestData = data;
+          }
+        } else if (!bestData) {
+          const altSnap = await getDoc(doc(db, "siteSettings", "todayDeal"));
+          if (altSnap.exists()) {
+            bestData = altSnap.data();
+          }
+        }
+
+        if (bestData && isMounted) {
           setSettings((prev) => ({
             ...prev,
-            ...altData,
-            frameBorderRadius: altData.frameBorderRadius ?? 0,
-            backgroundBannerBorderRadius: altData.backgroundBannerBorderRadius ?? 0,
-            borderRadius: altData.borderRadius ?? 0,
+            ...bestData,
+            frameBorderRadius: bestData.frameBorderRadius ?? 0,
+            backgroundBannerBorderRadius: bestData.backgroundBannerBorderRadius ?? 0,
+            borderRadius: bestData.borderRadius ?? 0,
           }));
+          return;
         }
       } catch (err) {
         console.warn("Could not fetch today's deal settings:", err);
@@ -165,6 +190,71 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
 
   // Save Settings to Firestore
   const handleSave = async () => {
+    setSaving(true);
+    setSavedSuccess(false);
+
+    try {
+      const payload: TodayDealSettings = {
+        ...settings,
+        status: campaignStatus,
+        updatedAt: new Date().toISOString(),
+        updatedBy: "Admin",
+      };
+
+      let savedOk = false;
+
+      try {
+        const res = await fetch("/api/admin/home-offers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) savedOk = true;
+      } catch (apiErr) {
+        console.warn("Admin home-offers API save fallback:", apiErr);
+      }
+
+      try {
+        await setDoc(doc(db, "settings", "today_deal"), payload, { merge: true });
+        await setDoc(doc(db, "siteSettings", "todayDeal"), payload, { merge: true });
+        savedOk = true;
+      } catch (fsErr) {
+        console.warn("Client Firestore today_deal save fallback:", fsErr);
+      }
+
+      if (!savedOk) {
+        throw new Error("Could not save Today's Deal settings to server or Firestore.");
+      }
+
+      clearDataCache("settings:today_deal");
+      clearDataCache("settings");
+
+      if (typeof window !== "undefined") {
+        try {
+          if ("BroadcastChannel" in window) {
+            const bc = new BroadcastChannel("oneplace_today_deal_sync");
+            bc.postMessage({ type: "TODAY_DEAL_UPDATED", settings: payload, timestamp: Date.now() });
+            bc.close();
+          }
+          localStorage.setItem("oneplace_today_deal_sync", JSON.stringify(payload));
+        } catch {
+          // ignore
+        }
+      }
+
+      setSettings(payload);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3500);
+
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error("Failed to save today's deal settings:", err);
+      alert("Failed to save settings. Please check your internet connection.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const _unusedLegacyHandleSave = async () => {
     setSaving(true);
     setSavedSuccess(false);
 
@@ -1315,15 +1405,15 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                       Frame Corner Radius
                     </label>
                     <span className="font-mono text-purple-400 font-bold">
-                      {settings.frameBorderRadius ?? 36}px
+                      {settings.frameBorderRadius ?? 0}px
                     </span>
                   </div>
                   <input
                     type="range"
-                    min="12"
+                    min="0"
                     max="48"
                     step="2"
-                    value={settings.frameBorderRadius ?? 36}
+                    value={settings.frameBorderRadius ?? 0}
                     onChange={(e) => setSettings({ ...settings, frameBorderRadius: Number(e.target.value) })}
                     className="w-full accent-purple-500 cursor-pointer"
                   />
@@ -1390,7 +1480,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={settings.boxBackgroundColor || "#090909"}
+                      value={toHexColor(settings.boxBackgroundColor, "#FFFFFF")}
                       onChange={(e) => setSettings({ ...settings, boxBackgroundColor: e.target.value })}
                       className="w-8 h-8 rounded-lg bg-transparent border-0 cursor-pointer"
                     />
@@ -1409,7 +1499,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={settings.headingColor || "#FFFFFF"}
+                      value={toHexColor(settings.headingColor, "#F1592A")}
                       onChange={(e) => setSettings({ ...settings, headingColor: e.target.value })}
                       className="w-8 h-8 rounded-lg bg-transparent border-0 cursor-pointer"
                     />
@@ -1428,7 +1518,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={settings.descriptionColor || "#E5E5E5"}
+                      value={toHexColor(settings.descriptionColor, "#F1592A")}
                       onChange={(e) => setSettings({ ...settings, descriptionColor: e.target.value })}
                       className="w-8 h-8 rounded-lg bg-transparent border-0 cursor-pointer"
                     />
@@ -1447,7 +1537,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={settings.eyebrowColor || "#ED0712"}
+                      value={toHexColor(settings.eyebrowColor, "#262626")}
                       onChange={(e) => setSettings({ ...settings, eyebrowColor: e.target.value })}
                       className="w-8 h-8 rounded-lg bg-transparent border-0 cursor-pointer"
                     />
@@ -1466,7 +1556,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={settings.ctaBackgroundColor || "#ED0712"}
+                      value={toHexColor(settings.ctaBackgroundColor, "#F1592A")}
                       onChange={(e) => setSettings({ ...settings, ctaBackgroundColor: e.target.value })}
                       className="w-8 h-8 rounded-lg bg-transparent border-0 cursor-pointer"
                     />
@@ -1485,7 +1575,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={settings.ctaTextColor || "#FFFFFF"}
+                      value={toHexColor(settings.ctaTextColor, "#FFFFFF")}
                       onChange={(e) => setSettings({ ...settings, ctaTextColor: e.target.value })}
                       className="w-8 h-8 rounded-lg bg-transparent border-0 cursor-pointer"
                     />
@@ -1504,7 +1594,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={settings.countdownBackgroundColor || "#FFFFFF"}
+                      value={toHexColor(settings.countdownBackgroundColor, "#F1592A")}
                       onChange={(e) => setSettings({ ...settings, countdownBackgroundColor: e.target.value })}
                       className="w-8 h-8 rounded-lg bg-transparent border-0 cursor-pointer"
                     />
@@ -1523,7 +1613,7 @@ export default function TodayDealTab({ initialSettings, onRefresh }: TodayDealTa
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={settings.countdownTextColor || "#090909"}
+                      value={toHexColor(settings.countdownTextColor, "#FFFFFF")}
                       onChange={(e) => setSettings({ ...settings, countdownTextColor: e.target.value })}
                       className="w-8 h-8 rounded-lg bg-transparent border-0 cursor-pointer"
                     />

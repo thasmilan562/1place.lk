@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const NO_CACHE_HEADERS = {
-  "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30",
+  "Cache-Control": "no-store, no-cache, must-revalidate",
 };
 
 function withTimeout<T>(promise: Promise<T>, ms = 1500): Promise<T> {
@@ -19,13 +19,23 @@ function withTimeout<T>(promise: Promise<T>, ms = 1500): Promise<T> {
 
 export async function GET() {
   try {
-    let settings: HomeOfferSettings = getLocalHomeOffers();
+    let settings: any = getLocalHomeOffers();
 
     try {
       const db = getAdminDb();
-      const snap = await withTimeout(db.collection("settings").doc("home_offers").get(), 1200);
-      if (snap.exists) {
-        settings = { ...settings, ...(snap.data() as HomeOfferSettings) };
+      const [dealSnap, homeSnap] = await Promise.all([
+        withTimeout(db.collection("settings").doc("today_deal").get(), 1200).catch(() => null),
+        withTimeout(db.collection("settings").doc("home_offers").get(), 1200).catch(() => null),
+      ]);
+      const remoteData = dealSnap?.exists ? dealSnap.data() : homeSnap?.exists ? homeSnap.data() : null;
+      if (remoteData) {
+        const localTime = settings?.updatedAt ? new Date(settings.updatedAt).getTime() : 0;
+        const remoteTime = remoteData.updatedAt ? new Date(remoteData.updatedAt).getTime() : 0;
+        if (remoteTime >= localTime) {
+          settings = { ...settings, ...remoteData };
+        } else {
+          settings = { ...remoteData, ...settings };
+        }
       }
     } catch {
       // Return local settings seamlessly

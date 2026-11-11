@@ -218,6 +218,44 @@ export async function getCategories(includeInactive = false): Promise<Category[]
   }, CACHE_TTL.CATEGORIES);
 }
 
+/** Categories explicitly stored in the admin collection, without demo fallbacks. */
+export async function getAdminCategories(forceRefresh = false): Promise<Category[]> {
+  if (forceRefresh) clearDataCache("categories:admin-managed");
+  return cachedFetch("categories:admin-managed", async () => {
+    try {
+      const snapshot = await getDocs(query(collection(db, "categories")));
+      const storedCategories = snapshot.docs.map((document) => {
+        const data = document.data() as Category;
+        const image = data.image_url || data.iconUrl || "";
+        const isActive = data.isActive !== undefined ? data.isActive : data.status !== "inactive";
+        const sortOrder = data.sortOrder !== undefined ? data.sortOrder : (data.sort_order ?? 0);
+        return {
+          ...data,
+          id: document.id,
+          image_url: normalizeImageUrl(image),
+          iconUrl: data.iconUrl || normalizeImageUrl(image),
+          isActive,
+          status: (isActive ? "active" : "inactive") as "active" | "inactive" | "deleted",
+          sort_order: sortOrder,
+          sortOrder,
+        };
+      }).filter((category) => {
+        if (category.isDeleted === true || category.status === "deleted" || category.status === "inactive") return false;
+        const name = (category.name || "").toLowerCase();
+        const slug = (category.slug || "").toLowerCase();
+        return !KNOWN_BRAND_NAMES.some((brand) => brand.toLowerCase() === name || brand.toLowerCase() === slug);
+      });
+
+      return deduplicateCategories(storedCategories).sort(
+        (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      );
+    } catch (error) {
+      console.warn("Unable to load admin-managed categories:", error);
+      return [];
+    }
+  }, CACHE_TTL.CATEGORIES);
+}
+
 // ── 4. Brands ──
 import { getBrandsFromDb } from "./firestore-brands";
 
@@ -364,43 +402,48 @@ export async function getOfferBanners(placement?: string): Promise<OfferBanner[]
 export async function getHeroSlides(): Promise<HeroSlide[]> {
   return cachedFetch("hero_slides:all", async () => {
     try {
+      let localList: HeroSlide[] = [];
+      let mergeFn: ((a: HeroSlide[], b: HeroSlide[]) => HeroSlide[]) | null = null;
       if (typeof window === "undefined") {
         try {
-          const { getLocalHeroSlides } = await import("@/lib/hero-store");
-          const localList = getLocalHeroSlides();
-          if (Array.isArray(localList) && localList.length > 0) {
-            const activeList = localList.filter((s) => s.active !== false);
-            if (activeList.length > 0) {
-              return activeList
-                .map((s) => ({
-                  ...s,
-                  image_url: normalizeImageUrl(s.image_url),
-                  desktop_image_url: normalizeImageUrl(s.desktop_image_url || s.image_url),
-                  mobile_image_url: normalizeImageUrl(s.mobile_image_url || s.desktop_image_url || s.image_url),
-                }))
-                .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-            }
-          }
+          const heroStore = await import("@/lib/hero-store");
+          localList = heroStore.getLocalHeroSlides();
+          mergeFn = heroStore.mergeHeroSlides;
         } catch {
           // ignore server local store lookup error
         }
       }
 
-      const q = query(collection(db, "hero_slides"));
-      const snapshot = await getDocs(q);
-      const slides = snapshot.docs.map((d) => {
-        const data = d.data() as HeroSlide;
-        return {
-          ...data,
+      let remoteList: HeroSlide[] = [];
+      try {
+        const q = query(collection(db, "hero_slides"));
+        const snapshot = await getDocs(q);
+        remoteList = snapshot.docs.map((d) => ({
+          ...(d.data() as HeroSlide),
           id: d.id,
-          image_url: normalizeImageUrl(data.image_url),
-          desktop_image_url: normalizeImageUrl(data.desktop_image_url || data.image_url),
-          mobile_image_url: normalizeImageUrl(data.mobile_image_url || data.desktop_image_url || data.image_url),
-        } as HeroSlide;
-      });
-      const activeSlides = slides.filter((s) => s.active !== false);
+        }));
+      } catch (e) {
+        console.warn("Offline/Error fetching remote hero slides:", e);
+      }
+
+      const combined = mergeFn && localList.length > 0 && remoteList.length > 0
+        ? mergeFn(localList, remoteList)
+        : remoteList.length > 0
+          ? remoteList
+          : localList;
+
+      const activeSlides = combined
+        .filter((s) => s.active !== false)
+        .map((s) => ({
+          ...s,
+          image_url: normalizeImageUrl(s.image_url),
+          desktop_image_url: normalizeImageUrl(s.desktop_image_url || s.image_url),
+          mobile_image_url: normalizeImageUrl(s.mobile_image_url || s.desktop_image_url || s.image_url),
+        }))
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
       if (activeSlides.length > 0) {
-        return activeSlides.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        return activeSlides;
       }
     } catch (e) {
       console.warn("Offline/Error fetching hero slides:", e);
@@ -800,37 +843,64 @@ export async function getMegaMenuSettings(): Promise<MegaMenuSettings> {
 // ── 21. Today Deal Settings ──
 export async function getTodayDealSettings(): Promise<TodayDealSettings> {
   return cachedFetch("settings:today_deal", async () => {
+    let bestData: Record<string, any> | null = null;
+
+    if (typeof window === "undefined") {
+      try {
+        const { getLocalHomeOffers } = await import("@/lib/home-offers-store");
+        const localOffers = getLocalHomeOffers();
+        if (localOffers && typeof localOffers === "object") {
+          bestData = localOffers;
+        }
+      } catch {
+        // ignore
+      }
+    } else {
+      try {
+        const res = await fetch(`/api/home-offers?_t=${Date.now()}`, { cache: "no-store" });
+        if (res.ok) {
+          const apiData = await res.json();
+          if (apiData && typeof apiData === "object") {
+            bestData = apiData;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     try {
       const docRef = doc(db, "settings", "today_deal");
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const dealData = docSnap.data();
-        return {
-          ...DEFAULT_TODAY_DEAL_SETTINGS,
-          ...dealData,
-          desktopImageUrl: normalizeImageUrl(dealData.desktopImageUrl),
-          mobileImageUrl: normalizeImageUrl(dealData.mobileImageUrl),
-          squareImageUrl: normalizeImageUrl(dealData.squareImageUrl),
-          backgroundBannerUrl: normalizeImageUrl(dealData.backgroundBannerUrl),
-        } as TodayDealSettings;
-      }
-
-      const altDocRef = doc(db, "siteSettings", "todayDeal");
-      const altSnap = await getDoc(altDocRef);
-      if (altSnap.exists()) {
-        const altData = altSnap.data();
-        return {
-          ...DEFAULT_TODAY_DEAL_SETTINGS,
-          ...altData,
-          desktopImageUrl: normalizeImageUrl(altData.desktopImageUrl),
-          mobileImageUrl: normalizeImageUrl(altData.mobileImageUrl),
-          squareImageUrl: normalizeImageUrl(altData.squareImageUrl),
-          backgroundBannerUrl: normalizeImageUrl(altData.backgroundBannerUrl),
-        } as TodayDealSettings;
+        const bestTime = bestData?.updatedAt ? new Date(bestData.updatedAt).getTime() : 0;
+        const docTime = dealData?.updatedAt ? new Date(dealData.updatedAt).getTime() : 0;
+        if (!bestData || docTime >= bestTime) {
+          bestData = dealData;
+        }
+      } else if (!bestData) {
+        const altDocRef = doc(db, "siteSettings", "todayDeal");
+        const altSnap = await getDoc(altDocRef);
+        if (altSnap.exists()) {
+          bestData = altSnap.data();
+        }
       }
     } catch (e) {
       console.warn("Offline/Error fetching Today's Deal settings:", e);
     }
+
+    if (bestData) {
+      return {
+        ...DEFAULT_TODAY_DEAL_SETTINGS,
+        ...bestData,
+        desktopImageUrl: normalizeImageUrl(bestData.desktopImageUrl),
+        mobileImageUrl: normalizeImageUrl(bestData.mobileImageUrl),
+        squareImageUrl: normalizeImageUrl(bestData.squareImageUrl),
+        backgroundBannerUrl: normalizeImageUrl(bestData.backgroundBannerUrl),
+      } as TodayDealSettings;
+    }
+
     return DEFAULT_TODAY_DEAL_SETTINGS;
   }, CACHE_TTL.SETTINGS);
 }

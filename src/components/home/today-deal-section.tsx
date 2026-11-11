@@ -73,10 +73,66 @@ export default function TodayDealSection({
   useEffect(() => {
     if (isLivePreview) return;
     let primaryExists = false;
-    const applySettings = (data?: Partial<TodayDealSettings>) => {
+    const applySettings = (data?: Partial<TodayDealSettings> | null) => {
       if (!data) return;
-      setLiveSettings((previous) => ({ ...previous, ...data } as TodayDealSettings));
+      setLiveSettings((previous) => {
+        const prevTime = previous?.updatedAt ? new Date(previous.updatedAt).getTime() : 0;
+        const nextTime = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
+        if (prevTime > 0 && nextTime > 0 && nextTime < prevTime) {
+          return previous;
+        }
+        return { ...previous, ...data } as TodayDealSettings;
+      });
     };
+    const fetchLatestApi = () => {
+      fetch(`/api/home-offers?_t=${Date.now()}`, { cache: "no-store" })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && typeof data === "object") applySettings(data);
+        })
+        .catch(() => {});
+    };
+
+    fetchLatestApi();
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      try {
+        channel = new BroadcastChannel("oneplace_today_deal_sync");
+        channel.onmessage = (event) => {
+          if (event.data?.settings) {
+            applySettings(event.data.settings);
+          } else {
+            fetchLatestApi();
+          }
+        };
+      } catch {
+        channel = null;
+      }
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "oneplace_today_deal_sync" && event.newValue) {
+        try {
+          const parsed = JSON.parse(event.newValue);
+          if (parsed && typeof parsed === "object") {
+            applySettings(parsed);
+            return;
+          }
+        } catch {
+          // ignore
+        }
+        fetchLatestApi();
+      }
+    };
+
+    const handleFocus = () => fetchLatestApi();
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", handleStorage);
+      window.addEventListener("focus", handleFocus);
+    }
+
     const primaryUnsubscribe = onSnapshot(
       doc(db, "settings", "today_deal"),
       (snapshot) => {
@@ -99,6 +155,11 @@ export default function TodayDealSection({
     return () => {
       primaryUnsubscribe();
       legacyUnsubscribe();
+      if (channel) channel.close();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleStorage);
+        window.removeEventListener("focus", handleFocus);
+      }
     };
   }, [isLivePreview]);
 
@@ -246,19 +307,38 @@ export default function TodayDealSection({
   const hasBgBanner = deal.backgroundBannerEnabled !== false;
   const bgOverlayOpacity = typeof deal.backgroundBannerOverlayOpacity === "number" ? deal.backgroundBannerOverlayOpacity / 100 : 0.45;
 
-  // Colors & Typography strictly following the screenshot aesthetic
-  const isOldDarkDefault =
-    (deal.boxBackgroundColor === "#090909" || !deal.boxBackgroundColor) &&
-    (deal.headingColor === "#FFFFFF" || !deal.headingColor);
-
-  const cardBgColor = isOldDarkDefault ? "#FFFFFF" : (deal.boxBackgroundColor || "#FFFFFF");
-  const headingTextColor = isOldDarkDefault ? "#F1592A" : (deal.headingColor || "#F1592A");
-  const descTextColor = isOldDarkDefault ? "#F1592A" : (deal.descriptionColor || "#F1592A");
-  const eyebrowTagColor = isOldDarkDefault ? "#262626" : (deal.eyebrowColor || "#262626");
-  const ctaBtnBg = isOldDarkDefault ? "#F1592A" : (deal.ctaBackgroundColor || "#F1592A");
+  // Colors & Typography honoring live user customization
+  const rawCardBgColor = deal.boxBackgroundColor || "#FFFFFF";
+  const boxOpacity = typeof deal.boxBackgroundOpacity === "number" ? deal.boxBackgroundOpacity : 100;
+  const cardBgColor = (() => {
+    if (boxOpacity >= 100) return rawCardBgColor;
+    const hex = rawCardBgColor.replace("#", "").trim();
+    if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(100, boxOpacity)) / 100})`;
+    }
+    return rawCardBgColor;
+  })();
+  const headingTextColor = deal.headingColor || "#F1592A";
+  const descTextColor = deal.descriptionColor || "#F1592A";
+  const eyebrowTagColor = deal.eyebrowColor || "#262626";
+  const ctaBtnBg = deal.ctaBackgroundColor || "#F1592A";
   const ctaBtnText = deal.ctaTextColor || "#FFFFFF";
-  const timerBg = isOldDarkDefault ? "#F1592A" : (deal.countdownBackgroundColor === "transparent" ? "#F1592A" : (deal.countdownBackgroundColor || "#F1592A"));
-  const timerText = isOldDarkDefault ? "#FFFFFF" : (deal.countdownTextColor === "#090909" ? "#FFFFFF" : (deal.countdownTextColor || "#FFFFFF"));
+  const timerBg = deal.countdownBackgroundColor === "transparent" ? "transparent" : (deal.countdownBackgroundColor || "#F1592A");
+  const timerText = deal.countdownTextColor || "#FFFFFF";
+  const leftCardRadius = typeof deal.borderRadius === "number" ? deal.borderRadius : 0;
+  const rightCardRadius = typeof deal.frameBorderRadius === "number" ? deal.frameBorderRadius : 0;
+  const bgBannerRadius = typeof deal.backgroundBannerBorderRadius === "number" ? deal.backgroundBannerBorderRadius : 0;
+  const cardMinHeight = typeof deal.frameHeight === "number" && deal.frameHeight >= 280 ? `${deal.frameHeight}px` : undefined;
+  const rightCardBackground =
+    deal.bannerBgType === "gradient"
+      ? `linear-gradient(135deg, ${deal.bannerBgGradientFrom || "#0F172A"}, ${deal.bannerBgGradientTo || "#020617"})`
+      : (deal.bannerBgColor || rawCardBgColor);
+  const imageDarkTint = typeof deal.imageOverlayOpacity === "number" && deal.imageOverlayOpacity > 0
+    ? deal.imageOverlayOpacity / 100
+    : 0;
 
   // Fit and padding resolution
   const cardPaddingClass =
@@ -285,6 +365,12 @@ export default function TodayDealSection({
       : deal.contentAlignment === "right"
         ? "text-right items-end"
         : "text-left items-start";
+  const verticalJustifyClass =
+    deal.verticalAlignment === "top"
+      ? "justify-start gap-6"
+      : deal.verticalAlignment === "bottom"
+        ? "justify-end gap-6"
+        : "justify-between";
 
   const content = (
     <section
@@ -292,22 +378,23 @@ export default function TodayDealSection({
       aria-label="Today's Deal Promotional Showcase"
       className={`today-deal-section w-full py-8 sm:py-12 lg:py-14 select-none relative overflow-hidden ${className}`}
     >
-      {/* ── 100% Sharp 90-Degree Square Background Banner Behind Both Cards ── */}
+      {/* ── Background Banner Behind Both Cards ── */}
       {hasBgBanner && (
         <div
-          className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-hidden rounded-none"
-          style={{ borderRadius: 0 }}
+          className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-hidden"
+          style={{ borderRadius: `${bgBannerRadius}px` }}
         >
           <img
             src={normalizeImageUrl(bgBannerUrl)}
             alt="Today's Deal Background Banner"
-            className="w-full h-full object-cover object-center rounded-none"
+            className="w-full h-full object-cover object-center"
+            style={{ borderRadius: `${bgBannerRadius}px` }}
           />
           <div
-            className="absolute inset-0 w-full h-full rounded-none"
+            className="absolute inset-0 w-full h-full"
             style={{
               backgroundColor: `rgba(0, 0, 0, ${bgOverlayOpacity})`,
-              borderRadius: 0,
+              borderRadius: `${bgBannerRadius}px`,
             }}
           />
         </div>
@@ -316,13 +403,15 @@ export default function TodayDealSection({
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="today-deal-section__grid grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-stretch">
 
-          {/* ── Left Card: 100% Sharp 90-Degree Square Corners (0px Radius) ── */}
+          {/* ── Left Card ── */}
           <div
             style={{
               backgroundColor: cardBgColor,
-              borderRadius: 0,
+              borderRadius: `${leftCardRadius}px`,
+              minHeight: cardMinHeight,
+              padding: typeof deal.boxPadding === "number" ? `${deal.boxPadding}px` : undefined,
             }}
-            className={`today-deal-section__copy border border-neutral-200/90 shadow-sm p-6 sm:p-10 lg:p-12 flex flex-col justify-between transition-all duration-300 rounded-none w-full min-h-[480px] sm:min-h-[520px] md:min-h-[560px] lg:min-h-[580px] h-full ${isBoxOnRight ? "md:order-2" : "md:order-1"
+            className={`today-deal-section__copy border border-neutral-200/90 shadow-sm p-6 sm:p-10 lg:p-12 flex flex-col ${verticalJustifyClass} transition-all duration-300 w-full min-h-[480px] sm:min-h-[520px] md:min-h-[560px] lg:min-h-[580px] h-full ${isBoxOnRight ? "md:order-2" : "md:order-1"
               }`}
           >
             <div className={`flex flex-col ${contentAlignClass}`}>
@@ -455,19 +544,21 @@ export default function TodayDealSection({
             </div>
           </div>
 
-          {/* ── Right Card: 100% Sharp 90-Degree Square Poster (0px Radius, Identical Equal Height) ── */}
+          {/* ── Right Card ── */}
           <div
             style={{
-              backgroundColor: deal.bannerBgColor || cardBgColor,
-              borderRadius: 0,
+              background: rightCardBackground,
+              borderRadius: `${rightCardRadius}px`,
+              minHeight: cardMinHeight,
             }}
-            className={`today-deal-section__image border border-neutral-200/90 shadow-sm ${cardPaddingClass} flex items-center justify-center relative overflow-hidden group transition-all duration-300 w-full rounded-none min-h-[480px] sm:min-h-[520px] md:min-h-[560px] lg:min-h-[580px] h-full ${isBoxOnRight ? "md:order-1" : "md:order-2"
+            className={`today-deal-section__image border border-neutral-200/90 shadow-sm ${cardPaddingClass} flex items-center justify-center relative overflow-hidden group transition-all duration-300 w-full min-h-[480px] sm:min-h-[520px] md:min-h-[560px] lg:min-h-[580px] h-full ${isBoxOnRight ? "md:order-1" : "md:order-2"
               }`}
           >
             <Link
               href={activeCtaUrl}
               target={deal.openInNewTab ? "_blank" : undefined}
-              className="w-full h-full flex items-center justify-center cursor-pointer overflow-hidden relative rounded-none"
+              className="w-full h-full flex items-center justify-center cursor-pointer overflow-hidden relative"
+              style={{ borderRadius: `${typeof deal.squareImageBorderRadius === "number" ? deal.squareImageBorderRadius : rightCardRadius}px` }}
               aria-label={deal.heading || "Today's Deal Product"}
             >
               {isLivePreview ? (
@@ -477,14 +568,14 @@ export default function TodayDealSection({
                   alt={deal.imageAlt || deal.heading || "Today's Deal Product Mockup"}
                   style={{
                     transform: imgScale !== 1 ? `scale(${imgScale})` : undefined,
-                    borderRadius: 0,
+                    borderRadius: `${typeof deal.squareImageBorderRadius === "number" ? deal.squareImageBorderRadius : 0}px`,
                   }}
-                  className={`${imageFitClass} ${activeFocalClass} transition-transform duration-500 ease-out group-hover:scale-105 rounded-none w-full h-full object-cover`}
+                  className={`${imageFitClass} ${activeFocalClass} transition-transform duration-500 ease-out group-hover:scale-105`}
                   onError={() => setImgError(true)}
                 />
               ) : (
                 /* Public Production Mode: Responsive picture element with desktop and mobile fallback */
-                <picture className="w-full h-full flex items-center justify-center rounded-none">
+                <picture className="w-full h-full flex items-center justify-center">
                   {mobileImg && (
                     <source
                       media="(max-width: 640px)"
@@ -496,12 +587,18 @@ export default function TodayDealSection({
                     alt={deal.imageAlt || deal.heading || "Today's Deal Product Mockup"}
                     style={{
                       transform: imgScale !== 1 ? `scale(${imgScale})` : undefined,
-                      borderRadius: 0,
+                      borderRadius: `${typeof deal.squareImageBorderRadius === "number" ? deal.squareImageBorderRadius : 0}px`,
                     }}
-                    className={`${imageFitClass} ${desktopFocalClass} transition-transform duration-500 ease-out group-hover:scale-105 rounded-none w-full h-full object-cover`}
+                    className={`${imageFitClass} ${desktopFocalClass} transition-transform duration-500 ease-out group-hover:scale-105`}
                     onError={() => setImgError(true)}
                   />
                 </picture>
+              )}
+              {imageDarkTint > 0 && (
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ backgroundColor: `rgba(0, 0, 0, ${imageDarkTint})` }}
+                />
               )}
             </Link>
           </div>

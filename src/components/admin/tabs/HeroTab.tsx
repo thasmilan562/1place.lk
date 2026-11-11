@@ -62,17 +62,29 @@ export default function HeroTab({ slides, onAdd, onEdit, onDelete, onToggleStatu
               }`}
             >
               {/* Media Preview Box */}
-              <div className="relative aspect-[2200/675] overflow-hidden" style={{ backgroundColor: "#f0eeeb" }}>
+              <div className="relative aspect-[2200/675] overflow-hidden" style={{ backgroundColor: slide.banner_bg_color || slide.bg_color || "#f0eeeb" }}>
                 <img
-                  src={slide.image_url}
+                  src={slide.desktop_image_url || slide.image_url}
                   alt={slide.alt || "Hero slide preview"}
-                  className="w-full h-full object-contain"
-                  style={{ objectPosition: slide.desktop_image_position || "center" }}
+                  className="w-full h-full"
+                  style={{
+                    objectFit: slide.image_fit_mode === "contain" ? "contain" : "cover",
+                    objectPosition: slide.desktop_image_position || "center",
+                  }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                {(slide.overlay_opacity ?? 0) > 0 && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundColor: slide.overlay_color || "#000000",
+                      opacity: (slide.overlay_opacity ?? 0) / 100,
+                    }}
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent pointer-events-none" />
                 
                 {/* Active Toggle Badge */}
-                <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10">
                   <button
                     type="button"
                     onClick={() => onToggleStatus?.(slide.id, slide.active === false)}
@@ -90,6 +102,36 @@ export default function HeroTab({ slides, onAdd, onEdit, onDelete, onToggleStatu
                   </button>
                 </div>
 
+                {/* Live Mini Overlay Text & Color Swatches */}
+                <div className="absolute bottom-2.5 left-3 right-3 flex items-end justify-between gap-2 pointer-events-none z-10">
+                  <div className="min-w-0">
+                    {slide.show_badge !== false && slide.campaign_label && (
+                      <span
+                        className="block text-[9px] font-extrabold uppercase tracking-wider truncate"
+                        style={{ color: slide.badge_text_color || "#f3c2d5" }}
+                      >
+                        {slide.campaign_label}
+                      </span>
+                    )}
+                    <p
+                      className="text-xs font-extrabold leading-tight truncate drop-shadow"
+                      style={{ color: slide.heading_line_1_color || slide.headingLine1Color || slide.heading_color || "#FFFFFF" }}
+                    >
+                      {slide.heading_line_1 || slide.heading || "Hero Banner"}
+                    </p>
+                  </div>
+                  {slide.show_primary_button !== false && (
+                    <span
+                      className="px-2 py-0.5 rounded text-[9px] font-bold shrink-0 shadow-xs"
+                      style={{
+                        backgroundColor: slide.button_bg_color || "#FFFFFF",
+                        color: slide.button_text_color || "#000000",
+                      }}
+                    >
+                      {slide.primary_button_text || "Shop Now"}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Info Body */}

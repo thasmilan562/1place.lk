@@ -43,13 +43,23 @@ export async function GET(req: Request) {
   if (!verifyAdminRequest(req)) return unauthorized();
 
   try {
-    let settings: HomeOfferSettings = getLocalHomeOffers();
+    let settings: any = getLocalHomeOffers();
 
     try {
       const db = getAdminDb();
-      const snap = await withTimeout(db.collection("settings").doc("home_offers").get(), 1500);
-      if (snap.exists) {
-        settings = { ...settings, ...(snap.data() as HomeOfferSettings) };
+      const [dealSnap, homeSnap] = await Promise.all([
+        withTimeout(db.collection("settings").doc("today_deal").get(), 1500).catch(() => null),
+        withTimeout(db.collection("settings").doc("home_offers").get(), 1500).catch(() => null),
+      ]);
+      const remoteData = dealSnap?.exists ? dealSnap.data() : homeSnap?.exists ? homeSnap.data() : null;
+      if (remoteData) {
+        const localTime = settings?.updatedAt ? new Date(settings.updatedAt).getTime() : 0;
+        const remoteTime = remoteData.updatedAt ? new Date(remoteData.updatedAt).getTime() : 0;
+        if (remoteTime >= localTime) {
+          settings = { ...settings, ...remoteData };
+        } else {
+          settings = { ...remoteData, ...settings };
+        }
       }
     } catch {
       // Offline / Quota exceeded fallback to local
@@ -70,7 +80,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const rawSettings = body.settings || body;
 
-    const payload: HomeOfferSettings = {
+    const payload: any = {
       ...HOME_OFFER_DEFAULTS,
       ...rawSettings,
       updatedAt: new Date().toISOString(),
@@ -86,6 +96,7 @@ export async function POST(req: Request) {
       await Promise.allSettled([
         withTimeout(db.collection("settings").doc("home_offers").set(clean, { merge: true }), 2000),
         withTimeout(db.collection("settings").doc("today_deal").set(clean, { merge: true }), 2000),
+        withTimeout(db.collection("siteSettings").doc("todayDeal").set(clean, { merge: true }), 2000),
       ]);
     } catch (dbErr) {
       console.warn("[Admin API HomeOffers POST] Firestore sync warning (local copy preserved):", dbErr);

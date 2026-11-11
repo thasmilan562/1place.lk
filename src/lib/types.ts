@@ -648,6 +648,7 @@ export interface HeroSlide {
   description_size?: string;
   button_size?: "small" | "medium" | "large";
   autoplay_duration?: number;
+  updated_at?: string;
 }
 
 export interface ProductBanner {

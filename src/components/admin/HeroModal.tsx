@@ -19,11 +19,31 @@ const presets = [
   { url: "https://images.unsplash.com/photo-1583394838336-acd977736f90?q=80&w=2200&auto=format&fit=crop", label: "Accessories & Everyday Tech" },
 ];
 
+function toHexColor(val: string | undefined, fallback = "#FFFFFF"): string {
+  if (!val) return fallback;
+  const trimmed = val.trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(trimmed)) return trimmed;
+  if (/^#[0-9A-Fa-f]{3}$/.test(trimmed)) {
+    const r = trimmed[1];
+    const g = trimmed[2];
+    const b = trimmed[3];
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+  return fallback;
+}
+
+function formatCase(text: string, casing?: "as_typed" | "uppercase" | "title_case") {
+  if (casing === "uppercase") return text.toUpperCase();
+  if (casing === "title_case") return text.replace(/\w\S*/g, (word) => word[0].toUpperCase() + word.slice(1).toLowerCase());
+  return text;
+}
+
 export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalProps) {
   const [imageUrl, setImageUrl] = useState("");
   const [mobileImageUrl, setMobileImageUrl] = useState("");
   const [alt, setAlt] = useState("");
   const [campaignLabel, setCampaignLabel] = useState("NEW ARRIVAL");
+  const [badgeTextColor, setBadgeTextColor] = useState("#805166");
   const [heading, setHeading] = useState("");
   const [description, setDescription] = useState("");
   const [promoText, setPromoText] = useState("");
@@ -32,6 +52,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
   const [showSecondaryButton, setShowSecondaryButton] = useState(false);
   const [secondaryButtonText, setSecondaryButtonText] = useState("View Product");
   const [secondaryButtonUrl, setSecondaryButtonUrl] = useState("");
+  const [secondaryButtonTextColor, setSecondaryButtonTextColor] = useState("#FFFFFF");
   const [startDate, setStartDate] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [sortOrder, setSortOrder] = useState<number>(1);
@@ -53,6 +74,8 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
   const [buttonBgColor, setButtonBgColor] = useState("#FFFFFF");
   const [overlayColor, setOverlayColor] = useState("#000000");
   const [overlayOpacity, setOverlayOpacity] = useState<number>(0);
+  const [bannerBgColor, setBannerBgColor] = useState("#F0EEEB");
+  const [imageFitMode, setImageFitMode] = useState<"cover" | "contain">("cover");
   const [desktopImagePosition, setDesktopImagePosition] = useState("center");
   const [mobileImagePosition, setMobileImagePosition] = useState("center");
 
@@ -93,10 +116,11 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
       setDesktopPreview(slide.desktop_image_url || slide.image_url || "");
       setMobilePreview(slide.mobile_image_url || "");
       setAlt(slide.alt || "");
-      setCampaignLabel(slide.campaign_label || "NEW ARRIVAL");
+      setCampaignLabel(slide.campaign_label !== undefined ? slide.campaign_label : "NEW ARRIVAL");
+      setBadgeTextColor(slide.badge_text_color || "#805166");
       setHeading(slide.heading || slide.alt || "");
-      setHeadingLine1(slide.heading_line_1 || "Latest Smartphones.");
-      setHeadingLine2(slide.heading_line_2 || "Ultimate Performance.");
+      setHeadingLine1(slide.heading_line_1 !== undefined ? slide.heading_line_1 : (slide.heading || "Latest Smartphones."));
+      setHeadingLine2(slide.heading_line_2 !== undefined ? slide.heading_line_2 : "");
       setShowHeadingLine1(slide.show_heading_line_1 ?? true);
       setShowHeadingLine2(slide.show_heading_line_2 ?? true);
       setHeadingLine1Color(slide.heading_line_1_color || slide.headingLine1Color || slide.heading_color || "#FFFFFF");
@@ -105,7 +129,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
       setHeadingLine2Casing(slide.heading_line_2_casing || "as_typed");
       setDescription(slide.description || "");
       setPromoText(slide.promo_text || "");
-      setPrimaryButtonText(slide.primary_button_text || "Shop Now");
+      setPrimaryButtonText(slide.primary_button_text !== undefined ? slide.primary_button_text : "Shop Now");
       setPrimaryButtonUrl(slide.primary_button_url || "/products");
       setShowBadge(slide.show_badge ?? true);
       setShowDescription(slide.show_description ?? true);
@@ -113,6 +137,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
       setShowSecondaryButton(slide.show_secondary_button ?? false);
       setSecondaryButtonText(slide.secondary_button_text || "View Product");
       setSecondaryButtonUrl(slide.secondary_button_url || "");
+      setSecondaryButtonTextColor(slide.secondary_button_text_color || "#FFFFFF");
       setStartDate(slide.start_date || "");
       setExpiryDate(slide.expiry_date || "");
       setSortOrder(slide.sort_order ?? 1);
@@ -133,6 +158,8 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
       setButtonBgColor(slide.button_bg_color || "#FFFFFF");
       setOverlayColor(slide.overlay_color || "#000000");
       setOverlayOpacity(slide.overlay_opacity ?? 0);
+      setBannerBgColor(slide.banner_bg_color || slide.bg_color || "#F0EEEB");
+      setImageFitMode(slide.image_fit_mode === "contain" ? "contain" : "cover");
       setDesktopImagePosition(slide.desktop_image_position || "center");
       setMobileImagePosition(slide.mobile_image_position || "center");
 
@@ -154,6 +181,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
       setMobilePreview("");
       setAlt("");
       setCampaignLabel("NEW ARRIVAL");
+      setBadgeTextColor("#805166");
       setHeading("Latest Smartphones. Ultimate Performance.");
       setHeadingLine1("Latest Smartphones.");
       setHeadingLine2("Ultimate Performance.");
@@ -173,6 +201,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
       setShowSecondaryButton(false);
       setSecondaryButtonText("View Product");
       setSecondaryButtonUrl("");
+      setSecondaryButtonTextColor("#FFFFFF");
       setStartDate("");
       setExpiryDate("");
       setSortOrder(1);
@@ -194,6 +223,8 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
       setButtonBgColor("#FFFFFF");
       setOverlayColor("#000000");
       setOverlayOpacity(0);
+      setBannerBgColor("#F0EEEB");
+      setImageFitMode("cover");
       setDesktopImagePosition("center");
       setMobileImagePosition("center");
 
@@ -261,11 +292,13 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
         mobile_image_url: finalMobileUrl || mainImg,
         alt: alt.trim() || computedHeading || "1PLACE.LK Hero Banner",
         campaign_label: campaignLabel.trim(),
+        badge_text_color: badgeTextColor,
         heading: computedHeading,
         heading_line_1: headingLine1.trim(),
         heading_line_2: headingLine2.trim(),
         show_heading_line_1: showHeadingLine1,
         show_heading_line_2: showHeadingLine2,
+        heading_color: headingLine1Color,
         heading_line_1_color: headingLine1Color,
         headingLine1Color: headingLine1Color,
         heading_line_2_color: headingLine2Color,
@@ -282,6 +315,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
         show_secondary_button: showSecondaryButton,
         secondary_button_text: secondaryButtonText.trim() || "View Product",
         secondary_button_url: secondaryButtonUrl.trim(),
+        secondary_button_text_color: secondaryButtonTextColor,
         start_date: startDate,
         expiry_date: expiryDate,
         sort_order: Number(sortOrder) || 1,
@@ -297,7 +331,10 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
         button_text_color: buttonTextColor,
         button_bg_color: buttonBgColor,
         overlay_color: overlayColor,
-        overlay_opacity: Number(overlayOpacity) ?? 40,
+        overlay_opacity: Number.isFinite(Number(overlayOpacity)) ? Number(overlayOpacity) : 0,
+        banner_bg_color: bannerBgColor,
+        bg_color: bannerBgColor,
+        image_fit_mode: imageFitMode,
         desktop_image_position: desktopImagePosition,
         mobile_image_position: mobileImagePosition,
         text_align: textAlign,
@@ -331,6 +368,11 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
   const currentPreviewImage = previewDevice === "mobile"
     ? (mobilePreview || desktopPreview || imageUrl || "/hero-slide-1.png")
     : (desktopPreview || imageUrl || "/hero-slide-1.png");
+
+  const previewHiddenText = previewDevice === "mobile" && (hideContentOnMobile || hideTextOnMobile);
+  const previewHiddenButtons = previewDevice === "mobile" && (hideContentOnMobile || hideButtonsOnMobile);
+  const formattedPreviewLine1 = formatCase(headingLine1 || heading || "Banner Heading", headingLine1Casing);
+  const formattedPreviewLine2 = formatCase(headingLine2 || "", headingLine2Casing);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-200">
@@ -387,14 +429,15 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
             <div
               className={`relative w-full rounded-2xl overflow-hidden border border-white/20 shadow-xl transition-all ${previewDevice === "mobile" ? "aspect-video w-full" : "aspect-[2200/675]"
                 }`}
-              style={{ background: "#f0eeeb" }}
+              style={{ background: bannerBgColor || "#f0eeeb" }}
             >
               {/* Background / Product Image */}
               <img
                 src={currentPreviewImage}
                 alt="Banner preview"
-                className="absolute inset-0 w-full h-full object-cover transition-all"
+                className="absolute inset-0 w-full h-full transition-all"
                 style={{
+                  objectFit: imageFitMode === "contain" ? "contain" : "cover",
                   objectPosition: previewDevice === "mobile" ? mobileImagePosition : desktopImagePosition,
                 }}
                 onError={(e) => {
@@ -420,59 +463,70 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                   textAlign,
                 }}
               >
-                <div className="space-y-1.5" style={{ width: "min(100%, " + (contentMaxWidth === "full" ? "100%" : contentMaxWidth) + ")" }}>
-                  {campaignLabel && showBadge && (
-                    <span
-                      className="inline-block px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-md"
-                      style={{ color: "#805166", backgroundColor: "transparent" }}
-                    >
-                      {campaignLabel}
-                    </span>
-                  )}
-                  <h4
-                    className="font-black leading-tight tracking-tight drop-shadow-md"
-                    style={{ color: headingLine1Color, fontSize: previewDevice === "mobile" ? mobileHeadingSize : desktopHeadingSize, lineHeight, letterSpacing, fontFamily, fontWeight }}
-                  >
-                    {headingLine1 || heading || "Banner Heading"}
-                    {headingLine2 && (
-                      <span className="block" style={{ color: headingLine2Color }}>
-                        {headingLine2}
+                {!previewHiddenText && (
+                  <div className="space-y-1.5" style={{ width: "min(100%, " + (contentMaxWidth === "full" ? "100%" : contentMaxWidth) + ")" }}>
+                    {campaignLabel && showBadge && (
+                      <span
+                        className="inline-block px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-md"
+                        style={{ color: badgeTextColor || "#805166", backgroundColor: "transparent" }}
+                      >
+                        {campaignLabel}
                       </span>
                     )}
-                  </h4>
-                  {description && showDescription && (
-                    <p
-                      className="line-clamp-2 font-medium"
-                      style={{
-                        color: descriptionColor,
-                        fontSize: descriptionSize,
-                      }}
+                    <h4
+                      className="font-black leading-tight tracking-tight drop-shadow-md"
+                      style={{ color: headingLine1Color, fontSize: previewDevice === "mobile" ? mobileHeadingSize : desktopHeadingSize, lineHeight, letterSpacing, fontFamily, fontWeight }}
                     >
-                      {description}
-                    </p>
-                  )}
-                  {promoText && (
-                    <span className="text-xs font-bold text-yellow-400 block drop-shadow-xs">
-                      Starting at {promoText.replace(/^Starting\s+at\s+/i, "")}
-                    </span>
-                  )}
-                </div>
+                      {showHeadingLine1 && (
+                        <span className="block" style={{ color: headingLine1Color }}>
+                          {formattedPreviewLine1}
+                        </span>
+                      )}
+                      {showHeadingLine2 && formattedPreviewLine2 && (
+                        <span className="block" style={{ color: headingLine2Color }}>
+                          {formattedPreviewLine2}
+                        </span>
+                      )}
+                    </h4>
+                    {description && showDescription && (
+                      <p
+                        className="line-clamp-2 font-medium"
+                        style={{
+                          color: descriptionColor,
+                          fontSize: descriptionSize,
+                        }}
+                      >
+                        {description}
+                      </p>
+                    )}
+                    {promoText && (
+                      <span className="text-xs font-bold text-yellow-400 block drop-shadow-xs">
+                        Starting at {promoText.replace(/^Starting\s+at\s+/i, "")}
+                      </span>
+                    )}
+                  </div>
+                )}
 
-                <div className="flex items-center gap-2 pt-2 w-full" style={{ justifyContent: contentHorizontalPosition === "left" ? "flex-start" : contentHorizontalPosition === "right" ? "flex-end" : "center" }}>
-                  {showPrimaryButton && (
-                    <span
-                      className="font-bold rounded-md shadow-sm"
-                      style={{ color: buttonTextColor, backgroundColor: buttonBgColor, fontSize: buttonSize === "small" ? "11px" : buttonSize === "large" ? "16px" : "13px", padding: buttonSize === "small" ? "6px 14px" : buttonSize === "large" ? "12px 28px" : "8px 20px" }}
-                    >
-                      {primaryButtonText || "Shop Now"}
-                    </span>
-                  )}
-                  {showSecondaryButton && (
-                    <span className="border border-white/30 text-white font-bold rounded-full bg-black/30 backdrop-blur-md" style={{ fontSize: buttonSize === "small" ? "10px" : buttonSize === "large" ? "15px" : "12px", padding: buttonSize === "small" ? "5px 12px" : buttonSize === "large" ? "11px 24px" : "7px 18px" }}>
-                      {secondaryButtonText || "View"}
-                    </span>
-                  )}
-                </div>
+                {!previewHiddenButtons && (
+                  <div className="flex items-center gap-2 pt-2 w-full" style={{ justifyContent: contentHorizontalPosition === "left" ? "flex-start" : contentHorizontalPosition === "right" ? "flex-end" : "center" }}>
+                    {showPrimaryButton && (
+                      <span
+                        className="font-bold rounded-md shadow-sm"
+                        style={{ color: buttonTextColor, backgroundColor: buttonBgColor, fontSize: buttonSize === "small" ? "11px" : buttonSize === "large" ? "16px" : "13px", padding: buttonSize === "small" ? "6px 14px" : buttonSize === "large" ? "12px 28px" : "8px 20px" }}
+                      >
+                        {primaryButtonText || "Shop Now"}
+                      </span>
+                    )}
+                    {showSecondaryButton && (
+                      <span
+                        className="border border-white/30 font-bold rounded-full bg-black/30 backdrop-blur-md"
+                        style={{ color: secondaryButtonTextColor || "#FFFFFF", fontSize: buttonSize === "small" ? "10px" : buttonSize === "large" ? "15px" : "12px", padding: buttonSize === "small" ? "5px 12px" : buttonSize === "large" ? "11px 24px" : "7px 18px" }}
+                      >
+                        {secondaryButtonText || "View"}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -495,7 +549,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
               <p className="mt-1 text-[10px] leading-relaxed text-white/60">Desktop fills the full-width hero. Mobile uses a zoomed 16:9 crop; adjust the mobile focal position below.</p>
             </div>
 
-            {/* Autoplay Duration & Description Font Size */}
+            {/* Autoplay Duration, Image Fit & Description Font Size */}
             <div className="pt-3 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-bold text-white/80 mb-1">
@@ -511,6 +565,20 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                   <option value="5.5">5.5 Seconds (Default Balanced)</option>
                   <option value="7">7 Seconds (Relaxed)</option>
                   <option value="10">10 Seconds (Slow Showcase)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-white/80 mb-1">
+                  Image Fit Mode
+                </label>
+                <select
+                  value={imageFitMode}
+                  onChange={(e) => setImageFitMode(e.target.value as "cover" | "contain")}
+                  className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs font-semibold focus:ring-1 focus:ring-rose-500 outline-none"
+                >
+                  <option value="cover">Cover (Full Frame Bleed)</option>
+                  <option value="contain">Contain (Show Full Artwork)</option>
                 </select>
               </div>
 
@@ -581,11 +649,29 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
             {/* Colors Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
+                <label className="block text-[11px] font-bold text-white/70 mb-1">Eyebrow / Badge Color</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={toHexColor(badgeTextColor, "#805166")}
+                    onChange={(e) => setBadgeTextColor(e.target.value)}
+                    className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent"
+                  />
+                  <input
+                    type="text"
+                    value={badgeTextColor}
+                    onChange={(e) => setBadgeTextColor(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white font-mono text-[11px]"
+                  />
+                </div>
+              </div>
+
+              <div>
                 <label className="block text-[11px] font-bold text-white/70 mb-1">Description Color</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
-                    value={descriptionColor}
+                    value={toHexColor(descriptionColor, "#D1D5DB")}
                     onChange={(e) => setDescriptionColor(e.target.value)}
                     className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent"
                   />
@@ -603,7 +689,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
-                    value={buttonTextColor}
+                    value={toHexColor(buttonTextColor, "#000000")}
                     onChange={(e) => setButtonTextColor(e.target.value)}
                     className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent"
                   />
@@ -621,7 +707,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
-                    value={buttonBgColor}
+                    value={toHexColor(buttonBgColor, "#FFFFFF")}
                     onChange={(e) => setButtonBgColor(e.target.value)}
                     className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent"
                   />
@@ -629,6 +715,24 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                     type="text"
                     value={buttonBgColor}
                     onChange={(e) => setButtonBgColor(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white font-mono text-[11px]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-white/70 mb-1">Banner Canvas Color</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={toHexColor(bannerBgColor, "#F0EEEB")}
+                    onChange={(e) => setBannerBgColor(e.target.value)}
+                    className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent"
+                  />
+                  <input
+                    type="text"
+                    value={bannerBgColor}
+                    onChange={(e) => setBannerBgColor(e.target.value)}
                     className="w-full px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white font-mono text-[11px]"
                   />
                 </div>
@@ -639,7 +743,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
-                    value={overlayColor}
+                    value={toHexColor(overlayColor, "#000000")}
                     onChange={(e) => setOverlayColor(e.target.value)}
                     className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent"
                   />
@@ -652,7 +756,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                 </div>
               </div>
 
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-[11px] font-bold text-white/70 mb-1">
                   Overlay Opacity ({overlayOpacity}%)
                 </label>
@@ -749,9 +853,10 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                   onChange={(e) => setContentMaxWidth(e.target.value as any)}
                   className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs font-semibold focus:ring-1 focus:ring-emerald-500 outline-none"
                 >
-                  <option value="620px">620px (Apple Style)</option>
                   <option value="500px">500px (Compact)</option>
+                  <option value="620px">620px (Apple Style)</option>
                   <option value="720px">720px (Wide)</option>
+                  <option value="760px">760px (Default Wide)</option>
                   <option value="full">Full Width</option>
                 </select>
               </div>
@@ -949,7 +1054,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={headingLine1Color}
+                      value={toHexColor(headingLine1Color, "#FFFFFF")}
                       onChange={(e) => setHeadingLine1Color(e.target.value)}
                       className="w-8 h-8 rounded-lg bg-transparent border border-white/20 cursor-pointer shrink-0"
                     />
@@ -1003,7 +1108,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={headingLine2Color}
+                      value={toHexColor(headingLine2Color, "#FFFFFF")}
                       onChange={(e) => setHeadingLine2Color(e.target.value)}
                       className="w-8 h-8 rounded-lg bg-transparent border border-white/20 cursor-pointer shrink-0"
                     />
@@ -1144,28 +1249,40 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
               <LinkIcon className="w-3.5 h-3.5 text-emerald-400" /> CTA Button Configuration
             </h4>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-white/60 mb-1">Primary Button Label</label>
-                <input
-                  type="text"
-                  value={primaryButtonText}
-                  onChange={(e) => setPrimaryButtonText(e.target.value)}
-                  placeholder="Shop Now"
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-xs"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-white/60 mb-1">Primary Destination URL</label>
-                <input
-                  type="text"
-                  value={primaryButtonUrl}
-                  onChange={(e) => setPrimaryButtonUrl(e.target.value)}
-                  placeholder="/products"
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-xs font-mono"
-                />
-              </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-white/80">Show Primary CTA Button</span>
+              <input
+                type="checkbox"
+                checked={showPrimaryButton}
+                onChange={(e) => setShowPrimaryButton(e.target.checked)}
+                className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+              />
             </div>
+
+            {showPrimaryButton && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-white/60 mb-1">Primary Button Label</label>
+                  <input
+                    type="text"
+                    value={primaryButtonText}
+                    onChange={(e) => setPrimaryButtonText(e.target.value)}
+                    placeholder="Shop Now"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-white/60 mb-1">Primary Destination URL</label>
+                  <input
+                    type="text"
+                    value={primaryButtonUrl}
+                    onChange={(e) => setPrimaryButtonUrl(e.target.value)}
+                    placeholder="/products"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-xs font-mono"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="pt-2 border-t border-white/10">
               <div className="flex items-center justify-between mb-3">
@@ -1179,7 +1296,7 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
               </div>
 
               {showSecondaryButton && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
                   <div>
                     <label className="block text-xs font-medium text-white/60 mb-1">Secondary Button Label</label>
                     <input
@@ -1199,6 +1316,23 @@ export default function HeroModal({ isOpen, onClose, onSave, slide }: HeroModalP
                       placeholder="/products/iphone-16-pro-max"
                       className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-xs font-mono"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-white/60 mb-1">Secondary Text Color</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={toHexColor(secondaryButtonTextColor, "#FFFFFF")}
+                        onChange={(e) => setSecondaryButtonTextColor(e.target.value)}
+                        className="w-8 h-8 rounded border-0 cursor-pointer bg-transparent shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={secondaryButtonTextColor}
+                        onChange={(e) => setSecondaryButtonTextColor(e.target.value)}
+                        className="w-full px-2 py-2 bg-white/5 border border-white/10 rounded-xl text-white font-mono text-xs"
+                      />
+                    </div>
                   </div>
                 </div>
               )}

@@ -6,23 +6,24 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import type { Category, Product } from "@/lib/types";
 import CategoryIcon from "@/components/ui/CategoryIcon";
-import { categories as fallbackCategories } from "@/lib/data";
-import { getCategories } from "@/lib/firestore-client";
+import { getAdminCategories } from "@/lib/firestore-client";
 import { deduplicateCategories } from "@/lib/category-utils";
 
 interface Props { categories?: Category[]; products?: Product[] }
 function getGeneratedCategoryArt(category: Category): string | undefined {
   const key = `${category.name} ${category.slug}`.toLowerCase();
-  if (/hot\s*wheel|hotwheel/.test(key)) return "/images/category-icons/hot-wheel.webp";
-  if (/gift.*flower|flower.*gift|bouquet|flower/.test(key)) return "/images/category-icons/gift-flowers.webp";
-  if (/gift/.test(key)) return "/images/category-icons/gift-items.webp";
+  if (/teddy|bear/.test(key)) return "/images/category-icons/white/teddy-bear.webp";
+  if (/watch/.test(key)) return "/images/category-icons/white/watch.webp";
+  if (/hot\s*wheel|hotwheel/.test(key)) return "/images/category-icons/white/hot-wheel.webp";
+  if (/gift.*flower|flower.*gift|bouquet|flower/.test(key)) return "/images/category-icons/white/gift-flowers.webp";
+  if (/gift/.test(key)) return "/images/category-icons/white/gift-items.webp";
   if (/laptop|macbook|computer/.test(key)) return "/images/category-icons/laptops.webp";
-  if (/beauty|skincare|skin-care|cosmetic/.test(key)) return "/images/category-icons/beauty.webp";
+  if (/beauty|skincare|skin-care|cosmetic/.test(key)) return "/images/category-icons/white/beauty.webp";
   if (/sport|fitness|gym/.test(key)) return "/images/category-icons/sports-fitness.webp";
-  if (/toy|game/.test(key)) return "/images/category-icons/toys-games.webp";
-  if (/home|living|furniture/.test(key)) return "/images/category-icons/home-living.webp";
-  if (/fashion|clothing|apparel/.test(key)) return "/images/category-icons/fashion.webp";
-  if (/electronic|smartphone|mobile|phone|tablet|accessor/.test(key)) return "/images/category-icons/electronics.webp";
+  if (/toy|game/.test(key)) return "/images/category-icons/white/toys-games.webp";
+  if (/home|living|furniture/.test(key)) return "/images/category-icons/white/home-living.webp";
+  if (/fashion|clothing|apparel/.test(key)) return "/images/category-icons/white/fashion.webp";
+  if (/electronic|smartphone|mobile|phone|tablet|accessor|earbud|headphone|speaker|audio|power\s*bank|charger|adapter|cable|camera|gimbal|projector|router|stand/.test(key)) return "/images/category-icons/white/electronics.webp";
   return undefined;
 }
 
@@ -31,17 +32,19 @@ function CategoryCollection({ categories: initialCategories, products = [] }: Pr
   const pathname = usePathname();
   const selected = useSearchParams()?.get("category");
   useEffect(() => {
-    if (initialCategories?.length) { setCategories(initialCategories); return; }
     let active = true;
-    getCategories().then(items => { if (active) setCategories(items.length ? items : fallbackCategories); }).catch(() => { if (active) setCategories(fallbackCategories); });
+    getAdminCategories(true).then(items => { if (active) setCategories(items); }).catch(() => { if (active) setCategories([]); });
     return () => { active = false; };
-  }, [initialCategories]);
-  const items = deduplicateCategories(categories.length ? categories : fallbackCategories);
+  }, []);
+  const items = deduplicateCategories(categories).filter((category) =>
+    category.status !== "inactive" && category.status !== "deleted" &&
+    category.isDeleted !== true && !/laptop|macbook|sports?|fitness/.test(`${category.name} ${category.slug}`.toLowerCase())
+  );
   if (!items.length) return null;
   return <section id="categories-strip" className="category-collection" aria-labelledby="category-collection-title">
     <div className="category-collection__inner">
-      <div className="category-collection__heading"><div><p>EXPLORE THE COLLECTION</p><h2 id="category-collection-title">Shop by category.</h2></div><button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-categories-menu"))}>View all <ChevronRight size={16}/></button></div>
-      <div className="category-collection__grid">{items.slice(0, 10).map(category => {
+      <div className="category-collection__heading"><div><p>BROWSE THE COLLECTION</p><h2 id="category-collection-title">Shop by category.</h2></div><button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-categories-menu"))}>View all <ChevronRight size={16}/></button></div>
+      <div className="category-collection__grid">{items.map(category => {
         const categoryName = category.name.trim().toLowerCase();
         const categoryProduct = products.find(product =>
           product.category_id === category.id || product.categoryId === category.id ||
@@ -61,3 +64,5 @@ function CategoryCollection({ categories: initialCategories, products = [] }: Pr
   </section>;
 }
 export default function CircularCategories(props: Props) { return <Suspense fallback={null}><CategoryCollection {...props}/></Suspense>; }
+
+

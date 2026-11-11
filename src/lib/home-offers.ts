@@ -1,7 +1,7 @@
 export interface HomeOfferSettings {
   enabled: boolean; dealTitle: string; dealImage: string; dealLink: string;
   ctaTitle: string; ctaText: string; ctaImage: string; ctaLink: string; endsAt: string;
-  dealBadge?: string; dealDescription?: string; dealBackgroundColor?: string;
+  dealBadge?: string; dealDescription?: string; dealBackgroundColor?: string; updatedAt?: string; [key: string]: any;
 }
 export const HOME_OFFER_DEFAULTS: HomeOfferSettings = {
   enabled: true, dealTitle: "Today's Deal", dealImage: "", dealLink: "/products",

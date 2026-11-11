@@ -146,39 +146,6 @@ function DashboardContent() {
   const [loadingMoreOrders, setLoadingMoreOrders] = useState(false);
   const loadedTabsRef = useRef<Set<string>>(new Set());
 
-  // COD Fee state
-  const [codFee, setCodFee] = useState<number>(250);
-  const [savingCod, setSavingCod] = useState(false);
-  const [codSavedMsg, setCodSavedMsg] = useState(false);
-
-  useEffect(() => {
-    if (activeTab !== "payments") return;
-    async function loadCodFee() {
-      try {
-        const snap = await getDoc(doc(db, "settings", "store"));
-        if (snap.exists() && snap.data().cod_fee !== undefined) {
-          setCodFee(Number(snap.data().cod_fee));
-        }
-      } catch {
-        // Silent offline fallback to default COD fee
-      }
-    }
-    loadCodFee();
-  }, [activeTab]);
-
-  const handleSaveCodFee = async () => {
-    try {
-      setSavingCod(true);
-      await setDoc(doc(db, "settings", "store"), { cod_fee: Number(codFee) }, { merge: true });
-      setCodSavedMsg(true);
-      setTimeout(() => setCodSavedMsg(false), 3000);
-    } catch (e) {
-      alert("Failed to update COD fee");
-    } finally {
-      setSavingCod(false);
-    }
-  };
-
   // Filters, Period & Sales Analytics States
   const [period, setPeriod] = useState<"month" | "week" | "today" | "year">("month");
   const [salesViewMode, setSalesViewMode] = useState<"monthly" | "weekly" | "daily">("monthly");
@@ -1047,6 +1014,28 @@ function DashboardContent() {
     }
   };
 
+  const broadcastHeroSync = (action: "save" | "toggle" | "delete", slide?: HeroSlide, deletedId?: string) => {
+    try {
+      const eventPayload = {
+        type: "HERO_UPDATED",
+        action,
+        slide,
+        deletedId,
+        updatedAt: Date.now(),
+      };
+      if (typeof window !== "undefined") {
+        if ("BroadcastChannel" in window) {
+          const channel = new BroadcastChannel("oneplace_hero_sync");
+          channel.postMessage(eventPayload);
+          channel.close();
+        }
+        localStorage.setItem("oneplace_hero_slides_sync", JSON.stringify(eventPayload));
+      }
+    } catch {
+      // ignore storage/channel errors
+    }
+  };
+
   const handleSaveHeroSlide = async (slideData: Partial<HeroSlide>) => {
     try {
       const slideId = slideData.id || editingHeroSlide?.id || `hero-${Date.now()}`;
@@ -1064,6 +1053,12 @@ function DashboardContent() {
       }
 
       const saved = (data.slide || payload) as HeroSlide;
+
+      // Best-effort client Firestore sync so real-time listeners fire even if server admin key is absent
+      setDoc(doc(db, "hero_slides", slideId), saved, { merge: true }).catch(() => {});
+      clearDataCache("hero_slides");
+      broadcastHeroSync("save", saved);
+
       setHeroSlides((prev) => {
         const exists = prev.some((s) => s.id === slideId);
         if (exists) {
@@ -1083,12 +1078,17 @@ function DashboardContent() {
   const handleToggleHeroSlideStatus = async (id: string, active: boolean) => {
     try {
       if (id) {
-        setHeroSlides((prev) => prev.map((s) => (s.id === id ? { ...s, active } : s)));
-        await fetch("/api/admin/hero", {
+        const updatedAt = new Date().toISOString();
+        setHeroSlides((prev) => prev.map((s) => (s.id === id ? { ...s, active, updated_at: updatedAt } : s)));
+        const res = await fetch("/api/admin/hero", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, active }),
+          body: JSON.stringify({ id, active, updated_at: updatedAt }),
         });
+        const data = await res.json().catch(() => ({}));
+        setDoc(doc(db, "hero_slides", id), { active, updated_at: updatedAt }, { merge: true }).catch(() => {});
+        clearDataCache("hero_slides");
+        broadcastHeroSync("toggle", data?.slide || ({ id, active, updated_at: updatedAt } as HeroSlide));
       }
     } catch (e) {
       console.error("Error toggling hero slide status:", e);
@@ -1107,6 +1107,9 @@ function DashboardContent() {
         if (!res.ok || !data.success) {
           console.warn("Delete hero slide warning:", data);
         }
+        deleteDoc(doc(db, "hero_slides", id)).catch(() => {});
+        clearDataCache("hero_slides");
+        broadcastHeroSync("delete", undefined, id);
       }
     } catch (e) {
       console.error("Error deleting hero slide:", e);
@@ -1290,7 +1293,7 @@ function DashboardContent() {
       {/* ════════════════════════════════════════════════════════════════════
           TAB 1: OVERVIEW DASHBOARD
       ════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "overview" && <StoreOverview orders={orders} products={products} customerCount={customers.length} loading={loading} />}
+      {activeTab === "overview" && <StoreOverview orders={orders} products={products} customerCount={customers.length} loading={loading} onRefresh={refreshData} />}
 
       {/* ════════════════════════════════════════════════════════════════════
           TAB 2: PRODUCTS TAB
@@ -1644,11 +1647,11 @@ function DashboardContent() {
               Payments & Gateways
             </h1>
             <p className="text-xs text-slate-400 font-medium mt-0.5">
-              Manage Cash on Delivery (COD) fee, PayHere online payments and WhatsApp checkout hotline
+              Manage PayHere online payments and WhatsApp checkout hotline. Cash on Delivery has no handling fee.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* PayHere Online Gateway Status */}
             <div className={`rounded-2xl border p-5 shadow-xs space-y-2 ${isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
               }`}>
@@ -1657,36 +1660,6 @@ function DashboardContent() {
                 <Check className="w-4 h-4" /> Connected & Verified
               </h3>
               <p className="text-xs text-slate-400">Merchant ID configured • LKR Sandbox & Production active</p>
-            </div>
-
-            {/* Editable Cash on Delivery (COD) Fee */}
-            <div className={`rounded-2xl border p-5 shadow-xs space-y-3 ${isLight ? "bg-white border-[#E2E8F0] text-[#0F172A]" : "bg-[#0E141D] border-white/[0.08] text-white"
-              }`}>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Cash on Delivery (COD) Fee</span>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-400">Rs.</span>
-                <input
-                  type="number"
-                  value={codFee}
-                  onChange={(e) => setCodFee(Number(e.target.value))}
-                  className={`w-full px-3 py-1.5 rounded-lg text-sm font-bold outline-none border transition-all ${isLight ? "bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500" : "bg-white/5 border-white/10 text-white focus:border-blue-500"
-                    }`}
-                  placeholder="250"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleSaveCodFee}
-                disabled={savingCod}
-                className="w-full py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                {savingCod ? "Saving..." : "Save COD Fee"}
-              </button>
-              {codSavedMsg && (
-                <p className="text-xs font-semibold text-emerald-400 text-center animate-in fade-in">
-                  ✓ COD Fee updated to Rs. {codFee}!
-                </p>
-              )}
             </div>
 
             {/* WhatsApp Direct Order */}
@@ -1754,8 +1727,12 @@ function DashboardContent() {
 
       {/* Hero Modal */}
       <HeroModal
+        key={editingHeroSlide?.id ? `edit-hero-${editingHeroSlide.id}` : "new-hero"}
         isOpen={isHeroModalOpen}
-        onClose={() => setIsHeroModalOpen(false)}
+        onClose={() => {
+          setIsHeroModalOpen(false);
+          setEditingHeroSlide(null);
+        }}
         onSave={handleSaveHeroSlide}
         slide={editingHeroSlide}
       />
